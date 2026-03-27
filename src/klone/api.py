@@ -22,6 +22,7 @@ from .schemas import (
     GovernanceGuardRecord,
     IngestExecutionResponse,
     IngestStatusResponse,
+    InternalRunRecord,
     MemoryEntityRecord,
     MemoryEpisodeDetailRecord,
     MemoryEventEpisodeMembershipRecord,
@@ -258,6 +259,11 @@ def _memory_episode_detail_from_payload(payload: dict[str, Any]) -> MemoryEpisod
     return MemoryEpisodeDetailRecord.model_validate(hydrated)
 
 
+def _internal_run_from_row(row: dict[str, Any]) -> InternalRunRecord:
+    payload = _decode_metadata(dict(row))
+    return InternalRunRecord.model_validate(payload)
+
+
 def _module_registry_payload() -> list[ModuleCapabilityRecord]:
     return [
         ModuleCapabilityRecord(
@@ -278,6 +284,7 @@ def _module_registry_payload() -> list[ModuleCapabilityRecord]:
 def health(request: Request, repository: KloneRepository = Depends(get_repository)) -> dict:
     runtime_settings = get_runtime_settings(request)
     bootstrap = get_bootstrap_report(request, repository)
+    latest_internal_run = repository.latest_internal_run()
     return {
         "status": "ok",
         "app": runtime_settings.app_name,
@@ -290,6 +297,13 @@ def health(request: Request, repository: KloneRepository = Depends(get_repositor
         "schema_user_version": bootstrap["schema_user_version"],
         "bootstrap_mode": bootstrap["bootstrap_mode"],
         "correction_schema_ready": bootstrap["correction_schema_ready"],
+        "latest_internal_run_id": latest_internal_run["id"] if latest_internal_run is not None else None,
+        "latest_internal_run_status": (
+            latest_internal_run["status"] if latest_internal_run is not None else None
+        ),
+        "latest_internal_trace_id": (
+            latest_internal_run["trace_id"] if latest_internal_run is not None else None
+        ),
     }
 
 
@@ -298,6 +312,7 @@ def status(request: Request, repository: KloneRepository = Depends(get_repositor
     runtime_settings = get_runtime_settings(request)
     bootstrap = get_bootstrap_report(request, repository)
     module_registry = _module_registry_payload()
+    recent_internal_runs = [_internal_run_from_row(row) for row in repository.list_internal_runs(limit=8)]
     rooms = _resolve_rooms(requested_room_id=None, permission="discover")
     aggregate = {
         "dataset_count": 0,
@@ -341,6 +356,8 @@ def status(request: Request, repository: KloneRepository = Depends(get_repositor
         runtime_config=RuntimeConfigRecord.model_validate(runtime_settings.runtime_snapshot()),
         bootstrap=BootstrapStatusRecord.model_validate(bootstrap),
         module_registry=module_registry,
+        latest_internal_run=recent_internal_runs[0] if recent_internal_runs else None,
+        recent_internal_runs=recent_internal_runs,
     )
 
 

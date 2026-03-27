@@ -7,8 +7,8 @@ from fastapi.staticfiles import StaticFiles
 
 from .api import router as api_router
 from .config import Settings, load_settings, settings
-from .contracts import APP_VERSION
-from .repository import KloneRepository
+from .contracts import APP_VERSION, BOOTSTRAP_TASK_ID
+from .repository import KloneRepository, utc_now_iso
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -20,12 +20,39 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        run_started_at = utc_now_iso()
         repository = KloneRepository(resolved_settings.sqlite_path)
         bootstrap_report = repository.initialize()
+        bootstrap_ids = repository.build_internal_run_identifiers(
+            run_kind="bootstrap",
+            started_at=run_started_at,
+            task_id=BOOTSTRAP_TASK_ID,
+        )
+        latest_internal_run = repository.record_internal_run(
+            run_id=bootstrap_ids["run_id"],
+            task_id=bootstrap_ids["task_id"],
+            run_kind="bootstrap",
+            status="completed",
+            trigger="startup",
+            trace_id=bootstrap_ids["trace_id"],
+            started_at=run_started_at,
+            completed_at=bootstrap_report["initialized_at"],
+            metadata={
+                "app_name": resolved_settings.app_name,
+                "environment": resolved_settings.environment,
+                "bootstrap_version": bootstrap_report["bootstrap_version"],
+                "schema_version": bootstrap_report["schema_version"],
+                "schema_user_version": bootstrap_report["schema_user_version"],
+                "bootstrap_mode": bootstrap_report["bootstrap_mode"],
+                "missing_tables": bootstrap_report["missing_tables"],
+                "correction_schema_ready": bootstrap_report["correction_schema_ready"],
+            },
+        )
         app.state.settings = resolved_settings
         app.state.repository = repository
         app.state.runtime_config = resolved_settings.runtime_snapshot()
         app.state.bootstrap_report = bootstrap_report
+        app.state.latest_internal_run = latest_internal_run
         yield
 
     app = FastAPI(

@@ -5,13 +5,15 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from fastapi import HTTPException
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from klone.api import memory_episode_detail, memory_episodes, memory_event_detail, memory_events  # noqa: E402
+from klone.api import memory_episode_detail, memory_episode_events, memory_episodes, memory_event_detail, memory_events  # noqa: E402
 from klone.ingest import ingest_dataset  # noqa: E402
 from klone.memory import MemoryService, system_ingest_episode_id  # noqa: E402
 from klone.repository import KloneRepository  # noqa: E402
@@ -342,6 +344,238 @@ class MemoryPhase2C1Tests(unittest.TestCase):
         )
         self.assertEqual(restricted_detail.status, "superseded")
         self.assertEqual(len(restricted_detail.supersession_relationships), 1)
+
+    def test_episode_query_filters_order_and_pagination_are_room_scoped(self) -> None:
+        restricted_one = self._ingest_dataset(
+            label="Restricted Episodes One",
+            classification_level="personal",
+            folder_name="restricted_episodes_one",
+            files={"one.txt": "alpha"},
+        )
+        restricted_two = self._ingest_dataset(
+            label="Restricted Episodes Two",
+            classification_level="personal",
+            folder_name="restricted_episodes_two",
+            files={"two.txt": "beta"},
+        )
+        self._ingest_dataset(
+            label="Public Episodes",
+            classification_level="public",
+            folder_name="public_episodes",
+            files={"three.txt": "gamma"},
+        )
+
+        room_id = "restricted-room"
+        first_episode_id = system_ingest_episode_id(room_id=room_id, ingest_run_id=restricted_one["run"]["id"])
+        second_episode_id = system_ingest_episode_id(room_id=room_id, ingest_run_id=restricted_two["run"]["id"])
+
+        self.memory_service.reject_episode(
+            room_id=room_id,
+            episode_id=first_episode_id,
+            reason="episode_filter_reject",
+        )
+
+        active_only = memory_episodes(
+            room_id=room_id,
+            limit=50,
+            offset=0,
+            status=None,
+            episode_type=None,
+            ingest_run_id=None,
+            include_corrected=False,
+            repository=self.repository,
+        )
+        rejected_only = memory_episodes(
+            room_id=room_id,
+            limit=50,
+            offset=0,
+            status="rejected",
+            episode_type=None,
+            ingest_run_id=None,
+            include_corrected=True,
+            repository=self.repository,
+        )
+        first_page = memory_episodes(
+            room_id=room_id,
+            limit=1,
+            offset=0,
+            status=None,
+            episode_type=None,
+            ingest_run_id=None,
+            include_corrected=True,
+            repository=self.repository,
+        )
+        second_page = memory_episodes(
+            room_id=room_id,
+            limit=1,
+            offset=1,
+            status=None,
+            episode_type=None,
+            ingest_run_id=None,
+            include_corrected=True,
+            repository=self.repository,
+        )
+        ordered_once = [
+            row.id
+            for row in memory_episodes(
+                room_id=room_id,
+                limit=50,
+                offset=0,
+                status=None,
+                episode_type=None,
+                ingest_run_id=None,
+                include_corrected=True,
+                repository=self.repository,
+            )
+        ]
+        ordered_twice = [
+            row.id
+            for row in memory_episodes(
+                room_id=room_id,
+                limit=50,
+                offset=0,
+                status=None,
+                episode_type=None,
+                ingest_run_id=None,
+                include_corrected=True,
+                repository=self.repository,
+            )
+        ]
+        run_scoped = memory_episodes(
+            room_id=room_id,
+            limit=50,
+            offset=0,
+            status=None,
+            episode_type=None,
+            ingest_run_id=restricted_one["run"]["id"],
+            include_corrected=True,
+            repository=self.repository,
+        )
+
+        self.assertEqual([row.id for row in active_only], [second_episode_id])
+        self.assertEqual([row.id for row in rejected_only], [first_episode_id])
+        self.assertEqual(ordered_once, ordered_twice)
+        self.assertEqual([row.id for row in first_page + second_page], ordered_once[:2])
+        self.assertEqual([row.id for row in run_scoped], [first_episode_id])
+
+        public_rows = memory_episodes(
+            room_id="public-room",
+            limit=50,
+            offset=0,
+            status=None,
+            episode_type=None,
+            ingest_run_id=None,
+            include_corrected=True,
+            repository=self.repository,
+        )
+        self.assertTrue(all(row.room_id == "public-room" for row in public_rows))
+        self.assertNotIn(first_episode_id, [row.id for row in public_rows])
+        self.assertNotIn(second_episode_id, [row.id for row in public_rows])
+
+    def test_episode_event_traversal_is_read_only_correction_aware_and_room_scoped(self) -> None:
+        restricted_result = self._ingest_dataset(
+            label="Restricted Traversal",
+            classification_level="personal",
+            folder_name="restricted_traversal",
+            files={"note.txt": "alpha"},
+        )
+        public_result = self._ingest_dataset(
+            label="Public Traversal",
+            classification_level="public",
+            folder_name="public_traversal",
+            files={"note.txt": "beta"},
+        )
+
+        restricted_room_id = "restricted-room"
+        public_room_id = "public-room"
+        restricted_run_id = restricted_result["run"]["id"]
+        restricted_episode_id = system_ingest_episode_id(
+            room_id=restricted_room_id,
+            ingest_run_id=restricted_run_id,
+        )
+        public_episode_id = system_ingest_episode_id(
+            room_id=public_room_id,
+            ingest_run_id=public_result["run"]["id"],
+        )
+
+        restricted_events = self.repository.list_memory_events(
+            room_id=restricted_room_id,
+            limit=50,
+            offset=0,
+            ingest_run_id=restricted_run_id,
+        )
+        ingest_started = next(row for row in restricted_events if row["event_type"] == "ingest_started")
+        ingest_completed = next(row for row in restricted_events if row["event_type"] == "ingest_completed")
+
+        self.memory_service.reject_episode(
+            room_id=restricted_room_id,
+            episode_id=restricted_episode_id,
+            reason="episode_traversal_reject",
+        )
+        self.memory_service.supersede_event(
+            room_id=restricted_room_id,
+            event_id=ingest_started["id"],
+            superseded_by_event_id=ingest_completed["id"],
+            reason="episode_traversal_supersede",
+        )
+
+        detail = memory_episode_detail(
+            episode_id=restricted_episode_id,
+            room_id=restricted_room_id,
+            repository=self.repository,
+        )
+        members = memory_episode_events(
+            episode_id=restricted_episode_id,
+            room_id=restricted_room_id,
+            limit=50,
+            offset=0,
+            repository=self.repository,
+        )
+        first_page = memory_episode_events(
+            episode_id=restricted_episode_id,
+            room_id=restricted_room_id,
+            limit=1,
+            offset=0,
+            repository=self.repository,
+        )
+        second_page = memory_episode_events(
+            episode_id=restricted_episode_id,
+            room_id=restricted_room_id,
+            limit=1,
+            offset=1,
+            repository=self.repository,
+        )
+
+        self.assertEqual(detail.status, "rejected")
+        self.assertEqual(detail.correction_reason, "episode_traversal_reject")
+        self.assertEqual([item.sequence_no for item in members], [1, 2])
+        self.assertEqual(
+            [(item.sequence_no, item.inclusion_basis, item.event.id) for item in first_page + second_page],
+            [(item.sequence_no, item.inclusion_basis, item.event.id) for item in members[:2]],
+        )
+        self.assertEqual(members[0].event.id, ingest_started["id"])
+        self.assertEqual(members[0].event.status, "superseded")
+        self.assertEqual(members[0].event.superseded_by_id, ingest_completed["id"])
+        self.assertEqual(members[0].event.correction_reason, "episode_traversal_supersede")
+        self.assertEqual(members[1].event.id, ingest_completed["id"])
+        self.assertEqual(members[1].event.status, "active")
+
+        with self.assertRaises(HTTPException) as public_read_error:
+            memory_episode_events(
+                episode_id=restricted_episode_id,
+                room_id=public_room_id,
+                limit=50,
+                offset=0,
+                repository=self.repository,
+            )
+        self.assertEqual(public_read_error.exception.status_code, 404)
+
+        public_detail = memory_episode_detail(
+            episode_id=public_episode_id,
+            room_id=public_room_id,
+            repository=self.repository,
+        )
+        self.assertEqual(public_detail.status, "active")
 
     def _ingest_dataset(
         self,

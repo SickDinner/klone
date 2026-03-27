@@ -33,12 +33,10 @@ Phase 2C.1 in progress
 - episode/event traversal refinement
 
 ## Next approved substep
-- verify whether provenance-aware retrieval on query/list surfaces is already fully implemented
-- if already implemented, identify the next exact unfinished 2C.1 read-only retrieval substep from repo evidence only
-- do not duplicate episode query / traversal or detail provenance work
 - provenance-aware retrieval on query/list surfaces
 - exact source-lineage exposure or provenance summary for read-only query results only
 - no duplicate work on episode query / traversal or detail provenance paths
+
 
 
 

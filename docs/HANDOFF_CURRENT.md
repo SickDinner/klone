@@ -8,16 +8,15 @@ Phase 2C.1: Query / Retrieval Primitives
 - memory spine, provenance, replay, correction, contract lock, and stress verification are in place
 
 ## Immediate goal
-Continue the next smallest safe 2C.1 substep:
-episode query primitive plus episode/event traversal refinement.
+Do not reimplement episode query primitive plus episode/event traversal refinement.
+First reconcile docs drift and identify the next exact unfinished 2C.1 substep from verified repo evidence only.
 
 ## Approved scope
-- room-scoped episode retrieval
-- status-aware filtering for episodes
-- deterministic ordering/pagination
-- read-only traversal between episodes and linked events
-- correction-aware visibility
-- provenance-aware detail traversal only if already supported by current shapes
+- docs/handoff alignment for verified 2C.1 state
+- duplicate-work prevention
+- identification of the next smallest in-scope 2C.1 step only
+- no new runtime behavior
+- no API widening
 
 ## Hard constraints
 - do not modify ingest behavior
@@ -33,3 +32,4 @@ episode query primitive plus episode/event traversal refinement.
 - compile pass
 - focused tests
 - local verification if read behavior changes
+

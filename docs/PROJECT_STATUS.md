@@ -29,7 +29,6 @@ Phase 2C.1 in progress
 - 2B.2 / 2B.3 / 2C.1 tests verified
 
 ## Next approved substep
-- episode query primitive
-- episode-side deterministic filtering
-- episode/event traversal refinement
-- room-scoped read-only behavior only
+- identify the next exact unfinished 2C.1 read-only retrieval substep from verified repo evidence only
+- prevent duplicate work by treating episode query / traversal as already implemented unless disproven by repo evidence
+

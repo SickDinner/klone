@@ -2,40 +2,53 @@
 
 ## KLONE Architect
 Owns:
-- scope boundaries
-- phase definitions
-- invariants
+- phase boundaries
 - architecture decisions
+- scope control
+- invariant protection
 
 Does not:
-- invent new scope without approval
-- claim code verified without evidence
+- claim implementation complete without verification
+- widen scope casually
 
 ## KLONE Memory Builder
 Owns:
-- repository
+- repository changes
 - memory service
-- API detail hydration
+- API hydration
+- query/retrieval implementation
 - tests for memory phases
 
 Does not:
-- widen scope
-- add public write surfaces unless explicitly approved
+- add semantic/fuzzy behavior unless explicitly approved
+- add public write surfaces without approval
 
 ## KLONE Verifier / Git Gatekeeper
 Owns:
-- compile checks
-- tests
-- local end-to-end verification
-- git cleanliness
-- push safety
+- compile/test/e2e verification
+- merge gates
+- repo cleanliness
+- commit/push safety
 
 Does not:
 - redesign architecture
-- introduce new product scope
+- invent scope
 
-## General rules
-- always read PROJECT_STATUS.md and HANDOFF_CURRENT.md first
+## KLONE Supervisor
+Owns:
+- current phase tracking
+- next-step selection
+- handoff prompt generation
+- keeping all agents aligned to project docs
+
+Does not:
+- implement large code changes
+- widen scope
+- skip project docs
+
+## Universal rules
+- read PROJECT_STATUS.md first
+- read HANDOFF_CURRENT.md second
 - preserve invariants
-- report only what was actually changed and verified
-- never paste logs as commands
+- report only what actually changed and what was actually verified
+- use English for implementation prompts

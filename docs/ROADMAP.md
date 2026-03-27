@@ -6,7 +6,7 @@ Memory spine:
 - memory_entities
 - memory_episodes
 - deterministic ingest-run episodes
-- read-only room-scoped memory API
+- room-scoped read-only API
 
 ## Phase 2B.2
 Hardening:
@@ -25,22 +25,23 @@ Correction layer:
 
 ## Phase 2B.4
 Contract closeout:
-- correction read contract lock
-- migration caveat
+- correction read contract locked
+- migration/bootstrap caveat documented
 - stability tests
 - no new write surface
 
 ## Phase 2C.1
-Query / retrieval primitives:
-- correction-aware querying
-- active / rejected / superseded visibility
-- lineage traversal
-- episode / event navigation
-- explainability-first query behavior
-- still no semantic/fuzzy behavior until core operations are stable
+Query / Retrieval Primitives:
+- status-aware filtering
+- event/episode traversal
+- correction-aware visibility
+- provenance-aware retrieval
+- deterministic ordering and pagination
 
-## Phase 2C
-Broader query / retrieval layer:
-- build on 2C.1 primitives only after contracts remain stable
-- explainability improvements
-- still no semantic/fuzzy behavior until core operations are stable
+## Not approved yet
+- semantic search
+- embeddings
+- OCR/transcription
+- fuzzy matching
+- autonomous reasoning layers
+- agentic memory mutation

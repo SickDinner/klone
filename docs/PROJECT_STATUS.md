@@ -1,28 +1,48 @@
 # KLONE Project Status
 
 ## Current phase
-Phase 2B.4 closeout.
-Next step after closeout: Phase 2C.1 Query / Retrieval primitives.
+Phase 2B.4 complete.
 
-## Completed
-- Phase 2B.1: deterministic memory spine
-- Phase 2B.2: normalized provenance + internal replay + hydrated detail reads
-- Phase 2B.3: correction layer + dedicated event supersession storage
-- Phase 2B.4: correction contract closeout + migration caveat + read stability
+## Phase state
+- Phase 2B.1 complete
+- Phase 2B.2 complete
+- Phase 2B.3 complete
+- Phase 2B.4 complete
+- Next approved phase: Phase 2C.1 Query / Retrieval Primitives
 
-## Invariants
+## Completed capabilities
+- deterministic memory spine
+- room-scoped memory events, entities, episodes
+- normalized provenance
+- internal replay / reseed
+- hydrated read-only detail routes
+- correction layer for events and episodes
+- dedicated memory_event_supersessions
+- correction audit coverage
+- replay preserves correction state
+- correction read contract locked
+- migration/bootstrap caveat documented
+
+## Locked invariants
 - evidence_text is immutable
 - no inferred or synthetic evidence
 - room-scoped only
-- replay must be idempotent
-- replay must preserve correction state
-- no public memory write endpoints
-- provenance must remain source-linked
+- no cross-room leakage
+- replay is deterministic and idempotent
+- replay preserves correction state
+- provenance remains source-linked
+- public memory API remains read-only
+- governance before intelligence
 
-## Current repo expectations
-- main is source of truth
-- feature work must stay tightly scoped
-- every phase ends with compile + tests + local real-app verification
+## Current merge status
+Phase 2B.4: merge-safe / closeout complete
 
-## Next approved phase
-Phase 2C.1: correction-aware query and retrieval primitives
+## Next approved work
+Phase 2C.1:
+- query / retrieval primitives
+- correction-aware filtering
+- lineage traversal
+- deterministic read behavior
+- no semantic search
+- no embeddings
+- no fuzzy matching

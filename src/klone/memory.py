@@ -129,11 +129,11 @@ class MemoryService:
                     result.events_upserted += 1
                 memory_events.append(event_row)
 
-        for event_row in memory_events:
-            for entity_payload, link_payload in self._build_event_entity_payloads(
-                event_row,
-                conn=conn,
-            ):
+            for event_row in memory_events:
+                for entity_payload, link_payload in self._build_event_entity_payloads(
+                    event_row,
+                    conn=conn,
+                ):
                     entity_decision = classification_guard.evaluate(
                         classification_level=entity_payload["classification_level"],
                         room_id=entity_payload["room_id"],

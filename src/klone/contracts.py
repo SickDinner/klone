@@ -6,6 +6,8 @@ BOOTSTRAP_VERSION = "b00.1"
 SCHEMA_VERSION = "phase_2b_4_memory_correction"
 SCHEMA_USER_VERSION = 204
 MODULE_REGISTRY_VERSION = "system_blueprint_v1"
+SYSTEM_SCOPE_ID = "system"
+BOOTSTRAP_TASK_ID = "task:bootstrap:system_startup"
 
 
 ClassificationLevel = Literal["public", "personal", "intimate", "restricted_bio"]
@@ -21,6 +23,9 @@ MemoryEpisodeType = Literal["system_ingest_run"]
 MemoryOwnerType = Literal["event", "episode"]
 MemoryProvenanceType = Literal["source_lineage", "seed_basis", "membership_basis"]
 MemoryStatus = Literal["active", "rejected", "superseded"]
+InternalRunKind = Literal["bootstrap"]
+InternalRunStatus = Literal["running", "completed", "failed", "blocked"]
+InternalRunTrigger = Literal["startup"]
 
 
 CLASSIFICATION_LEVEL_VALUES = set(get_args(ClassificationLevel))
@@ -35,3 +40,6 @@ MEMORY_EPISODE_TYPE_VALUES = set(get_args(MemoryEpisodeType))
 MEMORY_OWNER_TYPE_VALUES = set(get_args(MemoryOwnerType))
 MEMORY_PROVENANCE_TYPE_VALUES = set(get_args(MemoryProvenanceType))
 MEMORY_STATUS_VALUES = set(get_args(MemoryStatus))
+INTERNAL_RUN_KIND_VALUES = set(get_args(InternalRunKind))
+INTERNAL_RUN_STATUS_VALUES = set(get_args(InternalRunStatus))
+INTERNAL_RUN_TRIGGER_VALUES = set(get_args(InternalRunTrigger))

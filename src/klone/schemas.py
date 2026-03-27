@@ -9,6 +9,9 @@ from .contracts import (
     ExtractionStatus,
     GuardDecision,
     IngestStatus,
+    InternalRunKind,
+    InternalRunStatus,
+    InternalRunTrigger,
     MemoryEntityType,
     MemoryEpisodeType,
     MemoryOwnerType,
@@ -175,6 +178,19 @@ class ModuleCapabilityRecord(BaseModel):
     capability_count: int
 
 
+class InternalRunRecord(BaseModel):
+    id: str
+    task_id: str
+    run_kind: InternalRunKind
+    status: InternalRunStatus
+    trigger: InternalRunTrigger
+    room_id: str | None = None
+    trace_id: str
+    started_at: str
+    completed_at: str | None = None
+    metadata: dict[str, Any] | None = None
+
+
 class MissionControlStatus(BaseModel):
     app_name: str
     app_version: str
@@ -196,6 +212,8 @@ class MissionControlStatus(BaseModel):
     runtime_config: RuntimeConfigRecord
     bootstrap: BootstrapStatusRecord
     module_registry: list[ModuleCapabilityRecord]
+    latest_internal_run: InternalRunRecord | None = None
+    recent_internal_runs: list[InternalRunRecord]
 
 
 class IngestStatusResponse(BaseModel):

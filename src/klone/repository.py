@@ -11,12 +11,17 @@ from typing import Any
 
 from .contracts import (
     BOOTSTRAP_VERSION,
+    BOOTSTRAP_TASK_ID,
     ClassificationLevel,
+    INTERNAL_RUN_KIND_VALUES,
+    INTERNAL_RUN_STATUS_VALUES,
+    INTERNAL_RUN_TRIGGER_VALUES,
     IngestStatus,
     MEMORY_STATUS_VALUES,
     MemoryStatus,
     SCHEMA_USER_VERSION,
     SCHEMA_VERSION,
+    SYSTEM_SCOPE_ID,
 )
 
 
@@ -25,6 +30,7 @@ EXPECTED_TABLES = (
     "audit_events",
     "datasets",
     "ingest_runs",
+    "internal_runs",
     "memory_entities",
     "memory_episode_events",
     "memory_episodes",
@@ -137,6 +143,24 @@ class KloneRepository:
 
                 CREATE INDEX IF NOT EXISTS idx_audit_events_created_at
                     ON audit_events(created_at DESC);
+
+                CREATE TABLE IF NOT EXISTS internal_runs (
+                    id TEXT PRIMARY KEY,
+                    task_id TEXT NOT NULL,
+                    run_kind TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    trigger TEXT NOT NULL,
+                    room_id TEXT,
+                    trace_id TEXT NOT NULL,
+                    started_at TEXT NOT NULL,
+                    completed_at TEXT,
+                    metadata_json TEXT
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_internal_runs_started_at
+                    ON internal_runs(started_at DESC, id DESC);
+                CREATE INDEX IF NOT EXISTS idx_internal_runs_task_id
+                    ON internal_runs(task_id, started_at DESC);
 
                 CREATE TABLE IF NOT EXISTS memory_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -414,6 +438,20 @@ class KloneRepository:
             return
         conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_sql}")
 
+    def _validate_internal_run(
+        self,
+        *,
+        run_kind: str,
+        status: str,
+        trigger: str,
+    ) -> None:
+        if run_kind not in INTERNAL_RUN_KIND_VALUES:
+            raise ValueError(f"Unsupported internal run kind: {run_kind}")
+        if status not in INTERNAL_RUN_STATUS_VALUES:
+            raise ValueError(f"Unsupported internal run status: {status}")
+        if trigger not in INTERNAL_RUN_TRIGGER_VALUES:
+            raise ValueError(f"Unsupported internal run trigger: {trigger}")
+
     def _list_tables(self, conn: sqlite3.Connection) -> list[str]:
         rows = conn.execute(
             """
@@ -476,6 +514,107 @@ class KloneRepository:
                 database_preexisting=self.db_path.exists(),
             )
             return dict(self._bootstrap_report)
+
+    def build_internal_run_identifiers(
+        self,
+        *,
+        run_kind: str,
+        started_at: str,
+        room_id: str | None = None,
+        task_id: str | None = None,
+    ) -> dict[str, str]:
+        scope = room_id or SYSTEM_SCOPE_ID
+        effective_task_id = task_id or BOOTSTRAP_TASK_ID
+        run_id = f"run:{run_kind}:{scope}:{started_at}"
+        trace_id = f"trace:{run_kind}:{scope}:{started_at}"
+        return {
+            "task_id": effective_task_id,
+            "run_id": run_id,
+            "trace_id": trace_id,
+        }
+
+    def record_internal_run(
+        self,
+        *,
+        run_id: str,
+        task_id: str,
+        run_kind: str,
+        status: str,
+        trigger: str,
+        trace_id: str,
+        started_at: str,
+        completed_at: str | None = None,
+        room_id: str | None = None,
+        metadata: Mapping[str, Any] | None = None,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any]:
+        self._validate_internal_run(run_kind=run_kind, status=status, trigger=trigger)
+        with self._borrowed_connection(conn) as active_conn:
+            active_conn.execute(
+                """
+                INSERT INTO internal_runs (
+                    id,
+                    task_id,
+                    run_kind,
+                    status,
+                    trigger,
+                    room_id,
+                    trace_id,
+                    started_at,
+                    completed_at,
+                    metadata_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    task_id = excluded.task_id,
+                    run_kind = excluded.run_kind,
+                    status = excluded.status,
+                    trigger = excluded.trigger,
+                    room_id = excluded.room_id,
+                    trace_id = excluded.trace_id,
+                    started_at = excluded.started_at,
+                    completed_at = COALESCE(excluded.completed_at, internal_runs.completed_at),
+                    metadata_json = COALESCE(excluded.metadata_json, internal_runs.metadata_json)
+                """,
+                (
+                    run_id,
+                    task_id,
+                    run_kind,
+                    status,
+                    trigger,
+                    room_id,
+                    trace_id,
+                    started_at,
+                    completed_at,
+                    self._encode_metadata(metadata),
+                ),
+            )
+            row = active_conn.execute(
+                """
+                SELECT *
+                FROM internal_runs
+                WHERE id = ?
+                """,
+                (run_id,),
+            ).fetchone()
+            return dict(row)
+
+    def list_internal_runs(self, *, limit: int = 10) -> list[dict[str, Any]]:
+        with self.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM internal_runs
+                ORDER BY started_at DESC, id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def latest_internal_run(self) -> dict[str, Any] | None:
+        rows = self.list_internal_runs(limit=1)
+        return rows[0] if rows else None
 
     # Dataset persistence
     def upsert_dataset(

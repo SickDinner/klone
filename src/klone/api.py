@@ -20,6 +20,9 @@ from .schemas import (
     GovernanceGuardRecord,
     IngestExecutionResponse,
     IngestStatusResponse,
+    MemoryEntityRecord,
+    MemoryEpisodeRecord,
+    MemoryEventRecord,
     MissionControlStatus,
     PermissionLevelRecord,
     RoomRecord,
@@ -98,6 +101,33 @@ def _audit_event_from_row(row: dict[str, Any]) -> AuditEventRecord:
         payload["summary"] = "Summary-only event"
         payload["metadata"] = {"policy": "summary_only"}
     return AuditEventRecord.model_validate(payload)
+
+
+def _memory_event_from_row(row: dict[str, Any]) -> MemoryEventRecord:
+    payload = _decode_metadata(dict(row))
+    decision = output_guard.evaluate(classification_level=payload["classification_level"])
+    if decision.decision == "summary_only":
+        payload["evidence_text"] = "[summary-only]"
+        payload["metadata"] = {"policy": "summary_only"}
+    return MemoryEventRecord.model_validate(payload)
+
+
+def _memory_entity_from_row(row: dict[str, Any]) -> MemoryEntityRecord:
+    payload = _decode_metadata(dict(row))
+    decision = output_guard.evaluate(classification_level=payload["classification_level"])
+    if decision.decision == "summary_only":
+        payload["canonical_name"] = "[summary-only]"
+        payload["metadata"] = {"policy": "summary_only"}
+    return MemoryEntityRecord.model_validate(payload)
+
+
+def _memory_episode_from_row(row: dict[str, Any]) -> MemoryEpisodeRecord:
+    payload = _decode_metadata(dict(row))
+    decision = output_guard.evaluate(classification_level=payload["classification_level"])
+    if decision.decision == "summary_only":
+        payload["summary"] = "[summary-only]"
+        payload["metadata"] = {"policy": "summary_only"}
+    return MemoryEpisodeRecord.model_validate(payload)
 
 
 @router.get("/health")
@@ -254,6 +284,101 @@ def audit(
         rows.extend(repository.list_audit_events(room_id=room.id, limit=limit))
     rows = sorted(rows, key=lambda item: item["created_at"], reverse=True)[:limit]
     return [_audit_event_from_row(row) for row in rows]
+
+
+@router.get("/memory/events", response_model=list[MemoryEventRecord])
+def memory_events(
+    room_id: str = Query(..., min_length=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    repository: KloneRepository = Depends(get_repository),
+) -> list[MemoryEventRecord]:
+    room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
+    rows = repository.list_memory_events(room_id=room.id, limit=limit, offset=offset)
+    return [_memory_event_from_row(row) for row in rows]
+
+
+@router.get("/memory/events/{event_id}", response_model=MemoryEventRecord)
+def memory_event_detail(
+    event_id: int,
+    room_id: str = Query(..., min_length=1),
+    repository: KloneRepository = Depends(get_repository),
+) -> MemoryEventRecord:
+    room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
+    row = repository.get_memory_event(event_id, room_id=room.id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Memory event {event_id} was not found.")
+    return _memory_event_from_row(row)
+
+
+@router.get("/memory/entities", response_model=list[MemoryEntityRecord])
+def memory_entities(
+    room_id: str = Query(..., min_length=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    repository: KloneRepository = Depends(get_repository),
+) -> list[MemoryEntityRecord]:
+    room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
+    rows = repository.list_memory_entities(room_id=room.id, limit=limit, offset=offset)
+    return [_memory_entity_from_row(row) for row in rows]
+
+
+@router.get("/memory/entities/{entity_id}", response_model=MemoryEntityRecord)
+def memory_entity_detail(
+    entity_id: int,
+    room_id: str = Query(..., min_length=1),
+    repository: KloneRepository = Depends(get_repository),
+) -> MemoryEntityRecord:
+    room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
+    row = repository.get_memory_entity(entity_id, room_id=room.id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Memory entity {entity_id} was not found.")
+    return _memory_entity_from_row(row)
+
+
+@router.get("/memory/episodes", response_model=list[MemoryEpisodeRecord])
+def memory_episodes(
+    room_id: str = Query(..., min_length=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    repository: KloneRepository = Depends(get_repository),
+) -> list[MemoryEpisodeRecord]:
+    room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
+    rows = repository.list_memory_episodes(room_id=room.id, limit=limit, offset=offset)
+    return [_memory_episode_from_row(row) for row in rows]
+
+
+@router.get("/memory/episodes/{episode_id}", response_model=MemoryEpisodeRecord)
+def memory_episode_detail(
+    episode_id: str,
+    room_id: str = Query(..., min_length=1),
+    repository: KloneRepository = Depends(get_repository),
+) -> MemoryEpisodeRecord:
+    room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
+    row = repository.get_memory_episode(episode_id, room_id=room.id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Memory episode {episode_id} was not found.")
+    return _memory_episode_from_row(row)
+
+
+@router.get("/memory/episodes/{episode_id}/events", response_model=list[MemoryEventRecord])
+def memory_episode_events(
+    episode_id: str,
+    room_id: str = Query(..., min_length=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    repository: KloneRepository = Depends(get_repository),
+) -> list[MemoryEventRecord]:
+    room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
+    if repository.get_memory_episode(episode_id, room_id=room.id) is None:
+        raise HTTPException(status_code=404, detail=f"Memory episode {episode_id} was not found.")
+    rows = repository.list_memory_episode_events(
+        episode_id,
+        room_id=room.id,
+        limit=limit,
+        offset=offset,
+    )
+    return [_memory_event_from_row(row) for row in rows]
 
 
 @router.post("/ingest/scan", response_model=IngestExecutionResponse)

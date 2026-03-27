@@ -10,6 +10,7 @@ from typing import Any
 from .audit import AuditService
 from .contracts import AssetKind, ClassificationLevel, IngestStatus
 from .guards import access_guard, classification_guard
+from .memory import MemoryService
 from .repository import KloneRepository
 from .rooms import room_registry
 from .schemas import DatasetIngestRequest
@@ -147,7 +148,10 @@ def ingest_dataset(
 
     with repository.connection() as conn:
         audit_service = AuditService(repository)
-        audit_service.log_event(
+        memory_service = MemoryService(repository)
+        memory_source_event_ids: list[int] = []
+
+        ingest_requested_event = audit_service.log_event(
             event_type="ingest_requested",
             actor="hypervisor",
             target_type="dataset_root",
@@ -162,12 +166,13 @@ def ingest_dataset(
             },
             conn=conn,
         )
+        memory_source_event_ids.append(ingest_requested_event.id)
         classification_decision = classification_guard.evaluate(
             classification_level=request.classification_level,
             room_id=room_id,
         )
         if classification_decision.decision != "allowed":
-            audit_service.log_event(
+            ingest_blocked_event = audit_service.log_event(
                 event_type="ingest_blocked",
                 actor="hypervisor",
                 target_type="dataset_root",
@@ -178,6 +183,12 @@ def ingest_dataset(
                 metadata=classification_decision.model_dump(),
                 conn=conn,
             )
+            memory_source_event_ids.append(ingest_blocked_event.id)
+            memory_service.seed_from_audit_events(
+                room_id=room_id,
+                audit_event_ids=memory_source_event_ids,
+                conn=conn,
+            )
             raise PermissionError(classification_decision.reason)
         access_decision = access_guard.evaluate(
             room_id=room_id,
@@ -185,7 +196,7 @@ def ingest_dataset(
             requested_permission="write",
         )
         if access_decision.decision not in {"allowed", "requires_approval"}:
-            audit_service.log_event(
+            ingest_blocked_event = audit_service.log_event(
                 event_type="ingest_blocked",
                 actor="hypervisor",
                 target_type="dataset_root",
@@ -194,6 +205,12 @@ def ingest_dataset(
                 classification_level=request.classification_level,
                 summary="Ingest blocked by AccessGuard.",
                 metadata=access_decision.model_dump(),
+                conn=conn,
+            )
+            memory_source_event_ids.append(ingest_blocked_event.id)
+            memory_service.seed_from_audit_events(
+                room_id=room_id,
+                audit_event_ids=memory_source_event_ids,
                 conn=conn,
             )
             raise PermissionError(access_decision.reason)
@@ -207,7 +224,7 @@ def ingest_dataset(
             description=request.description,
             conn=conn,
         )
-        audit_service.log_event(
+        dataset_event = audit_service.log_event(
             event_type="dataset_registered" if created else "dataset_updated",
             actor="hypervisor",
             target_type="dataset",
@@ -216,12 +233,14 @@ def ingest_dataset(
             classification_level=request.classification_level,
             summary=f"Dataset '{dataset['label']}' registered for ingest.",
             metadata={
+                "dataset_id": dataset["id"],
                 "collection": request.collection,
                 "description": request.description,
                 "root_path": str(root_path),
             },
             conn=conn,
         )
+        memory_source_event_ids.append(dataset_event.id)
 
         run = repository.start_ingest_run(
             dataset["id"],
@@ -235,7 +254,7 @@ def ingest_dataset(
             last_scan_at=run["started_at"],
             conn=conn,
         )
-        audit_service.log_event(
+        ingest_started_event = audit_service.log_event(
             event_type="ingest_started",
             actor="hypervisor",
             target_type="ingest_run",
@@ -243,9 +262,14 @@ def ingest_dataset(
             room_id=room_id,
             classification_level=request.classification_level,
             summary=f"Ingest started for dataset '{dataset['label']}'.",
-            metadata={"files_discovered": len(files)},
+            metadata={
+                "dataset_id": dataset["id"],
+                "ingest_run_id": run["id"],
+                "files_discovered": len(files),
+            },
             conn=conn,
         )
+        memory_source_event_ids.append(ingest_started_event.id)
 
         assets_indexed = 0
         new_assets = 0
@@ -307,7 +331,7 @@ def ingest_dataset(
             last_scan_at=completed_run["completed_at"],
             conn=conn,
         )
-        audit_service.log_event(
+        ingest_completed_event = audit_service.log_event(
             event_type="ingest_completed",
             actor="hypervisor",
             target_type="ingest_run",
@@ -316,6 +340,8 @@ def ingest_dataset(
             classification_level=request.classification_level,
             summary=f"Ingest finished for dataset '{dataset['label']}'.",
             metadata={
+                "dataset_id": dataset["id"],
+                "ingest_run_id": completed_run["id"],
                 "files_discovered": len(files),
                 "assets_indexed": assets_indexed,
                 "new_assets": new_assets,
@@ -324,6 +350,13 @@ def ingest_dataset(
                 "duplicates_detected": duplicates_detected,
                 "errors": walk_errors[-10:],
             },
+            conn=conn,
+        )
+        memory_source_event_ids.append(ingest_completed_event.id)
+        memory_service.seed_from_audit_events(
+            room_id=room_id,
+            audit_event_ids=memory_source_event_ids,
+            ingest_run_id=completed_run["id"],
             conn=conn,
         )
 

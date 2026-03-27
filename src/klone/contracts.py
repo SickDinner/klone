@@ -9,6 +9,8 @@ ExtractionStatus = Literal["pending", "metadata_indexed", "failed"]
 DedupStatus = Literal["unique", "duplicate"]
 GuardDecision = Literal["allowed", "blocked", "requires_approval", "summary_only"]
 RoomType = Literal["public_room", "restricted_room", "sealed_room", "sandbox_room", "debug_room"]
+MemoryEntityType = Literal["dataset", "room", "system_actor"]
+MemoryEpisodeType = Literal["system_ingest_run"]
 
 
 CLASSIFICATION_LEVEL_VALUES = set(get_args(ClassificationLevel))
@@ -18,3 +20,5 @@ ROOM_STATUS_VALUES = set(get_args(RoomStatus))
 EXTRACTION_STATUS_VALUES = set(get_args(ExtractionStatus))
 DEDUP_STATUS_VALUES = set(get_args(DedupStatus))
 ROOM_TYPE_VALUES = set(get_args(RoomType))
+MEMORY_ENTITY_TYPE_VALUES = set(get_args(MemoryEntityType))
+MEMORY_EPISODE_TYPE_VALUES = set(get_args(MemoryEpisodeType))

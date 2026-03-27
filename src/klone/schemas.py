@@ -9,6 +9,8 @@ from .contracts import (
     ExtractionStatus,
     GuardDecision,
     IngestStatus,
+    MemoryEntityType,
+    MemoryEpisodeType,
     RoomStatus,
     RoomType,
 )
@@ -157,3 +159,91 @@ class IngestExecutionResponse(BaseModel):
     dataset: DatasetRecord
     run: IngestRunRecord
     errors: list[str]
+
+
+class MemoryEventRecord(BaseModel):
+    id: int
+    room_id: str
+    classification_level: ClassificationLevel
+    event_type: str
+    source_table: str
+    source_record_id: str
+    dataset_id: int | None = None
+    asset_id: int | None = None
+    ingest_run_id: int | None = None
+    occurred_at: str
+    recorded_at: str
+    title: str
+    evidence_text: str
+    metadata: dict[str, Any] | None = None
+    created_at: str
+    updated_at: str
+
+
+class MemoryEntityRecord(BaseModel):
+    id: int
+    room_id: str
+    classification_level: ClassificationLevel
+    entity_type: MemoryEntityType
+    canonical_name: str
+    canonical_key: str
+    seed_source_event_id: int
+    first_seen_at: str
+    last_seen_at: str
+    metadata: dict[str, Any] | None = None
+    created_at: str
+    updated_at: str
+
+
+class MemoryEpisodeRecord(BaseModel):
+    id: str
+    room_id: str
+    classification_level: ClassificationLevel
+    episode_type: MemoryEpisodeType
+    grouping_basis: str
+    source_table: str
+    source_record_id: str
+    title: str
+    summary: str
+    start_at: str
+    end_at: str
+    metadata: dict[str, Any] | None = None
+    created_at: str
+    updated_at: str
+
+
+class MemoryEventEntityLinkRecord(BaseModel):
+    event_id: int
+    entity_id: int
+    role: str
+    source_basis: str
+    created_at: str
+
+
+class MemoryEpisodeEventLinkRecord(BaseModel):
+    episode_id: str
+    event_id: int
+    sequence_no: int
+    inclusion_basis: str
+    created_at: str
+
+
+class MemorySeedResult(BaseModel):
+    room_id: str | None = None
+    ingest_run_id: int | None = None
+    seed_version: str
+    events_written: int = 0
+    events_upserted: int = 0
+    events_skipped: int = 0
+    entities_written: int = 0
+    entities_upserted: int = 0
+    entities_skipped: int = 0
+    episodes_written: int = 0
+    episodes_upserted: int = 0
+    episodes_skipped: int = 0
+    event_entity_links_written: int = 0
+    event_entity_links_upserted: int = 0
+    event_entity_links_skipped: int = 0
+    episode_event_links_written: int = 0
+    episode_event_links_upserted: int = 0
+    episode_event_links_skipped: int = 0

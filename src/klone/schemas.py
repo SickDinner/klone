@@ -322,6 +322,7 @@ class MemoryCorrectionResult(BaseModel):
 
 
 class MemoryEventDetailRecord(MemoryEventRecord):
+    corrected: bool
     source_lineage: list[MemoryProvenanceRecord]
     seed_basis: list[MemoryProvenanceRecord]
     provenance: list[MemoryProvenanceRecord]

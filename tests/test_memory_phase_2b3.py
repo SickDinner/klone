@@ -58,6 +58,9 @@ class MemoryPhase2B3Tests(unittest.TestCase):
             episode_id=episode_id,
         )
 
+        self.assertFalse(completed_before["corrected"])
+        self.assertFalse(started_before["corrected"])
+
         reject_event_result = self.memory_service.reject_event(
             room_id=room_id,
             event_id=ingest_requested["id"],
@@ -111,12 +114,14 @@ class MemoryPhase2B3Tests(unittest.TestCase):
         self.assertEqual(completed_after["status"], "rejected")
         self.assertEqual(completed_after["correction_reason"], "operator_reject")
         self.assertEqual(completed_after["corrected_by_role"], "owner")
+        self.assertTrue(completed_after["corrected"])
         self.assertEqual(completed_after["evidence_text"], completed_before["evidence_text"])
         self.assertTrue(completed_after["provenance"])
 
         self.assertEqual(started_after["status"], "superseded")
         self.assertEqual(started_after["superseded_by_id"], ingest_completed["id"])
         self.assertEqual(started_after["correction_reason"], "operator_supersede")
+        self.assertTrue(started_after["corrected"])
         self.assertEqual(started_after["evidence_text"], started_before["evidence_text"])
         self.assertTrue(started_after["provenance"])
 
@@ -171,9 +176,11 @@ class MemoryPhase2B3Tests(unittest.TestCase):
         self.assertEqual(replay_result.ingest_run_id, ingest_run_id)
         self.assertEqual(completed_after_replay["status"], correction_state_before_replay["event_status"])
         self.assertEqual(completed_after_replay["correction_reason"], correction_state_before_replay["event_reason"])
+        self.assertTrue(completed_after_replay["corrected"])
         self.assertEqual(completed_after_replay["evidence_text"], completed_before["evidence_text"])
         self.assertEqual(started_after_replay["status"], correction_state_before_replay["superseded_status"])
         self.assertEqual(started_after_replay["superseded_by_id"], correction_state_before_replay["superseded_by_id"])
+        self.assertTrue(started_after_replay["corrected"])
         self.assertEqual(started_after_replay["evidence_text"], started_before["evidence_text"])
         self.assertEqual(episode_after_replay["status"], correction_state_before_replay["episode_status"])
         self.assertEqual(episode_after_replay["correction_reason"], correction_state_before_replay["episode_reason"])

@@ -463,6 +463,7 @@ class MemoryService:
             )
         ]
         payload = _decode_row_metadata(event_row)
+        payload["corrected"] = payload.get("status") in {"rejected", "superseded"}
         payload["provenance"] = provenance
         payload["source_lineage"] = [
             row for row in provenance if row["provenance_type"] == "source_lineage"

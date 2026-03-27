@@ -31,11 +31,12 @@ Phase 2C.1 in progress
 - episode query primitive
 - episode-side deterministic filtering
 - episode/event traversal refinement
+- query/list provenance summary exposure
 
 ## Next approved substep
-- provenance-aware retrieval on query/list surfaces
-- exact source-lineage exposure or provenance summary for read-only query results only
-- no duplicate work on episode query / traversal or detail provenance paths
+- identify the next exact unfinished 2C.1 read-only retrieval substep from verified repo evidence only
+- do not reimplement event query, episode query, traversal, detail provenance, or query/list provenance summary
+
 
 
 

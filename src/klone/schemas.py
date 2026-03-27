@@ -11,6 +11,8 @@ from .contracts import (
     IngestStatus,
     MemoryEntityType,
     MemoryEpisodeType,
+    MemoryOwnerType,
+    MemoryProvenanceType,
     RoomStatus,
     RoomType,
 )
@@ -228,6 +230,40 @@ class MemoryEpisodeEventLinkRecord(BaseModel):
     created_at: str
 
 
+class MemoryProvenanceRecord(BaseModel):
+    id: int
+    room_id: str
+    owner_type: MemoryOwnerType
+    owner_id: str
+    provenance_type: MemoryProvenanceType
+    source_table: str
+    source_record_id: str
+    source_field: str | None = None
+    basis_type: str
+    basis_value: str | None = None
+    created_at: str
+
+
+class MemoryLinkedEntityRecord(BaseModel):
+    entity_id: int
+    room_id: str
+    classification_level: ClassificationLevel
+    entity_type: MemoryEntityType
+    canonical_name: str
+    canonical_key: str
+    first_seen_at: str
+    last_seen_at: str
+    role: str
+    source_basis: str
+    metadata: dict[str, Any] | None = None
+
+
+class MemoryEpisodeMemberRecord(BaseModel):
+    sequence_no: int
+    inclusion_basis: str
+    event: MemoryEventRecord
+
+
 class MemorySeedResult(BaseModel):
     room_id: str | None = None
     ingest_run_id: int | None = None
@@ -247,3 +283,32 @@ class MemorySeedResult(BaseModel):
     episode_event_links_written: int = 0
     episode_event_links_upserted: int = 0
     episode_event_links_skipped: int = 0
+    provenance_written: int = 0
+    provenance_upserted: int = 0
+    provenance_skipped: int = 0
+
+
+class MemoryReplayRequestInternal(BaseModel):
+    room_id: str
+    ingest_run_id: int | None = None
+    actor_role: str = "owner"
+    seed_version: str
+
+
+class MemoryReplayResult(MemorySeedResult):
+    pass
+
+
+class MemoryEventDetailRecord(MemoryEventRecord):
+    source_lineage: list[MemoryProvenanceRecord]
+    seed_basis: list[MemoryProvenanceRecord]
+    provenance: list[MemoryProvenanceRecord]
+    linked_entities: list[MemoryLinkedEntityRecord]
+
+
+class MemoryEpisodeDetailRecord(MemoryEpisodeRecord):
+    source_lineage: list[MemoryProvenanceRecord]
+    seed_basis: list[MemoryProvenanceRecord]
+    membership_basis: list[MemoryProvenanceRecord]
+    provenance: list[MemoryProvenanceRecord]
+    linked_events: list[MemoryEpisodeMemberRecord]

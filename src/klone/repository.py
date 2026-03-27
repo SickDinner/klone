@@ -200,6 +200,37 @@ class KloneRepository:
 
                 CREATE INDEX IF NOT EXISTS idx_memory_episode_events_episode_sequence
                     ON memory_episode_events(episode_id, sequence_no ASC);
+
+                CREATE TABLE IF NOT EXISTS memory_provenance (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    room_id TEXT NOT NULL,
+                    owner_type TEXT NOT NULL,
+                    owner_id TEXT NOT NULL,
+                    provenance_type TEXT NOT NULL,
+                    source_table TEXT NOT NULL,
+                    source_record_id TEXT NOT NULL,
+                    source_field TEXT,
+                    basis_type TEXT NOT NULL,
+                    basis_value TEXT,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_memory_provenance_owner
+                    ON memory_provenance(room_id, owner_type, owner_id);
+                CREATE INDEX IF NOT EXISTS idx_memory_provenance_source
+                    ON memory_provenance(room_id, source_table, source_record_id);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_provenance_unique
+                    ON memory_provenance(
+                        room_id,
+                        owner_type,
+                        owner_id,
+                        provenance_type,
+                        source_table,
+                        source_record_id,
+                        ifnull(source_field, ''),
+                        basis_type,
+                        ifnull(basis_value, '')
+                    );
                 """
             )
 
@@ -778,6 +809,24 @@ class KloneRepository:
             ).fetchall()
             return [dict(row) for row in rows]
 
+    def list_audit_events_for_room(
+        self,
+        *,
+        room_id: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._borrowed_connection(conn) as active_conn:
+            rows = active_conn.execute(
+                """
+                SELECT *
+                FROM audit_events
+                WHERE room_id = ?
+                ORDER BY created_at ASC, id ASC
+                """,
+                (room_id,),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
     # Memory persistence
     def upsert_memory_event(
         self,
@@ -1101,6 +1150,94 @@ class KloneRepository:
             ).fetchone()
             return dict(row), True
 
+    def upsert_memory_provenance(
+        self,
+        payload: Mapping[str, Any],
+        *,
+        conn: sqlite3.Connection | None = None,
+    ) -> tuple[dict[str, Any], bool]:
+        with self._borrowed_connection(conn) as active_conn:
+            existing = active_conn.execute(
+                """
+                SELECT *
+                FROM memory_provenance
+                WHERE room_id = ?
+                  AND owner_type = ?
+                  AND owner_id = ?
+                  AND provenance_type = ?
+                  AND source_table = ?
+                  AND source_record_id = ?
+                  AND ((source_field = ?) OR (source_field IS NULL AND ? IS NULL))
+                  AND basis_type = ?
+                  AND ((basis_value = ?) OR (basis_value IS NULL AND ? IS NULL))
+                """,
+                (
+                    payload["room_id"],
+                    payload["owner_type"],
+                    payload["owner_id"],
+                    payload["provenance_type"],
+                    payload["source_table"],
+                    payload["source_record_id"],
+                    payload.get("source_field"),
+                    payload.get("source_field"),
+                    payload["basis_type"],
+                    payload.get("basis_value"),
+                    payload.get("basis_value"),
+                ),
+            ).fetchone()
+            if existing is not None:
+                return dict(existing), False
+
+            created_at = payload.get("created_at", utc_now_iso())
+            cursor = active_conn.execute(
+                """
+                INSERT INTO memory_provenance (
+                    room_id, owner_type, owner_id, provenance_type, source_table,
+                    source_record_id, source_field, basis_type, basis_value, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload["room_id"],
+                    payload["owner_type"],
+                    payload["owner_id"],
+                    payload["provenance_type"],
+                    payload["source_table"],
+                    payload["source_record_id"],
+                    payload.get("source_field"),
+                    payload["basis_type"],
+                    payload.get("basis_value"),
+                    created_at,
+                ),
+            )
+            row = active_conn.execute(
+                "SELECT * FROM memory_provenance WHERE id = ?",
+                (cursor.lastrowid,),
+            ).fetchone()
+            return dict(row), True
+
+    def list_memory_provenance(
+        self,
+        *,
+        room_id: str,
+        owner_type: str,
+        owner_id: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._borrowed_connection(conn) as active_conn:
+            rows = active_conn.execute(
+                """
+                SELECT *
+                FROM memory_provenance
+                WHERE room_id = ?
+                  AND owner_type = ?
+                  AND owner_id = ?
+                ORDER BY provenance_type ASC, source_table ASC, source_record_id ASC, basis_type ASC, id ASC
+                """,
+                (room_id, owner_type, owner_id),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
     def list_memory_events(
         self,
         *,
@@ -1132,6 +1269,39 @@ class KloneRepository:
                 (event_id, room_id),
             ).fetchone()
             return dict(row) if row is not None else None
+
+    def list_memory_event_entity_details(
+        self,
+        event_id: int,
+        *,
+        room_id: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._borrowed_connection(conn) as active_conn:
+            rows = active_conn.execute(
+                """
+                SELECT me.entity_id,
+                       e.room_id,
+                       e.classification_level,
+                       e.entity_type,
+                       e.canonical_name,
+                       e.canonical_key,
+                       e.first_seen_at,
+                       e.last_seen_at,
+                       me.role,
+                       me.source_basis,
+                       e.metadata_json
+                FROM memory_event_entities me
+                JOIN memory_entities e ON e.id = me.entity_id
+                JOIN memory_events ev ON ev.id = me.event_id
+                WHERE me.event_id = ?
+                  AND ev.room_id = ?
+                  AND e.room_id = ?
+                ORDER BY e.entity_type ASC, e.canonical_key ASC, me.role ASC
+                """,
+                (event_id, room_id, room_id),
+            ).fetchall()
+            return [dict(row) for row in rows]
 
     def list_memory_events_for_ingest_run(
         self,
@@ -1235,6 +1405,34 @@ class KloneRepository:
                 LIMIT ? OFFSET ?
                 """,
                 (episode_id, room_id, limit, offset),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def list_memory_episode_member_details(
+        self,
+        episode_id: str,
+        *,
+        room_id: str,
+        limit: int,
+        offset: int,
+        conn: sqlite3.Connection | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._borrowed_connection(conn) as active_conn:
+            rows = active_conn.execute(
+                """
+                SELECT mee.sequence_no,
+                       mee.inclusion_basis,
+                       me.*
+                FROM memory_episode_events mee
+                JOIN memory_events me ON me.id = mee.event_id
+                JOIN memory_episodes ep ON ep.id = mee.episode_id
+                WHERE mee.episode_id = ?
+                  AND ep.room_id = ?
+                  AND me.room_id = ?
+                ORDER BY mee.sequence_no ASC, me.id ASC
+                LIMIT ? OFFSET ?
+                """,
+                (episode_id, room_id, room_id, limit, offset),
             ).fetchall()
             return [dict(row) for row in rows]
 

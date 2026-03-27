@@ -7,9 +7,10 @@ from typing import Any
 
 from .audit import AuditService
 from .guards import access_guard, classification_guard
-from .repository import KloneRepository
+from .repository import KloneRepository, utc_now_iso
 from .rooms import room_registry
 from .schemas import (
+    MemoryCorrectionResult,
     MemoryReplayRequestInternal,
     MemoryReplayResult,
     MemorySeedResult,
@@ -216,6 +217,226 @@ class MemoryService:
         )
         return result
 
+    def reject_event(
+        self,
+        *,
+        room_id: str,
+        event_id: int,
+        reason: str,
+        actor_role: str = "owner",
+        conn: sqlite3.Connection | None = None,
+    ) -> MemoryCorrectionResult:
+        room = self._require_room(room_id)
+        normalized_reason = self._normalize_correction_reason(reason)
+        self._log_correction_started(
+            room_id=room_id,
+            memory_kind="event",
+            memory_id=str(event_id),
+            operation="reject_event",
+            reason=normalized_reason,
+            actor_role=actor_role,
+            classification_level=room.classification,
+            conn=conn,
+        )
+
+        try:
+            self._ensure_correction_access(room_id=room_id, actor_role=actor_role)
+            event_row = self.repository.get_memory_event_for_correction(
+                event_id,
+                room_id=room_id,
+                conn=conn,
+            )
+            if event_row is None:
+                raise ValueError(f"Memory event {event_id} was not found in room {room_id}.")
+            self._ensure_room_classification(
+                room_id=room_id,
+                classification_level=event_row["classification_level"],
+            )
+            correction = self._resolve_event_rejection(
+                event_row=event_row,
+                reason=normalized_reason,
+                actor_role=actor_role,
+                conn=conn,
+            )
+        except (PermissionError, ValueError) as error:
+            self._log_correction_blocked(
+                room_id=room_id,
+                memory_kind="event",
+                memory_id=str(event_id),
+                operation="reject_event",
+                reason=normalized_reason,
+                actor_role=actor_role,
+                classification_level=room.classification,
+                previous_status=None,
+                resulting_status=None,
+                superseded_by_id=None,
+                block_reason=str(error),
+                conn=conn,
+            )
+            raise
+
+        self._log_correction_completed(
+            result=correction,
+            reason=normalized_reason,
+            actor_role=actor_role,
+            classification_level=room.classification,
+            conn=conn,
+        )
+        return correction
+
+    def reject_episode(
+        self,
+        *,
+        room_id: str,
+        episode_id: str,
+        reason: str,
+        actor_role: str = "owner",
+        conn: sqlite3.Connection | None = None,
+    ) -> MemoryCorrectionResult:
+        room = self._require_room(room_id)
+        normalized_reason = self._normalize_correction_reason(reason)
+        self._log_correction_started(
+            room_id=room_id,
+            memory_kind="episode",
+            memory_id=episode_id,
+            operation="reject_episode",
+            reason=normalized_reason,
+            actor_role=actor_role,
+            classification_level=room.classification,
+            conn=conn,
+        )
+
+        try:
+            self._ensure_correction_access(room_id=room_id, actor_role=actor_role)
+            episode_row = self.repository.get_memory_episode_for_correction(
+                episode_id,
+                room_id=room_id,
+                conn=conn,
+            )
+            if episode_row is None:
+                raise ValueError(f"Memory episode {episode_id} was not found in room {room_id}.")
+            self._ensure_room_classification(
+                room_id=room_id,
+                classification_level=episode_row["classification_level"],
+            )
+            correction = self._resolve_episode_rejection(
+                episode_row=episode_row,
+                reason=normalized_reason,
+                actor_role=actor_role,
+                conn=conn,
+            )
+        except (PermissionError, ValueError) as error:
+            self._log_correction_blocked(
+                room_id=room_id,
+                memory_kind="episode",
+                memory_id=episode_id,
+                operation="reject_episode",
+                reason=normalized_reason,
+                actor_role=actor_role,
+                classification_level=room.classification,
+                previous_status=None,
+                resulting_status=None,
+                superseded_by_id=None,
+                block_reason=str(error),
+                conn=conn,
+            )
+            raise
+
+        self._log_correction_completed(
+            result=correction,
+            reason=normalized_reason,
+            actor_role=actor_role,
+            classification_level=room.classification,
+            conn=conn,
+        )
+        return correction
+
+    def supersede_event(
+        self,
+        *,
+        room_id: str,
+        event_id: int,
+        superseded_by_event_id: int,
+        reason: str,
+        actor_role: str = "owner",
+        conn: sqlite3.Connection | None = None,
+    ) -> MemoryCorrectionResult:
+        room = self._require_room(room_id)
+        normalized_reason = self._normalize_correction_reason(reason)
+        self._log_correction_started(
+            room_id=room_id,
+            memory_kind="event",
+            memory_id=str(event_id),
+            operation="supersede_event",
+            reason=normalized_reason,
+            actor_role=actor_role,
+            classification_level=room.classification,
+            superseded_by_id=superseded_by_event_id,
+            conn=conn,
+        )
+
+        try:
+            self._ensure_correction_access(room_id=room_id, actor_role=actor_role)
+            source_event = self.repository.get_memory_event_for_correction(
+                event_id,
+                room_id=room_id,
+                conn=conn,
+            )
+            if source_event is None:
+                raise ValueError(f"Memory event {event_id} was not found in room {room_id}.")
+            replacement_event = self.repository.validate_same_room_event_reference(
+                room_id=room_id,
+                event_id=event_id,
+                reference_event_id=superseded_by_event_id,
+                conn=conn,
+            )
+            if replacement_event is None:
+                raise ValueError(
+                    f"Replacement memory event {superseded_by_event_id} was not found in room {room_id}."
+                )
+            if event_id == superseded_by_event_id:
+                raise ValueError("A memory event cannot supersede itself.")
+            self._ensure_room_classification(
+                room_id=room_id,
+                classification_level=source_event["classification_level"],
+            )
+            self._ensure_room_classification(
+                room_id=room_id,
+                classification_level=replacement_event["classification_level"],
+            )
+            correction = self._resolve_event_supersession(
+                source_event=source_event,
+                replacement_event=replacement_event,
+                reason=normalized_reason,
+                actor_role=actor_role,
+                conn=conn,
+            )
+        except (PermissionError, ValueError) as error:
+            self._log_correction_blocked(
+                room_id=room_id,
+                memory_kind="event",
+                memory_id=str(event_id),
+                operation="supersede_event",
+                reason=normalized_reason,
+                actor_role=actor_role,
+                classification_level=room.classification,
+                previous_status=None,
+                resulting_status=None,
+                superseded_by_id=superseded_by_event_id,
+                block_reason=str(error),
+                conn=conn,
+            )
+            raise
+
+        self._log_correction_completed(
+            result=correction,
+            reason=normalized_reason,
+            actor_role=actor_role,
+            classification_level=room.classification,
+            conn=conn,
+        )
+        return correction
+
     def get_event_detail(
         self,
         *,
@@ -223,7 +444,7 @@ class MemoryService:
         event_id: int,
         conn: sqlite3.Connection | None = None,
     ) -> dict[str, Any] | None:
-        event_row = self.repository.get_memory_event(event_id, room_id=room_id)
+        event_row = self.repository.get_memory_event(event_id, room_id=room_id, conn=conn)
         if event_row is None:
             return None
 
@@ -257,7 +478,7 @@ class MemoryService:
         episode_id: str,
         conn: sqlite3.Connection | None = None,
     ) -> dict[str, Any] | None:
-        episode_row = self.repository.get_memory_episode(episode_id, room_id=room_id)
+        episode_row = self.repository.get_memory_episode(episode_id, room_id=room_id, conn=conn)
         if episode_row is None:
             return None
 
@@ -317,6 +538,177 @@ class MemoryService:
                 }
             )
         return members
+
+    def _resolve_event_rejection(
+        self,
+        *,
+        event_row: Mapping[str, Any],
+        reason: str,
+        actor_role: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> MemoryCorrectionResult:
+        previous_status = event_row["status"]
+        if previous_status == "rejected":
+            if (
+                event_row.get("correction_reason") == reason
+                and event_row.get("superseded_by_id") is None
+                and event_row.get("corrected_by_role") == actor_role
+            ):
+                return MemoryCorrectionResult(
+                    room_id=event_row["room_id"],
+                    memory_kind="event",
+                    memory_id=str(event_row["id"]),
+                    operation="reject_event",
+                    previous_status="rejected",
+                    resulting_status="rejected",
+                    superseded_by_id=None,
+                    corrected_at=event_row["corrected_at"],
+                    corrected_by_role=event_row["corrected_by_role"],
+                )
+            raise ValueError("Memory event is already rejected with a different correction state.")
+        if previous_status != "active":
+            raise ValueError(f"Memory event cannot be rejected from status {previous_status}.")
+
+        corrected_at = utc_now_iso()
+        updated_row = self.repository.update_memory_event_status(
+            event_row["id"],
+            room_id=event_row["room_id"],
+            status="rejected",
+            correction_reason=reason,
+            superseded_by_id=None,
+            corrected_at=corrected_at,
+            corrected_by_role=actor_role,
+            conn=conn,
+        )
+        if updated_row is None:
+            raise ValueError(f"Memory event {event_row['id']} was not found in room {event_row['room_id']}.")
+        return MemoryCorrectionResult(
+            room_id=updated_row["room_id"],
+            memory_kind="event",
+            memory_id=str(updated_row["id"]),
+            operation="reject_event",
+            previous_status=previous_status,
+            resulting_status=updated_row["status"],
+            superseded_by_id=updated_row.get("superseded_by_id"),
+            corrected_at=updated_row["corrected_at"],
+            corrected_by_role=updated_row["corrected_by_role"],
+        )
+
+    def _resolve_episode_rejection(
+        self,
+        *,
+        episode_row: Mapping[str, Any],
+        reason: str,
+        actor_role: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> MemoryCorrectionResult:
+        previous_status = episode_row["status"]
+        if previous_status == "rejected":
+            if (
+                episode_row.get("correction_reason") == reason
+                and episode_row.get("corrected_by_role") == actor_role
+            ):
+                return MemoryCorrectionResult(
+                    room_id=episode_row["room_id"],
+                    memory_kind="episode",
+                    memory_id=str(episode_row["id"]),
+                    operation="reject_episode",
+                    previous_status="rejected",
+                    resulting_status="rejected",
+                    superseded_by_id=None,
+                    corrected_at=episode_row["corrected_at"],
+                    corrected_by_role=episode_row["corrected_by_role"],
+                )
+            raise ValueError("Memory episode is already rejected with a different correction state.")
+        if previous_status != "active":
+            raise ValueError(f"Memory episode cannot be rejected from status {previous_status}.")
+
+        corrected_at = utc_now_iso()
+        updated_row = self.repository.update_memory_episode_status(
+            episode_row["id"],
+            room_id=episode_row["room_id"],
+            status="rejected",
+            correction_reason=reason,
+            corrected_at=corrected_at,
+            corrected_by_role=actor_role,
+            conn=conn,
+        )
+        if updated_row is None:
+            raise ValueError(
+                f"Memory episode {episode_row['id']} was not found in room {episode_row['room_id']}."
+            )
+        return MemoryCorrectionResult(
+            room_id=updated_row["room_id"],
+            memory_kind="episode",
+            memory_id=str(updated_row["id"]),
+            operation="reject_episode",
+            previous_status=previous_status,
+            resulting_status=updated_row["status"],
+            superseded_by_id=None,
+            corrected_at=updated_row["corrected_at"],
+            corrected_by_role=updated_row["corrected_by_role"],
+        )
+
+    def _resolve_event_supersession(
+        self,
+        *,
+        source_event: Mapping[str, Any],
+        replacement_event: Mapping[str, Any],
+        reason: str,
+        actor_role: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> MemoryCorrectionResult:
+        if replacement_event["status"] != "active":
+            raise ValueError("Replacement memory event must be active.")
+
+        previous_status = source_event["status"]
+        if previous_status == "superseded":
+            if (
+                source_event.get("superseded_by_id") == replacement_event["id"]
+                and source_event.get("correction_reason") == reason
+                and source_event.get("corrected_by_role") == actor_role
+            ):
+                return MemoryCorrectionResult(
+                    room_id=source_event["room_id"],
+                    memory_kind="event",
+                    memory_id=str(source_event["id"]),
+                    operation="supersede_event",
+                    previous_status="superseded",
+                    resulting_status="superseded",
+                    superseded_by_id=source_event["superseded_by_id"],
+                    corrected_at=source_event["corrected_at"],
+                    corrected_by_role=source_event["corrected_by_role"],
+                )
+            raise ValueError("Memory event is already superseded with a different correction state.")
+        if previous_status != "active":
+            raise ValueError(f"Memory event cannot be superseded from status {previous_status}.")
+
+        corrected_at = utc_now_iso()
+        updated_row = self.repository.update_memory_event_status(
+            source_event["id"],
+            room_id=source_event["room_id"],
+            status="superseded",
+            correction_reason=reason,
+            superseded_by_id=replacement_event["id"],
+            corrected_at=corrected_at,
+            corrected_by_role=actor_role,
+            conn=conn,
+        )
+        if updated_row is None:
+            raise ValueError(
+                f"Memory event {source_event['id']} was not found in room {source_event['room_id']}."
+            )
+        return MemoryCorrectionResult(
+            room_id=updated_row["room_id"],
+            memory_kind="event",
+            memory_id=str(updated_row["id"]),
+            operation="supersede_event",
+            previous_status=previous_status,
+            resulting_status=updated_row["status"],
+            superseded_by_id=updated_row["superseded_by_id"],
+            corrected_at=updated_row["corrected_at"],
+            corrected_by_role=updated_row["corrected_by_role"],
+        )
 
     def _materialize_memory(
         self,
@@ -867,6 +1259,156 @@ class MemoryService:
         if isinstance(value, str) and value.isdigit():
             return int(value)
         return None
+
+    def _normalize_correction_reason(self, reason: str) -> str:
+        normalized = reason.strip()
+        if not normalized:
+            raise ValueError("Correction reason is required.")
+        return normalized
+
+    def _ensure_correction_access(self, *, room_id: str, actor_role: str) -> None:
+        decision = access_guard.evaluate(
+            room_id=room_id,
+            actor_role=actor_role,
+            requested_permission="write",
+        )
+        if decision.decision not in {"allowed", "requires_approval"}:
+            raise PermissionError(decision.reason)
+
+    def _log_correction_started(
+        self,
+        *,
+        room_id: str,
+        memory_kind: str,
+        memory_id: str,
+        operation: str,
+        reason: str,
+        actor_role: str,
+        classification_level: str,
+        superseded_by_id: int | None = None,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
+        self.audit_service.log_event(
+            event_type="memory_correction_started",
+            actor="hypervisor",
+            target_type=f"memory_{memory_kind}",
+            target_id=memory_id,
+            room_id=room_id,
+            classification_level=classification_level,
+            summary="Memory correction started.",
+            metadata=self._correction_audit_metadata(
+                room_id=room_id,
+                memory_kind=memory_kind,
+                memory_id=memory_id,
+                operation=operation,
+                reason=reason,
+                actor_role=actor_role,
+                superseded_by_id=superseded_by_id,
+            ),
+            conn=conn,
+        )
+
+    def _log_correction_completed(
+        self,
+        *,
+        result: MemoryCorrectionResult,
+        reason: str,
+        actor_role: str,
+        classification_level: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
+        self.audit_service.log_event(
+            event_type="memory_correction_completed",
+            actor="hypervisor",
+            target_type=f"memory_{result.memory_kind}",
+            target_id=result.memory_id,
+            room_id=result.room_id,
+            classification_level=classification_level,
+            summary="Memory correction completed.",
+            metadata=self._correction_audit_metadata(
+                room_id=result.room_id,
+                memory_kind=result.memory_kind,
+                memory_id=result.memory_id,
+                operation=result.operation,
+                reason=reason,
+                actor_role=actor_role,
+                previous_status=result.previous_status,
+                resulting_status=result.resulting_status,
+                superseded_by_id=result.superseded_by_id,
+            ),
+            conn=conn,
+        )
+
+    def _log_correction_blocked(
+        self,
+        *,
+        room_id: str,
+        memory_kind: str,
+        memory_id: str,
+        operation: str,
+        reason: str,
+        actor_role: str,
+        classification_level: str,
+        previous_status: str | None,
+        resulting_status: str | None,
+        superseded_by_id: int | None,
+        block_reason: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
+        self.audit_service.log_event(
+            event_type="memory_correction_blocked",
+            actor="hypervisor",
+            target_type=f"memory_{memory_kind}",
+            target_id=memory_id,
+            room_id=room_id,
+            classification_level=classification_level,
+            summary="Memory correction blocked.",
+            metadata=self._correction_audit_metadata(
+                room_id=room_id,
+                memory_kind=memory_kind,
+                memory_id=memory_id,
+                operation=operation,
+                reason=reason,
+                actor_role=actor_role,
+                previous_status=previous_status,
+                resulting_status=resulting_status,
+                superseded_by_id=superseded_by_id,
+                extra={"block_reason": block_reason},
+            ),
+            conn=conn,
+        )
+
+    def _correction_audit_metadata(
+        self,
+        *,
+        room_id: str,
+        memory_kind: str,
+        memory_id: str,
+        operation: str,
+        reason: str,
+        actor_role: str,
+        previous_status: str | None = None,
+        resulting_status: str | None = None,
+        superseded_by_id: int | None = None,
+        extra: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        metadata: dict[str, Any] = {
+            "room_id": room_id,
+            "memory_kind": memory_kind,
+            "memory_id": memory_id,
+            "operation": operation,
+            "reason": reason,
+            "actor_role": actor_role,
+        }
+        if previous_status is not None:
+            metadata["previous_status"] = previous_status
+        if resulting_status is not None:
+            metadata["resulting_status"] = resulting_status
+        if superseded_by_id is not None:
+            metadata["superseded_by_id"] = superseded_by_id
+        if extra:
+            metadata.update(dict(extra))
+        return metadata
 
     def _ensure_write_access(
         self,

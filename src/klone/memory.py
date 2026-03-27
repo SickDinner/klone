@@ -44,6 +44,12 @@ def _stable_fact_string(fields: list[tuple[str, Any]]) -> str:
     return "|".join(parts)
 
 
+def _metadata_value(metadata: Mapping[str, Any] | None, key: str) -> Any:
+    if metadata is None:
+        return None
+    return metadata.get(key)
+
+
 def _normalize_canonical_key(prefix: str, value: str | int) -> str:
     return f"{prefix}:{str(value).strip().lower()}"
 
@@ -437,22 +443,89 @@ class MemoryService:
         source_event: Mapping[str, Any],
         metadata: Mapping[str, Any] | None,
     ) -> str | None:
-        summary = source_event.get("summary")
-        if isinstance(summary, str) and summary.strip():
-            return summary
-        fact_string = _stable_fact_string(
-            [
-                ("event_type", source_event.get("event_type")),
-                ("actor", source_event.get("actor")),
-                ("target_type", source_event.get("target_type")),
-                ("target_id", source_event.get("target_id")),
-                ("room_id", source_event.get("room_id")),
-                ("classification_level", source_event.get("classification_level")),
-                ("created_at", source_event.get("created_at")),
-                ("metadata", metadata),
-            ]
-        )
-        return fact_string or None
+        event_type = source_event.get("event_type")
+        if event_type == "ingest_requested":
+            return _stable_fact_string(
+                [
+                    ("event_type", event_type),
+                    ("actor", source_event.get("actor")),
+                    ("target_type", source_event.get("target_type")),
+                    ("target_id", source_event.get("target_id")),
+                    ("room_id", source_event.get("room_id")),
+                    ("classification_level", source_event.get("classification_level")),
+                    ("collection", _metadata_value(metadata, "collection")),
+                    ("created_at", source_event.get("created_at")),
+                ]
+            ) or None
+        if event_type in {"dataset_registered", "dataset_updated"}:
+            return _stable_fact_string(
+                [
+                    ("event_type", event_type),
+                    ("actor", source_event.get("actor")),
+                    ("target_type", source_event.get("target_type")),
+                    ("target_id", source_event.get("target_id")),
+                    ("room_id", source_event.get("room_id")),
+                    ("classification_level", source_event.get("classification_level")),
+                    ("dataset_id", _metadata_value(metadata, "dataset_id")),
+                    ("collection", _metadata_value(metadata, "collection")),
+                    ("root_path", _metadata_value(metadata, "root_path")),
+                    ("created_at", source_event.get("created_at")),
+                ]
+            ) or None
+        if event_type == "ingest_started":
+            return _stable_fact_string(
+                [
+                    ("event_type", event_type),
+                    ("actor", source_event.get("actor")),
+                    ("target_type", source_event.get("target_type")),
+                    ("target_id", source_event.get("target_id")),
+                    ("room_id", source_event.get("room_id")),
+                    ("classification_level", source_event.get("classification_level")),
+                    ("dataset_id", _metadata_value(metadata, "dataset_id")),
+                    ("ingest_run_id", _metadata_value(metadata, "ingest_run_id")),
+                    ("files_discovered", _metadata_value(metadata, "files_discovered")),
+                    ("created_at", source_event.get("created_at")),
+                ]
+            ) or None
+        if event_type == "ingest_completed":
+            errors = _metadata_value(metadata, "errors")
+            error_count = len(errors) if isinstance(errors, list) else None
+            return _stable_fact_string(
+                [
+                    ("event_type", event_type),
+                    ("actor", source_event.get("actor")),
+                    ("target_type", source_event.get("target_type")),
+                    ("target_id", source_event.get("target_id")),
+                    ("room_id", source_event.get("room_id")),
+                    ("classification_level", source_event.get("classification_level")),
+                    ("dataset_id", _metadata_value(metadata, "dataset_id")),
+                    ("ingest_run_id", _metadata_value(metadata, "ingest_run_id")),
+                    ("files_discovered", _metadata_value(metadata, "files_discovered")),
+                    ("assets_indexed", _metadata_value(metadata, "assets_indexed")),
+                    ("new_assets", _metadata_value(metadata, "new_assets")),
+                    ("updated_assets", _metadata_value(metadata, "updated_assets")),
+                    ("unchanged_assets", _metadata_value(metadata, "unchanged_assets")),
+                    ("duplicates_detected", _metadata_value(metadata, "duplicates_detected")),
+                    ("error_count", error_count),
+                    ("created_at", source_event.get("created_at")),
+                ]
+            ) or None
+        if event_type == "ingest_blocked":
+            return _stable_fact_string(
+                [
+                    ("event_type", event_type),
+                    ("actor", source_event.get("actor")),
+                    ("target_type", source_event.get("target_type")),
+                    ("target_id", source_event.get("target_id")),
+                    ("room_id", source_event.get("room_id")),
+                    ("classification_level", source_event.get("classification_level")),
+                    ("guard_name", _metadata_value(metadata, "guard_name")),
+                    ("decision", _metadata_value(metadata, "decision")),
+                    ("requires_supervisor", _metadata_value(metadata, "requires_supervisor")),
+                    ("created_at", source_event.get("created_at")),
+                ]
+            ) or None
+        return None
 
     def _extract_exact_int(self, metadata: Mapping[str, Any] | None, key: str) -> int | None:
         if metadata is None:

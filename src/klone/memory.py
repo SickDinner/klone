@@ -437,6 +437,116 @@ class MemoryService:
         )
         return correction
 
+    def query_events(
+        self,
+        *,
+        room_id: str,
+        limit: int,
+        offset: int,
+        status: str | None = None,
+        event_type: str | None = None,
+        ingest_run_id: int | None = None,
+        include_corrected: bool = True,
+    ) -> list[dict[str, Any]]:
+        self._require_room(room_id)
+        return [
+            _decode_row_metadata(row)
+            for row in self.repository.list_memory_events(
+                room_id=room_id,
+                limit=limit,
+                offset=offset,
+                status=status,
+                event_type=event_type,
+                ingest_run_id=ingest_run_id,
+                include_corrected=include_corrected,
+            )
+        ]
+
+    def query_episodes(
+        self,
+        *,
+        room_id: str,
+        limit: int,
+        offset: int,
+        status: str | None = None,
+        episode_type: str | None = None,
+        ingest_run_id: int | None = None,
+        include_corrected: bool = True,
+    ) -> list[dict[str, Any]]:
+        self._require_room(room_id)
+        return [
+            _decode_row_metadata(row)
+            for row in self.repository.list_memory_episodes(
+                room_id=room_id,
+                limit=limit,
+                offset=offset,
+                status=status,
+                episode_type=episode_type,
+                ingest_run_id=ingest_run_id,
+                include_corrected=include_corrected,
+            )
+        ]
+
+    def list_event_episode_memberships(
+        self,
+        *,
+        room_id: str,
+        event_id: int,
+        limit: int,
+        offset: int,
+        conn: sqlite3.Connection | None = None,
+    ) -> list[dict[str, Any]]:
+        membership_rows = self.repository.list_memory_event_episode_memberships(
+            event_id,
+            room_id=room_id,
+            limit=limit,
+            offset=offset,
+            conn=conn,
+        )
+        memberships: list[dict[str, Any]] = []
+        for row in membership_rows:
+            episode_payload = {
+                "id": row["episode_id"],
+                "room_id": row["episode_room_id"],
+                "classification_level": row["episode_classification_level"],
+                "episode_type": row["episode_type"],
+                "grouping_basis": row["grouping_basis"],
+                "source_table": row["episode_source_table"],
+                "source_record_id": row["episode_source_record_id"],
+                "title": row["episode_title"],
+                "summary": row["episode_summary"],
+                "status": row["episode_status"],
+                "correction_reason": row["episode_correction_reason"],
+                "corrected_at": row["episode_corrected_at"],
+                "corrected_by_role": row["episode_corrected_by_role"],
+                "start_at": row["start_at"],
+                "end_at": row["end_at"],
+                "metadata_json": row["episode_metadata_json"],
+                "created_at": row["episode_created_at"],
+                "updated_at": row["episode_updated_at"],
+            }
+            memberships.append(
+                {
+                    "sequence_no": row["sequence_no"],
+                    "inclusion_basis": row["inclusion_basis"],
+                    "episode": _decode_row_metadata(episode_payload),
+                }
+            )
+        return memberships
+
+    def list_event_supersession_relationships(
+        self,
+        *,
+        room_id: str,
+        event_id: int,
+        conn: sqlite3.Connection | None = None,
+    ) -> list[dict[str, Any]]:
+        return self.repository.list_memory_event_supersession_relationships(
+            event_id,
+            room_id=room_id,
+            conn=conn,
+        )
+
     def get_event_detail(
         self,
         *,
@@ -462,6 +572,18 @@ class MemoryService:
                 conn=conn,
             )
         ]
+        episode_memberships = self.list_event_episode_memberships(
+            room_id=room_id,
+            event_id=event_id,
+            limit=200,
+            offset=0,
+            conn=conn,
+        )
+        supersession_relationships = self.list_event_supersession_relationships(
+            room_id=room_id,
+            event_id=event_id,
+            conn=conn,
+        )
         payload = _decode_row_metadata(event_row)
         payload["corrected"] = payload.get("status") in {"rejected", "superseded"}
         payload["provenance"] = provenance
@@ -469,7 +591,10 @@ class MemoryService:
             row for row in provenance if row["provenance_type"] == "source_lineage"
         ]
         payload["seed_basis"] = [row for row in provenance if row["provenance_type"] == "seed_basis"]
+        payload["provenance_summary"] = self._build_provenance_summary(provenance)
         payload["linked_entities"] = linked_entities
+        payload["episode_memberships"] = episode_memberships
+        payload["supersession_relationships"] = supersession_relationships
         return payload
 
     def get_episode_detail(
@@ -506,6 +631,7 @@ class MemoryService:
             row for row in provenance if row["provenance_type"] == "membership_basis"
         ]
         payload["linked_events"] = linked_events
+        payload["provenance_summary"] = self._build_provenance_summary(provenance)
         return payload
 
     def list_episode_members(
@@ -539,6 +665,27 @@ class MemoryService:
                 }
             )
         return members
+
+    def _build_provenance_summary(self, provenance: list[dict[str, Any]]) -> dict[str, Any]:
+        source_refs = sorted(
+            {
+                f"{row['source_table']}:{row['source_record_id']}"
+                for row in provenance
+            }
+        )
+        return {
+            "total_count": len(provenance),
+            "source_lineage_count": sum(
+                1 for row in provenance if row["provenance_type"] == "source_lineage"
+            ),
+            "seed_basis_count": sum(
+                1 for row in provenance if row["provenance_type"] == "seed_basis"
+            ),
+            "membership_basis_count": sum(
+                1 for row in provenance if row["provenance_type"] == "membership_basis"
+            ),
+            "source_refs": source_refs,
+        }
 
     def _resolve_event_rejection(
         self,

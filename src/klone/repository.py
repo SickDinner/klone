@@ -1348,17 +1348,35 @@ class KloneRepository:
         room_id: str,
         limit: int,
         offset: int,
+        status: MemoryStatus | None = None,
+        event_type: str | None = None,
+        ingest_run_id: int | None = None,
+        include_corrected: bool = True,
     ) -> list[dict[str, Any]]:
         with self.connection() as conn:
+            clauses = ["room_id = ?"]
+            params: list[Any] = [room_id]
+            if status is not None:
+                clauses.append("status = ?")
+                params.append(status)
+            elif not include_corrected:
+                clauses.append("status = ?")
+                params.append("active")
+            if event_type is not None:
+                clauses.append("event_type = ?")
+                params.append(event_type)
+            if ingest_run_id is not None:
+                clauses.append("ingest_run_id = ?")
+                params.append(ingest_run_id)
             rows = conn.execute(
-                """
+                f"""
                 SELECT *
                 FROM memory_events
-                WHERE room_id = ?
+                WHERE {' AND '.join(clauses)}
                 ORDER BY occurred_at DESC, created_at DESC, id DESC
                 LIMIT ? OFFSET ?
                 """,
-                (room_id, limit, offset),
+                (*params, limit, offset),
             ).fetchall()
             return [dict(row) for row in rows]
 
@@ -1645,17 +1663,36 @@ class KloneRepository:
         room_id: str,
         limit: int,
         offset: int,
+        status: MemoryStatus | None = None,
+        episode_type: str | None = None,
+        ingest_run_id: int | None = None,
+        include_corrected: bool = True,
     ) -> list[dict[str, Any]]:
         with self.connection() as conn:
+            clauses = ["room_id = ?"]
+            params: list[Any] = [room_id]
+            if status is not None:
+                clauses.append("status = ?")
+                params.append(status)
+            elif not include_corrected:
+                clauses.append("status = ?")
+                params.append("active")
+            if episode_type is not None:
+                clauses.append("episode_type = ?")
+                params.append(episode_type)
+            if ingest_run_id is not None:
+                clauses.append("source_table = ?")
+                clauses.append("source_record_id = ?")
+                params.extend(["ingest_runs", str(ingest_run_id)])
             rows = conn.execute(
-                """
+                f"""
                 SELECT *
                 FROM memory_episodes
-                WHERE room_id = ?
+                WHERE {' AND '.join(clauses)}
                 ORDER BY start_at DESC, created_at DESC, id ASC
                 LIMIT ? OFFSET ?
                 """,
-                (room_id, limit, offset),
+                (*params, limit, offset),
             ).fetchall()
             return [dict(row) for row in rows]
 
@@ -1808,6 +1845,81 @@ class KloneRepository:
                 LIMIT ? OFFSET ?
                 """,
                 (episode_id, room_id, room_id, limit, offset),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def list_memory_event_episode_memberships(
+        self,
+        event_id: int,
+        *,
+        room_id: str,
+        limit: int,
+        offset: int,
+        conn: sqlite3.Connection | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._borrowed_connection(conn) as active_conn:
+            rows = active_conn.execute(
+                """
+                SELECT mee.sequence_no,
+                       mee.inclusion_basis,
+                       ep.id AS episode_id,
+                       ep.room_id AS episode_room_id,
+                       ep.classification_level AS episode_classification_level,
+                       ep.episode_type,
+                       ep.grouping_basis,
+                       ep.source_table AS episode_source_table,
+                       ep.source_record_id AS episode_source_record_id,
+                       ep.title AS episode_title,
+                       ep.summary AS episode_summary,
+                       ep.status AS episode_status,
+                       ep.correction_reason AS episode_correction_reason,
+                       ep.corrected_at AS episode_corrected_at,
+                       ep.corrected_by_role AS episode_corrected_by_role,
+                       ep.start_at,
+                       ep.end_at,
+                       ep.metadata_json AS episode_metadata_json,
+                       ep.created_at AS episode_created_at,
+                       ep.updated_at AS episode_updated_at
+                FROM memory_episode_events mee
+                JOIN memory_episodes ep ON ep.id = mee.episode_id
+                JOIN memory_events ev ON ev.id = mee.event_id
+                WHERE mee.event_id = ?
+                  AND ev.room_id = ?
+                  AND ep.room_id = ?
+                ORDER BY ep.start_at DESC, ep.created_at DESC, ep.id ASC, mee.sequence_no ASC
+                LIMIT ? OFFSET ?
+                """,
+                (event_id, room_id, room_id, limit, offset),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def list_memory_event_supersession_relationships(
+        self,
+        event_id: int,
+        *,
+        room_id: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._borrowed_connection(conn) as active_conn:
+            rows = active_conn.execute(
+                """
+                SELECT id,
+                       room_id,
+                       old_event_id,
+                       new_event_id,
+                       reason,
+                       created_at,
+                       created_by_role,
+                       CASE
+                           WHEN old_event_id = ? THEN 'old_event'
+                           ELSE 'new_event'
+                       END AS event_role
+                FROM memory_event_supersessions
+                WHERE room_id = ?
+                  AND (old_event_id = ? OR new_event_id = ?)
+                ORDER BY created_at ASC, id ASC
+                """,
+                (str(event_id), room_id, str(event_id), str(event_id)),
             ).fetchall()
             return [dict(row) for row in rows]
 

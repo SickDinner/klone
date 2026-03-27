@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .blueprint import SYSTEM_BLUEPRINT
 from .config import settings
+from .contracts import MemoryEpisodeType, MemoryStatus
 from .guards import access_guard, governance_guard_catalog, output_guard
 from .ingest import ingest_dataset
 from .memory import MemoryService
@@ -23,12 +24,15 @@ from .schemas import (
     IngestStatusResponse,
     MemoryEntityRecord,
     MemoryEpisodeDetailRecord,
+    MemoryEventEpisodeMembershipRecord,
     MemoryEpisodeMemberRecord,
     MemoryEpisodeRecord,
     MemoryEventDetailRecord,
     MemoryEventRecord,
     MemoryLinkedEntityRecord,
     MemoryProvenanceRecord,
+    MemoryProvenanceSummaryRecord,
+    MemoryEventSupersessionRecord,
     MissionControlStatus,
     PermissionLevelRecord,
     RoomRecord,
@@ -149,6 +153,26 @@ def _memory_linked_entity_from_row(row: dict[str, Any]) -> MemoryLinkedEntityRec
     return MemoryLinkedEntityRecord.model_validate(payload)
 
 
+def _memory_provenance_summary_from_payload(payload: dict[str, Any]) -> MemoryProvenanceSummaryRecord:
+    return MemoryProvenanceSummaryRecord.model_validate(payload)
+
+
+def _memory_event_supersession_from_payload(payload: dict[str, Any]) -> MemoryEventSupersessionRecord:
+    return MemoryEventSupersessionRecord.model_validate(payload)
+
+
+def _memory_event_episode_membership_from_payload(
+    payload: dict[str, Any],
+) -> MemoryEventEpisodeMembershipRecord:
+    return MemoryEventEpisodeMembershipRecord.model_validate(
+        {
+            "sequence_no": payload["sequence_no"],
+            "inclusion_basis": payload["inclusion_basis"],
+            "episode": _memory_episode_from_row(payload["episode"]),
+        }
+    )
+
+
 def _memory_event_detail_from_payload(payload: dict[str, Any]) -> MemoryEventDetailRecord:
     decision = output_guard.evaluate(classification_level=payload["classification_level"])
     hydrated = dict(payload)
@@ -164,8 +188,19 @@ def _memory_event_detail_from_payload(payload: dict[str, Any]) -> MemoryEventDet
     hydrated["provenance"] = [
         _memory_provenance_from_row(item) for item in hydrated.get("provenance", [])
     ]
+    hydrated["provenance_summary"] = _memory_provenance_summary_from_payload(
+        hydrated.get("provenance_summary", {})
+    )
     hydrated["linked_entities"] = [
         _memory_linked_entity_from_row(item) for item in hydrated.get("linked_entities", [])
+    ]
+    hydrated["episode_memberships"] = [
+        _memory_event_episode_membership_from_payload(item)
+        for item in hydrated.get("episode_memberships", [])
+    ]
+    hydrated["supersession_relationships"] = [
+        _memory_event_supersession_from_payload(item)
+        for item in hydrated.get("supersession_relationships", [])
     ]
     return MemoryEventDetailRecord.model_validate(hydrated)
 
@@ -198,6 +233,9 @@ def _memory_episode_detail_from_payload(payload: dict[str, Any]) -> MemoryEpisod
     hydrated["provenance"] = [
         _memory_provenance_from_row(item) for item in hydrated.get("provenance", [])
     ]
+    hydrated["provenance_summary"] = _memory_provenance_summary_from_payload(
+        hydrated.get("provenance_summary", {})
+    )
     hydrated["linked_events"] = [
         _memory_episode_member_from_payload(item) for item in hydrated.get("linked_events", [])
     ]
@@ -365,10 +403,22 @@ def memory_events(
     room_id: str = Query(..., min_length=1),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    status: MemoryStatus | None = Query(default=None),
+    event_type: str | None = Query(default=None, min_length=1),
+    ingest_run_id: int | None = Query(default=None, ge=1),
+    include_corrected: bool = Query(default=True),
     repository: KloneRepository = Depends(get_repository),
 ) -> list[MemoryEventRecord]:
     room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
-    rows = repository.list_memory_events(room_id=room.id, limit=limit, offset=offset)
+    rows = MemoryService(repository).query_events(
+        room_id=room.id,
+        limit=limit,
+        offset=offset,
+        status=status,
+        event_type=event_type,
+        ingest_run_id=ingest_run_id,
+        include_corrected=include_corrected,
+    )
     return [_memory_event_from_row(row) for row in rows]
 
 
@@ -415,10 +465,22 @@ def memory_episodes(
     room_id: str = Query(..., min_length=1),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    status: MemoryStatus | None = Query(default=None),
+    episode_type: MemoryEpisodeType | None = Query(default=None),
+    ingest_run_id: int | None = Query(default=None, ge=1),
+    include_corrected: bool = Query(default=True),
     repository: KloneRepository = Depends(get_repository),
 ) -> list[MemoryEpisodeRecord]:
     room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
-    rows = repository.list_memory_episodes(room_id=room.id, limit=limit, offset=offset)
+    rows = MemoryService(repository).query_episodes(
+        room_id=room.id,
+        limit=limit,
+        offset=offset,
+        status=status,
+        episode_type=episode_type,
+        ingest_run_id=ingest_run_id,
+        include_corrected=include_corrected,
+    )
     return [_memory_episode_from_row(row) for row in rows]
 
 

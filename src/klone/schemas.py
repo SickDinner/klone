@@ -274,6 +274,31 @@ class MemoryEpisodeMemberRecord(BaseModel):
     event: MemoryEventRecord
 
 
+class MemoryEventEpisodeMembershipRecord(BaseModel):
+    sequence_no: int
+    inclusion_basis: str
+    episode: MemoryEpisodeRecord
+
+
+class MemoryEventSupersessionRecord(BaseModel):
+    id: str
+    room_id: str
+    old_event_id: str
+    new_event_id: str
+    reason: str | None = None
+    created_at: str
+    created_by_role: str
+    event_role: str
+
+
+class MemoryProvenanceSummaryRecord(BaseModel):
+    total_count: int
+    source_lineage_count: int
+    seed_basis_count: int
+    membership_basis_count: int
+    source_refs: list[str]
+
+
 class MemorySeedResult(BaseModel):
     room_id: str | None = None
     ingest_run_id: int | None = None
@@ -326,7 +351,10 @@ class MemoryEventDetailRecord(MemoryEventRecord):
     source_lineage: list[MemoryProvenanceRecord]
     seed_basis: list[MemoryProvenanceRecord]
     provenance: list[MemoryProvenanceRecord]
+    provenance_summary: MemoryProvenanceSummaryRecord
     linked_entities: list[MemoryLinkedEntityRecord]
+    episode_memberships: list[MemoryEventEpisodeMembershipRecord]
+    supersession_relationships: list[MemoryEventSupersessionRecord]
 
 
 class MemoryEpisodeDetailRecord(MemoryEpisodeRecord):
@@ -334,4 +362,5 @@ class MemoryEpisodeDetailRecord(MemoryEpisodeRecord):
     seed_basis: list[MemoryProvenanceRecord]
     membership_basis: list[MemoryProvenanceRecord]
     provenance: list[MemoryProvenanceRecord]
+    provenance_summary: MemoryProvenanceSummaryRecord
     linked_events: list[MemoryEpisodeMemberRecord]

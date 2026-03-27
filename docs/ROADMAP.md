@@ -30,6 +30,14 @@ Contract closeout:
 - stability tests
 - no new write surface
 
+## Phase 2B.5
+Stress / invariant verification:
+- replay/correction stress cases
+- room isolation adversarial checks
+- provenance stability checks
+- legacy SQLite bootstrap tolerance
+- no runtime feature expansion
+
 ## Phase 2C.1
 Query / Retrieval Primitives:
 - status-aware filtering

@@ -4,19 +4,11 @@
 Phase 2C.1: Query / Retrieval Primitives
 
 ## Baseline
-- 2B.1 complete
-- 2B.2 complete
-- 2B.3 complete
-- 2B.4 complete
-- 2C.1 step 1 complete:
-  - room-scoped memory event query primitive
-  - status-aware filtering
-  - deterministic ordering/pagination
-  - correction-aware query coverage
-  - tests verified
+- 2B.1 through 2B.5 complete
+- memory spine, provenance, replay, correction, contract lock, and stress verification are in place
 
 ## Immediate goal
-Implement the next smallest safe 2C.1 substep:
+Continue the next smallest safe 2C.1 substep:
 episode query primitive plus episode/event traversal refinement.
 
 ## Approved scope

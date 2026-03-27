@@ -248,6 +248,7 @@ class MemoryEventRecord(BaseModel):
     corrected_at: str | None = None
     corrected_by_role: str | None = None
     metadata: dict[str, Any] | None = None
+    provenance_summary: "MemoryProvenanceSummaryRecord | None" = None
     created_at: str
     updated_at: str
 
@@ -284,6 +285,7 @@ class MemoryEpisodeRecord(BaseModel):
     start_at: str
     end_at: str
     metadata: dict[str, Any] | None = None
+    provenance_summary: "MemoryProvenanceSummaryRecord | None" = None
     created_at: str
     updated_at: str
 

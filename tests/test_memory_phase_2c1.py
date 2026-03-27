@@ -265,6 +265,50 @@ class MemoryPhase2C1Tests(unittest.TestCase):
         self.assertGreater(episode_detail.provenance_summary.membership_basis_count, 0)
         self.assertGreaterEqual(len(episode_detail.linked_events), 1)
 
+    def test_query_results_expose_provenance_summary(self) -> None:
+        result = self._ingest_dataset(
+            label="Query Provenance Summary",
+            classification_level="personal",
+            folder_name="query_provenance_summary",
+            files={"note.txt": "alpha"},
+        )
+
+        room_id = "restricted-room"
+        run_id = result["run"]["id"]
+        episode_id = system_ingest_episode_id(room_id=room_id, ingest_run_id=run_id)
+
+        event_rows = memory_events(
+            room_id=room_id,
+            repository=self.repository,
+            limit=50,
+            offset=0,
+            status=None,
+            event_type=None,
+            ingest_run_id=run_id,
+            include_corrected=True,
+        )
+        self.assertTrue(event_rows)
+        started_event = next(row for row in event_rows if row.event_type == "ingest_started")
+        self.assertIsNotNone(started_event.provenance_summary)
+        self.assertGreater(started_event.provenance_summary.total_count, 0)
+        self.assertGreater(started_event.provenance_summary.source_lineage_count, 0)
+
+        episode_rows = memory_episodes(
+            room_id=room_id,
+            repository=self.repository,
+            limit=50,
+            offset=0,
+            status=None,
+            episode_type=None,
+            ingest_run_id=run_id,
+            include_corrected=True,
+        )
+        self.assertTrue(episode_rows)
+        episode_row = next(row for row in episode_rows if row.id == episode_id)
+        self.assertIsNotNone(episode_row.provenance_summary)
+        self.assertGreater(episode_row.provenance_summary.total_count, 0)
+        self.assertGreater(episode_row.provenance_summary.source_lineage_count, 0)
+
     def test_room_isolation_for_queries_and_traversal(self) -> None:
         restricted_result = self._ingest_dataset(
             label="Restricted Dataset",

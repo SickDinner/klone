@@ -437,6 +437,25 @@ class MemoryService:
         )
         return correction
 
+    def _attach_provenance_summary(
+        self,
+        *,
+        room_id: str,
+        owner_type: str,
+        owner_id: str,
+        payload: dict[str, Any],
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any]:
+        hydrated = dict(payload)
+        provenance = self.repository.list_memory_provenance(
+            room_id=room_id,
+            owner_type=owner_type,
+            owner_id=owner_id,
+            conn=conn,
+        )
+        hydrated["provenance_summary"] = self._build_provenance_summary(provenance)
+        return hydrated
+
     def query_events(
         self,
         *,
@@ -449,17 +468,23 @@ class MemoryService:
         include_corrected: bool = True,
     ) -> list[dict[str, Any]]:
         self._require_room(room_id)
+        rows = self.repository.list_memory_events(
+            room_id=room_id,
+            limit=limit,
+            offset=offset,
+            status=status,
+            event_type=event_type,
+            ingest_run_id=ingest_run_id,
+            include_corrected=include_corrected,
+        )
         return [
-            _decode_row_metadata(row)
-            for row in self.repository.list_memory_events(
+            self._attach_provenance_summary(
                 room_id=room_id,
-                limit=limit,
-                offset=offset,
-                status=status,
-                event_type=event_type,
-                ingest_run_id=ingest_run_id,
-                include_corrected=include_corrected,
+                owner_type="event",
+                owner_id=str(row["id"]),
+                payload=_decode_row_metadata(row),
             )
+            for row in rows
         ]
 
     def query_episodes(
@@ -474,17 +499,23 @@ class MemoryService:
         include_corrected: bool = True,
     ) -> list[dict[str, Any]]:
         self._require_room(room_id)
+        rows = self.repository.list_memory_episodes(
+            room_id=room_id,
+            limit=limit,
+            offset=offset,
+            status=status,
+            episode_type=episode_type,
+            ingest_run_id=ingest_run_id,
+            include_corrected=include_corrected,
+        )
         return [
-            _decode_row_metadata(row)
-            for row in self.repository.list_memory_episodes(
+            self._attach_provenance_summary(
                 room_id=room_id,
-                limit=limit,
-                offset=offset,
-                status=status,
-                episode_type=episode_type,
-                ingest_run_id=ingest_run_id,
-                include_corrected=include_corrected,
+                owner_type="episode",
+                owner_id=row["id"],
+                payload=_decode_row_metadata(row),
             )
+            for row in rows
         ]
 
     def list_event_episode_memberships(

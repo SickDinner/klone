@@ -1,6 +1,13 @@
 from typing import Literal, get_args
 
 
+APP_VERSION = "0.2.0"
+BOOTSTRAP_VERSION = "b00.1"
+SCHEMA_VERSION = "phase_2b_4_memory_correction"
+SCHEMA_USER_VERSION = 204
+MODULE_REGISTRY_VERSION = "system_blueprint_v1"
+
+
 ClassificationLevel = Literal["public", "personal", "intimate", "restricted_bio"]
 AssetKind = Literal["image", "audio", "video", "text", "document", "archive", "generic"]
 IngestStatus = Literal["pending", "running", "completed", "completed_with_warnings", "failed"]

@@ -9,7 +9,30 @@ import re
 import sqlite3
 from typing import Any
 
-from .contracts import ClassificationLevel, IngestStatus, MEMORY_STATUS_VALUES, MemoryStatus
+from .contracts import (
+    BOOTSTRAP_VERSION,
+    ClassificationLevel,
+    IngestStatus,
+    MEMORY_STATUS_VALUES,
+    MemoryStatus,
+    SCHEMA_USER_VERSION,
+    SCHEMA_VERSION,
+)
+
+
+EXPECTED_TABLES = (
+    "assets",
+    "audit_events",
+    "datasets",
+    "ingest_runs",
+    "memory_entities",
+    "memory_episode_events",
+    "memory_episodes",
+    "memory_event_entities",
+    "memory_event_supersessions",
+    "memory_events",
+    "memory_provenance",
+)
 
 
 def utc_now_iso() -> str:
@@ -24,9 +47,11 @@ def slugify(value: str) -> str:
 class KloneRepository:
     def __init__(self, db_path: Path) -> None:
         self.db_path = Path(db_path)
+        self._bootstrap_report: dict[str, Any] | None = None
 
     # Schema bootstrap
-    def initialize(self) -> None:
+    def initialize(self) -> dict[str, Any]:
+        database_preexisting = self.db_path.exists()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self.connection() as conn:
             conn.executescript(
@@ -309,6 +334,12 @@ class KloneRepository:
             )
             conn.execute("UPDATE memory_events SET status = 'active' WHERE status IS NULL")
             conn.execute("UPDATE memory_episodes SET status = 'active' WHERE status IS NULL")
+            conn.execute(f"PRAGMA user_version = {SCHEMA_USER_VERSION}")
+            self._bootstrap_report = self._build_bootstrap_report(
+                conn,
+                database_preexisting=database_preexisting,
+            )
+            return dict(self._bootstrap_report)
 
     @contextmanager
     def connection(self) -> Iterator[sqlite3.Connection]:
@@ -382,6 +413,69 @@ class KloneRepository:
         if column_name in existing_columns:
             return
         conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_sql}")
+
+    def _list_tables(self, conn: sqlite3.Connection) -> list[str]:
+        rows = conn.execute(
+            """
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+            ORDER BY name ASC
+            """
+        ).fetchall()
+        return [str(row["name"]) for row in rows]
+
+    def _table_columns(self, conn: sqlite3.Connection, table_name: str) -> set[str]:
+        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        return {str(row["name"]) for row in rows}
+
+    def _build_bootstrap_report(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        database_preexisting: bool,
+    ) -> dict[str, Any]:
+        actual_tables = self._list_tables(conn)
+        actual_table_set = set(actual_tables)
+        missing_tables = sorted(table for table in EXPECTED_TABLES if table not in actual_table_set)
+        memory_event_columns = self._table_columns(conn, "memory_events")
+        memory_episode_columns = self._table_columns(conn, "memory_episodes")
+        correction_schema_ready = (
+            "memory_event_supersessions" in actual_table_set
+            and {"status", "correction_reason", "corrected_at", "corrected_by_role"}.issubset(
+                memory_episode_columns
+            )
+            and {
+                "status",
+                "correction_reason",
+                "superseded_by_id",
+                "corrected_at",
+                "corrected_by_role",
+            }.issubset(memory_event_columns)
+        )
+        schema_user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        return {
+            "bootstrap_version": BOOTSTRAP_VERSION,
+            "schema_version": SCHEMA_VERSION,
+            "schema_user_version": schema_user_version,
+            "bootstrap_mode": "existing_db" if database_preexisting else "fresh_db",
+            "database_path": str(self.db_path),
+            "initialized_at": utc_now_iso(),
+            "expected_tables": list(EXPECTED_TABLES),
+            "actual_tables": actual_tables,
+            "missing_tables": missing_tables,
+            "correction_schema_ready": correction_schema_ready,
+        }
+
+    def bootstrap_report(self) -> dict[str, Any]:
+        if self._bootstrap_report is not None:
+            return dict(self._bootstrap_report)
+        with self.connection() as conn:
+            self._bootstrap_report = self._build_bootstrap_report(
+                conn,
+                database_preexisting=self.db_path.exists(),
+            )
+            return dict(self._bootstrap_report)
 
     # Dataset persistence
     def upsert_dataset(

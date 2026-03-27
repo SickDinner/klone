@@ -7,8 +7,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .blueprint import SYSTEM_BLUEPRINT
-from .config import settings
-from .contracts import MemoryEpisodeType, MemoryStatus
+from .config import Settings, settings
+from .contracts import APP_VERSION, MODULE_REGISTRY_VERSION, MemoryEpisodeType, MemoryStatus
 from .guards import access_guard, governance_guard_catalog, output_guard
 from .ingest import ingest_dataset
 from .memory import MemoryService
@@ -33,9 +33,12 @@ from .schemas import (
     MemoryProvenanceRecord,
     MemoryProvenanceSummaryRecord,
     MemoryEventSupersessionRecord,
+    ModuleCapabilityRecord,
     MissionControlStatus,
     PermissionLevelRecord,
+    BootstrapStatusRecord,
     RoomRecord,
+    RuntimeConfigRecord,
 )
 
 
@@ -44,6 +47,19 @@ router = APIRouter(prefix="/api")
 
 def get_repository(request: Request) -> KloneRepository:
     return request.app.state.repository
+
+
+def get_runtime_settings(request: Request) -> Settings:
+    return getattr(request.app.state, "settings", settings)
+
+
+def get_bootstrap_report(request: Request, repository: KloneRepository | None = None) -> dict[str, Any]:
+    state_report = getattr(request.app.state, "bootstrap_report", None)
+    if state_report is not None:
+        return dict(state_report)
+    if repository is None:
+        repository = get_repository(request)
+    return repository.bootstrap_report()
 
 
 def _resolve_rooms(
@@ -242,19 +258,46 @@ def _memory_episode_detail_from_payload(payload: dict[str, Any]) -> MemoryEpisod
     return MemoryEpisodeDetailRecord.model_validate(hydrated)
 
 
+def _module_registry_payload() -> list[ModuleCapabilityRecord]:
+    return [
+        ModuleCapabilityRecord(
+            id=module.id,
+            name=module.name,
+            stage=module.stage,
+            status=module.status,
+            supervisor=module.supervisor,
+            key_inputs=list(module.key_inputs),
+            outputs=list(module.outputs),
+            capability_count=len(module.key_inputs) + len(module.outputs),
+        )
+        for module in SYSTEM_BLUEPRINT.modules
+    ]
+
+
 @router.get("/health")
-def health() -> dict:
+def health(request: Request, repository: KloneRepository = Depends(get_repository)) -> dict:
+    runtime_settings = get_runtime_settings(request)
+    bootstrap = get_bootstrap_report(request, repository)
     return {
         "status": "ok",
-        "app": settings.app_name,
-        "environment": settings.environment,
-        "owner_debug_mode": settings.owner_debug_mode,
-        "database_path": str(settings.sqlite_path),
+        "app": runtime_settings.app_name,
+        "app_version": APP_VERSION,
+        "environment": runtime_settings.environment,
+        "owner_debug_mode": runtime_settings.owner_debug_mode,
+        "database_path": str(runtime_settings.sqlite_path),
+        "bootstrap_version": bootstrap["bootstrap_version"],
+        "schema_version": bootstrap["schema_version"],
+        "schema_user_version": bootstrap["schema_user_version"],
+        "bootstrap_mode": bootstrap["bootstrap_mode"],
+        "correction_schema_ready": bootstrap["correction_schema_ready"],
     }
 
 
 @router.get("/status", response_model=MissionControlStatus)
-def status(repository: KloneRepository = Depends(get_repository)) -> MissionControlStatus:
+def status(request: Request, repository: KloneRepository = Depends(get_repository)) -> MissionControlStatus:
+    runtime_settings = get_runtime_settings(request)
+    bootstrap = get_bootstrap_report(request, repository)
+    module_registry = _module_registry_payload()
     rooms = _resolve_rooms(requested_room_id=None, permission="discover")
     aggregate = {
         "dataset_count": 0,
@@ -278,10 +321,14 @@ def status(repository: KloneRepository = Depends(get_repository)) -> MissionCont
         else None
     )
     return MissionControlStatus(
-        app_name=settings.app_name,
-        environment=settings.environment,
-        owner_debug_mode=settings.owner_debug_mode,
-        database_path=str(settings.sqlite_path),
+        app_name=runtime_settings.app_name,
+        app_version=APP_VERSION,
+        environment=runtime_settings.environment,
+        owner_debug_mode=runtime_settings.owner_debug_mode,
+        database_path=str(runtime_settings.sqlite_path),
+        schema_version=bootstrap["schema_version"],
+        bootstrap_version=bootstrap["bootstrap_version"],
+        module_registry_version=MODULE_REGISTRY_VERSION,
         dataset_count=aggregate["dataset_count"],
         indexed_asset_count=aggregate["asset_count"],
         duplicate_asset_count=aggregate["duplicate_count"],
@@ -291,6 +338,9 @@ def status(repository: KloneRepository = Depends(get_repository)) -> MissionCont
         module_count=len(SYSTEM_BLUEPRINT.modules),
         agent_count=len(SYSTEM_BLUEPRINT.agents),
         guard_count=len(governance_guard_catalog()),
+        runtime_config=RuntimeConfigRecord.model_validate(runtime_settings.runtime_snapshot()),
+        bootstrap=BootstrapStatusRecord.model_validate(bootstrap),
+        module_registry=module_registry,
     )
 
 

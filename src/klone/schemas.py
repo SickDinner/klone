@@ -136,11 +136,54 @@ class GovernanceGuardRecord(BaseModel):
     latest_result: GuardResultRecord | None = None
 
 
+class RuntimeConfigRecord(BaseModel):
+    app_name: str
+    app_version: str
+    environment: str
+    owner_debug_mode: bool
+    project_root: str
+    data_dir: str
+    database_path: str
+    asset_preview_limit: int
+    audit_preview_limit: int
+    bootstrap_version: str
+    schema_version: str
+    module_registry_version: str
+
+
+class BootstrapStatusRecord(BaseModel):
+    bootstrap_version: str
+    schema_version: str
+    schema_user_version: int
+    bootstrap_mode: str
+    database_path: str
+    initialized_at: str
+    expected_tables: list[str]
+    actual_tables: list[str]
+    missing_tables: list[str]
+    correction_schema_ready: bool
+
+
+class ModuleCapabilityRecord(BaseModel):
+    id: str
+    name: str
+    stage: str
+    status: str
+    supervisor: str
+    key_inputs: list[str]
+    outputs: list[str]
+    capability_count: int
+
+
 class MissionControlStatus(BaseModel):
     app_name: str
+    app_version: str
     environment: str
     owner_debug_mode: bool
     database_path: str
+    schema_version: str
+    bootstrap_version: str
+    module_registry_version: str
     dataset_count: int
     indexed_asset_count: int
     duplicate_asset_count: int
@@ -150,6 +193,9 @@ class MissionControlStatus(BaseModel):
     module_count: int
     agent_count: int
     guard_count: int
+    runtime_config: RuntimeConfigRecord
+    bootstrap: BootstrapStatusRecord
+    module_registry: list[ModuleCapabilityRecord]
 
 
 class IngestStatusResponse(BaseModel):

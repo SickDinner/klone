@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Klone Mission Control</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">Supervised Modular Clone Architecture</p>
+        <h1>Klone Mission Control</h1>
+        <p class="lede" id="mission">Loading mission summary...</p>
+
+        <div class="hero-grid">
+          <article class="panel panel-accent">
+            <h2>Hypervisor</h2>
+            <p id="hypervisor-answer">Loading control-plane status...</p>
+          </article>
+          <article class="panel">
+            <h2>Phase 2A Focus</h2>
+            <ul class="plain-list">
+              <li>Dataset intake stays room-aware and audited.</li>
+              <li>Indexed assets remain tied to datasets, classifications, and rooms.</li>
+              <li>Governance is visible in the UI, not hidden behind internal assumptions.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <h2>Mission Control Summary</h2>
+          <p>Read-oriented control panels for the current ingest spine, governance hooks, and module health.</p>
+        </div>
+        <div class="status-grid" id="status-cards"></div>
+      </section>
+
+      <section class="section two-up">
+        <article class="panel">
+          <div class="section-head">
+            <h2>Dataset Intake</h2>
+            <p>Scan a local folder into the governed ingest spine with an explicit classification level.</p>
+          </div>
+          <form id="ingest-form" class="form-stack">
+            <label class="field">
+              <span>Label</span>
+              <input type="text" name="label" placeholder="Media Lake Intake" required />
+            </label>
+            <label class="field">
+              <span>Root Path</span>
+              <input type="text" name="root_path" placeholder="C:\\path\\to\\dataset" required />
+            </label>
+            <label class="field">
+              <span>Collection</span>
+              <input type="text" name="collection" value="default" required />
+            </label>
+            <label class="field">
+              <span>Classification Level</span>
+              <select name="classification_level">
+                <option value="public">public</option>
+                <option value="personal" selected>personal</option>
+                <option value="intimate">intimate</option>
+                <option value="restricted_bio">restricted_bio</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Description</span>
+              <textarea name="description" rows="3" placeholder="What this dataset is and why it belongs here"></textarea>
+            </label>
+            <div class="form-actions">
+              <button class="button" type="submit">Scan Dataset</button>
+              <span class="feedback" id="ingest-feedback">No ingest run started yet.</span>
+            </div>
+          </form>
+        </article>
+
+        <article class="panel">
+          <div class="section-head">
+            <h2>Dataset List</h2>
+            <p>Datasets stay visible as governed objects with room linkage, classification, and scan state.</p>
+          </div>
+          <div class="stack" id="dataset-list"></div>
+        </article>
+      </section>
+
+      <section class="section two-up">
+        <article>
+          <div class="section-head">
+            <h2>Indexed Asset Browser</h2>
+            <p>Inspectable asset index with hashing, extraction status, room scope, and ingest timestamps.</p>
+          </div>
+          <div class="panel table-panel">
+            <div class="toolbar">
+              <label class="field field-inline">
+                <span>Room</span>
+                <select id="asset-room-filter"></select>
+              </label>
+              <label class="field field-inline">
+                <span>Dataset</span>
+                <select id="asset-dataset-filter"></select>
+              </label>
+              <button class="button button-secondary" id="asset-refresh" type="button">Refresh</button>
+            </div>
+            <div class="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th>File</th>
+                    <th>Dataset</th>
+                    <th>Kind</th>
+                    <th>Classification</th>
+                    <th>Extraction</th>
+                    <th>Indexed</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody id="asset-table"></tbody>
+              </table>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="section-head">
+            <h2>Asset Detail</h2>
+            <p>Read-only inspection of the selected indexed asset.</p>
+          </div>
+          <div id="asset-detail" class="detail-card empty-state">Select an asset from the browser.</div>
+        </article>
+      </section>
+
+      <section class="section three-up">
+        <article class="panel">
+          <div class="section-head">
+            <h2>Room Registry</h2>
+            <p>First-class governed rooms with classification, supervisor, retention, and role boundaries.</p>
+          </div>
+          <div class="stack" id="room-list"></div>
+        </article>
+        <article class="panel">
+          <div class="section-head">
+            <h2>Governance Guards</h2>
+            <p>Deterministic guard shells that gate access, classification, audit, and output decisions.</p>
+          </div>
+          <div class="stack" id="guard-list"></div>
+        </article>
+        <article class="panel">
+          <div class="section-head">
+            <h2>Audit Preview</h2>
+            <p>Recent audit events for ingest and room-governed operations.</p>
+          </div>
+          <div class="stack" id="audit-list"></div>
+        </article>
+      </section>
+
+      <section class="section two-up">
+        <article>
+          <div class="section-head">
+            <h2>Modules</h2>
+            <p>Current module status across the supervised architecture.</p>
+          </div>
+          <div class="card-grid" id="modules"></div>
+        </article>
+        <article>
+          <div class="section-head">
+            <h2>Ingest Runs</h2>
+            <p>Recent ingest run history with typed status and indexing counts.</p>
+          </div>
+          <div class="stack" id="ingest-runs"></div>
+        </article>
+      </section>
+
+      <section class="section two-up">
+        <article>
+          <div class="section-head">
+            <h2>Agents</h2>
+            <p>Registry of supervisors and workers involved in the current architecture.</p>
+          </div>
+          <div class="stack" id="agents"></div>
+        </article>
+        <article>
+          <div class="section-head">
+            <h2>Build Phases</h2>
+            <p>Roadmap from the ingest spine toward memory, art, genomics, and later controlled simulation layers.</p>
+          </div>
+          <div class="stack" id="phases"></div>
+        </article>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

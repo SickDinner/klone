@@ -1,0 +1,97 @@
+Metadata-Version: 2.4
+Name: klone
+Version: 0.1.0
+Summary: Modular local-first architecture for a personal clone system.
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi<1.0,>=0.115
+Requires-Dist: uvicorn<1.0,>=0.34
+
+# Klone
+
+`Klone` on modulaarinen, paikallisesti hallittu tutkimus- ja käyttöliittymärunko henkilökohtaiselle "virtuaalikloonille". Tämän version tarkoitus on luoda turvallinen perusta, jossa muistot, media, genomidata, piirros- ja kuvamittaristot sekä myöhemmät simulaatiot voidaan koota saman supervisor-kerroksen alle.
+
+## Mitä tämä on
+
+- Oma käyttöliittymä koko järjestelmälle.
+- Supervisor/hypervisor-arkkitehtuuri, jossa jokaisella osa-alueella on oma vastuullinen moduulinsa.
+- Luottamustasoihin jaettu tietomalli, jotta raaka DNA, yksityisviestit, kuvat ja äänet eivät elä samassa avoimessa säiliössä.
+- Ensimmäinen API + dashboard, josta näkee järjestelmän moduulit, agentit ja toteutusvaiheet.
+
+## Mitä tämä ei vielä ole
+
+- Ei valmis "digitaalinen ihminen".
+- Ei kliininen diagnoosityökalu.
+- Ei koko genomin atomitason simulaattori.
+
+Käytännössä oikea tie on:
+
+1. `genomics intelligence`
+   raakadata -> laadunvarmistus -> variantit -> annotaatio -> geenit/proteiinit/reitit
+2. `molecular modeling`
+   valikoitu proteiini tai variantti -> rakennekonteksti -> simulaatio
+3. `memory / media intelligence`
+   viestit, kuvat, äänet, päiväkirjat -> aikajana, profiilit, muistiverkko
+4. `clone interaction layer`
+   käyttöliittymä, agentit, supervisor, arviointi, debuggaus
+
+## Onko hypervisor minä?
+
+Ei pysyvänä tuotantojärjestelmän komponenttina. Voin toimia arkkitehtina, pariohjelmoijana ja debuggerina, mutta oikea `hypervisor` kannattaa toteuttaa omana paikallisena ohjelmistokerroksenaan, jonka säännöt, lokitus, käyttöoikeudet ja debug-oikeudet ovat sinun hallinnassasi.
+
+## Arkkitehtuurin ydin
+
+Järjestelmä jakautuu neljään vyöhykkeeseen:
+
+- `public knowledge`
+  julkiset tietokannat, julkaisut, referenssit
+- `personal knowledge`
+  kuvat, äänet, piirrokset, dokumentit, aikajana
+- `sensitive cognition`
+  muistot, yksityisviestit, vuorovaikutushistoria, henkilökohtaiset mallit
+- `restricted bio`
+  genomidata, variantit, rakenteellinen biomallinnus, korkean riskin analytiikka
+
+Supervisor hallitsee liikennettä vyöhykkeiden välillä. Moduulit eivät saa lukea kaikkea oletuksena.
+
+## Projektin rakenne
+
+```text
+.
+├─ docs/
+│  ├─ ARCHITECTURE.md
+│  └─ DATA_GOVERNANCE.md
+├─ src/
+│  └─ klone/
+│     ├─ __init__.py
+│     ├─ blueprint.py
+│     ├─ config.py
+│     ├─ main.py
+│     ├─ models.py
+│     └─ static/
+│        ├─ app.js
+│        ├─ index.html
+│        └─ styles.css
+└─ pyproject.toml
+```
+
+## Käynnistys
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e .
+uvicorn klone.main:app --reload
+```
+
+Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
+
+## Seuraavat järkevät rakennusvaiheet
+
+1. Ingest-putket tiedostokansioille, viesteille, kuville ja äänille.
+2. Vektorihaku + evidenssivarasto muistimoduulille.
+3. Genomidatan erillinen sisäänluku, annotaatio ja oikeuksien rajaus.
+4. Kuvien ja piirrosten formaalinen mittaristo.
+5. Targetoitu molekyyli- ja proteiinitason mallinnus valituille, tunnetuille biomolekyyleille.
+6. Supervisorin evaluointi-, audit- ja debug-kanava.
+

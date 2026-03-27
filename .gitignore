@@ -9,3 +9,4 @@ Thumbs.db
 data/
 exports/
 
+tmp_phase_2b_1_verify/*.db

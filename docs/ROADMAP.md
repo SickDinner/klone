@@ -30,9 +30,17 @@ Contract closeout:
 - stability tests
 - no new write surface
 
-## Phase 2C
-Query / retrieval layer:
+## Phase 2C.1
+Query / retrieval primitives:
 - correction-aware querying
+- active / rejected / superseded visibility
 - lineage traversal
+- episode / event navigation
+- explainability-first query behavior
+- still no semantic/fuzzy behavior until core operations are stable
+
+## Phase 2C
+Broader query / retrieval layer:
+- build on 2C.1 primitives only after contracts remain stable
 - explainability improvements
 - still no semantic/fuzzy behavior until core operations are stable

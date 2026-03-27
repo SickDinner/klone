@@ -1,13 +1,14 @@
 # KLONE Project Status
 
 ## Current phase
-Phase 2B.3 complete or in final closeout.
-Next step: Phase 2B.4 Memory Correction Contract Closeout.
+Phase 2B.4 complete.
+Next step: Phase 2C.1 Query / Retrieval primitives.
 
 ## Completed
 - Phase 2B.1: deterministic memory spine
 - Phase 2B.2: normalized provenance + internal replay + hydrated detail reads
 - Phase 2B.3: correction layer + dedicated event supersession storage
+- Phase 2B.4: correction contract closeout + migration caveat + read stability
 
 ## Invariants
 - evidence_text is immutable
@@ -24,4 +25,4 @@ Next step: Phase 2B.4 Memory Correction Contract Closeout.
 - every phase ends with compile + tests + local real-app verification
 
 ## Next approved phase
-Phase 2B.4: contract lock, migration note, read stability
+Phase 2C.1: correction-aware query and retrieval primitives

@@ -10,6 +10,7 @@ from .blueprint import SYSTEM_BLUEPRINT
 from .config import settings
 from .guards import access_guard, governance_guard_catalog, output_guard
 from .ingest import ingest_dataset
+from .memory import MemoryService
 from .repository import KloneRepository
 from .rooms import PERMISSION_LEVELS, room_registry
 from .schemas import (
@@ -21,8 +22,13 @@ from .schemas import (
     IngestExecutionResponse,
     IngestStatusResponse,
     MemoryEntityRecord,
+    MemoryEpisodeDetailRecord,
+    MemoryEpisodeMemberRecord,
     MemoryEpisodeRecord,
+    MemoryEventDetailRecord,
     MemoryEventRecord,
+    MemoryLinkedEntityRecord,
+    MemoryProvenanceRecord,
     MissionControlStatus,
     PermissionLevelRecord,
     RoomRecord,
@@ -128,6 +134,74 @@ def _memory_episode_from_row(row: dict[str, Any]) -> MemoryEpisodeRecord:
         payload["summary"] = "[summary-only]"
         payload["metadata"] = {"policy": "summary_only"}
     return MemoryEpisodeRecord.model_validate(payload)
+
+
+def _memory_provenance_from_row(row: dict[str, Any]) -> MemoryProvenanceRecord:
+    return MemoryProvenanceRecord.model_validate(dict(row))
+
+
+def _memory_linked_entity_from_row(row: dict[str, Any]) -> MemoryLinkedEntityRecord:
+    payload = dict(row)
+    decision = output_guard.evaluate(classification_level=payload["classification_level"])
+    if decision.decision == "summary_only":
+        payload["canonical_name"] = "[summary-only]"
+        payload["metadata"] = {"policy": "summary_only"}
+    return MemoryLinkedEntityRecord.model_validate(payload)
+
+
+def _memory_event_detail_from_payload(payload: dict[str, Any]) -> MemoryEventDetailRecord:
+    decision = output_guard.evaluate(classification_level=payload["classification_level"])
+    hydrated = dict(payload)
+    if decision.decision == "summary_only":
+        hydrated["evidence_text"] = "[summary-only]"
+        hydrated["metadata"] = {"policy": "summary_only"}
+    hydrated["source_lineage"] = [
+        _memory_provenance_from_row(item) for item in hydrated.get("source_lineage", [])
+    ]
+    hydrated["seed_basis"] = [
+        _memory_provenance_from_row(item) for item in hydrated.get("seed_basis", [])
+    ]
+    hydrated["provenance"] = [
+        _memory_provenance_from_row(item) for item in hydrated.get("provenance", [])
+    ]
+    hydrated["linked_entities"] = [
+        _memory_linked_entity_from_row(item) for item in hydrated.get("linked_entities", [])
+    ]
+    return MemoryEventDetailRecord.model_validate(hydrated)
+
+
+def _memory_episode_member_from_payload(payload: dict[str, Any]) -> MemoryEpisodeMemberRecord:
+    return MemoryEpisodeMemberRecord.model_validate(
+        {
+            "sequence_no": payload["sequence_no"],
+            "inclusion_basis": payload["inclusion_basis"],
+            "event": _memory_event_from_row(payload["event"]),
+        }
+    )
+
+
+def _memory_episode_detail_from_payload(payload: dict[str, Any]) -> MemoryEpisodeDetailRecord:
+    decision = output_guard.evaluate(classification_level=payload["classification_level"])
+    hydrated = dict(payload)
+    if decision.decision == "summary_only":
+        hydrated["summary"] = "[summary-only]"
+        hydrated["metadata"] = {"policy": "summary_only"}
+    hydrated["source_lineage"] = [
+        _memory_provenance_from_row(item) for item in hydrated.get("source_lineage", [])
+    ]
+    hydrated["seed_basis"] = [
+        _memory_provenance_from_row(item) for item in hydrated.get("seed_basis", [])
+    ]
+    hydrated["membership_basis"] = [
+        _memory_provenance_from_row(item) for item in hydrated.get("membership_basis", [])
+    ]
+    hydrated["provenance"] = [
+        _memory_provenance_from_row(item) for item in hydrated.get("provenance", [])
+    ]
+    hydrated["linked_events"] = [
+        _memory_episode_member_from_payload(item) for item in hydrated.get("linked_events", [])
+    ]
+    return MemoryEpisodeDetailRecord.model_validate(hydrated)
 
 
 @router.get("/health")
@@ -298,17 +372,17 @@ def memory_events(
     return [_memory_event_from_row(row) for row in rows]
 
 
-@router.get("/memory/events/{event_id}", response_model=MemoryEventRecord)
+@router.get("/memory/events/{event_id}", response_model=MemoryEventDetailRecord)
 def memory_event_detail(
     event_id: int,
     room_id: str = Query(..., min_length=1),
     repository: KloneRepository = Depends(get_repository),
-) -> MemoryEventRecord:
+) -> MemoryEventDetailRecord:
     room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
-    row = repository.get_memory_event(event_id, room_id=room.id)
-    if row is None:
+    payload = MemoryService(repository).get_event_detail(room_id=room.id, event_id=event_id)
+    if payload is None:
         raise HTTPException(status_code=404, detail=f"Memory event {event_id} was not found.")
-    return _memory_event_from_row(row)
+    return _memory_event_detail_from_payload(payload)
 
 
 @router.get("/memory/entities", response_model=list[MemoryEntityRecord])
@@ -348,37 +422,37 @@ def memory_episodes(
     return [_memory_episode_from_row(row) for row in rows]
 
 
-@router.get("/memory/episodes/{episode_id}", response_model=MemoryEpisodeRecord)
+@router.get("/memory/episodes/{episode_id}", response_model=MemoryEpisodeDetailRecord)
 def memory_episode_detail(
     episode_id: str,
     room_id: str = Query(..., min_length=1),
     repository: KloneRepository = Depends(get_repository),
-) -> MemoryEpisodeRecord:
+) -> MemoryEpisodeDetailRecord:
     room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
-    row = repository.get_memory_episode(episode_id, room_id=room.id)
-    if row is None:
+    payload = MemoryService(repository).get_episode_detail(room_id=room.id, episode_id=episode_id)
+    if payload is None:
         raise HTTPException(status_code=404, detail=f"Memory episode {episode_id} was not found.")
-    return _memory_episode_from_row(row)
+    return _memory_episode_detail_from_payload(payload)
 
 
-@router.get("/memory/episodes/{episode_id}/events", response_model=list[MemoryEventRecord])
+@router.get("/memory/episodes/{episode_id}/events", response_model=list[MemoryEpisodeMemberRecord])
 def memory_episode_events(
     episode_id: str,
     room_id: str = Query(..., min_length=1),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     repository: KloneRepository = Depends(get_repository),
-) -> list[MemoryEventRecord]:
+) -> list[MemoryEpisodeMemberRecord]:
     room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
     if repository.get_memory_episode(episode_id, room_id=room.id) is None:
         raise HTTPException(status_code=404, detail=f"Memory episode {episode_id} was not found.")
-    rows = repository.list_memory_episode_events(
-        episode_id,
+    members = MemoryService(repository).list_episode_members(
         room_id=room.id,
+        episode_id=episode_id,
         limit=limit,
         offset=offset,
     )
-    return [_memory_event_from_row(row) for row in rows]
+    return [_memory_episode_member_from_payload(item) for item in members]
 
 
 @router.post("/ingest/scan", response_model=IngestExecutionResponse)

@@ -651,3 +651,369 @@ class MemoryService:
         row, created = self.repository.upsert_memory_episode(episode_payload, conn=conn)
         row["_created"] = created
         return row
+
+    def _upsert_event_provenance(
+        self,
+        *,
+        event_row: Mapping[str, Any],
+        source_event: Mapping[str, Any],
+        seed_version: str,
+        result: MemorySeedResult,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
+        source_record_id = source_event.get("id")
+        if source_record_id is None:
+            result.provenance_skipped += 1
+            return
+        rows = [
+            {
+                "room_id": event_row["room_id"],
+                "owner_type": "event",
+                "owner_id": str(event_row["id"]),
+                "provenance_type": "source_lineage",
+                "source_table": "audit_events",
+                "source_record_id": str(source_record_id),
+                "source_field": None,
+                "basis_type": "source_record",
+                "basis_value": None,
+            },
+            {
+                "room_id": event_row["room_id"],
+                "owner_type": "event",
+                "owner_id": str(event_row["id"]),
+                "provenance_type": "seed_basis",
+                "source_table": "audit_events",
+                "source_record_id": str(source_record_id),
+                "source_field": "event_type",
+                "basis_type": "eligible_audit_event_type",
+                "basis_value": str(source_event["event_type"]),
+            },
+            {
+                "room_id": event_row["room_id"],
+                "owner_type": "event",
+                "owner_id": str(event_row["id"]),
+                "provenance_type": "seed_basis",
+                "source_table": "audit_events",
+                "source_record_id": str(source_record_id),
+                "source_field": "seed_version",
+                "basis_type": "seed_version",
+                "basis_value": seed_version,
+            },
+        ]
+        self._upsert_provenance_rows(rows=rows, result=result, conn=conn)
+
+    def _upsert_episode_provenance(
+        self,
+        *,
+        episode_row: Mapping[str, Any],
+        linked_events: list[dict[str, Any]],
+        seed_version: str,
+        result: MemorySeedResult,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
+        rows: list[dict[str, Any]] = [
+            {
+                "room_id": episode_row["room_id"],
+                "owner_type": "episode",
+                "owner_id": str(episode_row["id"]),
+                "provenance_type": "source_lineage",
+                "source_table": episode_row["source_table"],
+                "source_record_id": episode_row["source_record_id"],
+                "source_field": None,
+                "basis_type": "source_record",
+                "basis_value": None,
+            },
+            {
+                "room_id": episode_row["room_id"],
+                "owner_type": "episode",
+                "owner_id": str(episode_row["id"]),
+                "provenance_type": "seed_basis",
+                "source_table": episode_row["source_table"],
+                "source_record_id": episode_row["source_record_id"],
+                "source_field": "grouping_basis",
+                "basis_type": "grouping_basis",
+                "basis_value": str(episode_row["grouping_basis"]),
+            },
+            {
+                "room_id": episode_row["room_id"],
+                "owner_type": "episode",
+                "owner_id": str(episode_row["id"]),
+                "provenance_type": "seed_basis",
+                "source_table": episode_row["source_table"],
+                "source_record_id": episode_row["source_record_id"],
+                "source_field": "seed_version",
+                "basis_type": "seed_version",
+                "basis_value": seed_version,
+            },
+        ]
+
+        for event_row in linked_events:
+            rows.append(
+                {
+                    "room_id": episode_row["room_id"],
+                    "owner_type": "episode",
+                    "owner_id": str(episode_row["id"]),
+                    "provenance_type": "membership_basis",
+                    "source_table": "memory_events",
+                    "source_record_id": str(event_row["id"]),
+                    "source_field": "ingest_run_id",
+                    "basis_type": "inclusion_basis",
+                    "basis_value": "ingest_run_id_exact_match",
+                }
+            )
+
+        self._upsert_provenance_rows(rows=rows, result=result, conn=conn)
+
+    def _upsert_provenance_rows(
+        self,
+        *,
+        rows: list[dict[str, Any]],
+        result: MemorySeedResult,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
+        for row in rows:
+            if not row.get("room_id") or not row.get("owner_id") or not row.get("source_record_id"):
+                result.provenance_skipped += 1
+                continue
+            self._ensure_room_classification(
+                room_id=row["room_id"],
+                classification_level=self._require_room(row["room_id"]).classification,
+            )
+            _, created = self.repository.upsert_memory_provenance(row, conn=conn)
+            if created:
+                result.provenance_written += 1
+            else:
+                result.provenance_upserted += 1
+
+    def _build_evidence_text(
+        self,
+        source_event: Mapping[str, Any],
+        metadata: Mapping[str, Any] | None,
+    ) -> str | None:
+        common_fields = [
+            ("event_type", source_event["event_type"]),
+            ("actor", source_event["actor"]),
+            ("target_type", source_event["target_type"]),
+            ("target_id", source_event["target_id"]),
+            ("room_id", source_event["room_id"]),
+            ("classification_level", source_event["classification_level"]),
+            ("created_at", source_event["created_at"]),
+        ]
+
+        event_type = source_event["event_type"]
+        if event_type == "ingest_requested":
+            return _stable_fact_string(
+                common_fields
+                + [
+                    ("collection", _metadata_value(metadata, "collection")),
+                    ("root_path", _metadata_value(metadata, "root_path")),
+                ]
+            )
+        if event_type in {"dataset_registered", "dataset_updated"}:
+            return _stable_fact_string(
+                common_fields
+                + [
+                    ("dataset_id", self._extract_exact_int(metadata, "dataset_id")),
+                    ("collection", _metadata_value(metadata, "collection")),
+                    ("root_path", _metadata_value(metadata, "root_path")),
+                    ("description", _metadata_value(metadata, "description")),
+                ]
+            )
+        if event_type == "ingest_started":
+            return _stable_fact_string(
+                common_fields
+                + [
+                    ("dataset_id", self._extract_exact_int(metadata, "dataset_id")),
+                    ("ingest_run_id", self._extract_exact_int(metadata, "ingest_run_id")),
+                    ("files_discovered", self._extract_exact_int(metadata, "files_discovered")),
+                ]
+            )
+        if event_type == "ingest_completed":
+            return _stable_fact_string(
+                common_fields
+                + [
+                    ("dataset_id", self._extract_exact_int(metadata, "dataset_id")),
+                    ("ingest_run_id", self._extract_exact_int(metadata, "ingest_run_id")),
+                    ("files_discovered", self._extract_exact_int(metadata, "files_discovered")),
+                    ("assets_indexed", self._extract_exact_int(metadata, "assets_indexed")),
+                    ("new_assets", self._extract_exact_int(metadata, "new_assets")),
+                    ("updated_assets", self._extract_exact_int(metadata, "updated_assets")),
+                    ("unchanged_assets", self._extract_exact_int(metadata, "unchanged_assets")),
+                    ("duplicates_detected", self._extract_exact_int(metadata, "duplicates_detected")),
+                    ("error_count", len(_metadata_value(metadata, "errors") or [])),
+                ]
+            )
+        if event_type == "ingest_blocked":
+            return _stable_fact_string(
+                common_fields
+                + [
+                    ("guard_name", _metadata_value(metadata, "guard_name")),
+                    ("decision", _metadata_value(metadata, "decision")),
+                    ("requires_supervisor", _metadata_value(metadata, "requires_supervisor")),
+                ]
+            )
+        return None
+
+    def _extract_exact_int(
+        self,
+        metadata: Mapping[str, Any] | None,
+        key: str,
+    ) -> int | None:
+        value = _metadata_value(metadata, key)
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str) and value.isdigit():
+            return int(value)
+        return None
+
+    def _ensure_write_access(
+        self,
+        *,
+        room_id: str,
+        actor_role: str,
+        result: MemorySeedResult,
+        conn: sqlite3.Connection | None = None,
+        mode: str,
+    ) -> None:
+        decision = access_guard.evaluate(
+            room_id=room_id,
+            actor_role=actor_role,
+            requested_permission="write",
+        )
+        if decision.decision not in {"allowed", "requires_approval"}:
+            self._log_batch_blocked(
+                mode=mode,
+                room_id=room_id,
+                ingest_run_id=result.ingest_run_id,
+                room_classification=self._require_room(room_id).classification,
+                reason=decision.reason,
+                result=result,
+                conn=conn,
+            )
+            raise PermissionError(decision.reason)
+
+    def _ensure_room_classification(
+        self,
+        *,
+        room_id: str,
+        classification_level: str,
+    ) -> None:
+        decision = classification_guard.evaluate(
+            room_id=room_id,
+            classification_level=classification_level,
+        )
+        if decision.decision != "allowed":
+            raise PermissionError(decision.reason)
+
+    def _require_room(self, room_id: str):
+        room = room_registry.get_room(room_id)
+        if room is None:
+            raise PermissionError(f"Room {room_id} is not registered.")
+        return room
+
+    def _log_batch_started(
+        self,
+        *,
+        mode: str,
+        room_id: str,
+        ingest_run_id: int | None,
+        seed_version: str,
+        room_classification: str,
+        metadata: Mapping[str, Any] | None = None,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
+        self.audit_service.log_event(
+            event_type=f"memory_{mode}_started",
+            actor="hypervisor",
+            target_type="memory_room",
+            target_id=room_id,
+            room_id=room_id,
+            classification_level=room_classification,
+            summary=f"Memory {mode} started.",
+            metadata=self._result_metadata(
+                room_id=room_id,
+                ingest_run_id=ingest_run_id,
+                seed_version=seed_version,
+                extra=metadata,
+            ),
+            conn=conn,
+        )
+
+    def _log_batch_completed(
+        self,
+        *,
+        mode: str,
+        room_id: str,
+        ingest_run_id: int | None,
+        room_classification: str,
+        result: MemorySeedResult,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
+        self.audit_service.log_event(
+            event_type=f"memory_{mode}_completed",
+            actor="hypervisor",
+            target_type="memory_room",
+            target_id=room_id,
+            room_id=room_id,
+            classification_level=room_classification,
+            summary=f"Memory {mode} completed.",
+            metadata=self._result_metadata(
+                room_id=room_id,
+                ingest_run_id=ingest_run_id,
+                seed_version=result.seed_version,
+                result=result,
+            ),
+            conn=conn,
+        )
+
+    def _log_batch_blocked(
+        self,
+        *,
+        mode: str,
+        room_id: str,
+        ingest_run_id: int | None,
+        room_classification: str,
+        reason: str,
+        result: MemorySeedResult,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
+        self.audit_service.log_event(
+            event_type=f"memory_{mode}_blocked",
+            actor="hypervisor",
+            target_type="memory_room",
+            target_id=room_id,
+            room_id=room_id,
+            classification_level=room_classification,
+            summary=f"Memory {mode} blocked.",
+            metadata=self._result_metadata(
+                room_id=room_id,
+                ingest_run_id=ingest_run_id,
+                seed_version=result.seed_version,
+                result=result,
+                extra={"reason": reason},
+            ),
+            conn=conn,
+        )
+
+    def _result_metadata(
+        self,
+        *,
+        room_id: str,
+        ingest_run_id: int | None,
+        seed_version: str,
+        result: MemorySeedResult | None = None,
+        extra: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        metadata: dict[str, Any] = {
+            "room_id": room_id,
+            "seed_version": seed_version,
+        }
+        if ingest_run_id is not None:
+            metadata["ingest_run_id"] = ingest_run_id
+        if result is not None:
+            metadata.update(result.model_dump())
+        if extra:
+            metadata.update(dict(extra))
+        return metadata

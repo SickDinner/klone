@@ -13,6 +13,7 @@ MemoryEntityType = Literal["dataset", "room", "system_actor"]
 MemoryEpisodeType = Literal["system_ingest_run"]
 MemoryOwnerType = Literal["event", "episode"]
 MemoryProvenanceType = Literal["source_lineage", "seed_basis", "membership_basis"]
+MemoryStatus = Literal["active", "rejected", "superseded"]
 
 
 CLASSIFICATION_LEVEL_VALUES = set(get_args(ClassificationLevel))
@@ -26,3 +27,4 @@ MEMORY_ENTITY_TYPE_VALUES = set(get_args(MemoryEntityType))
 MEMORY_EPISODE_TYPE_VALUES = set(get_args(MemoryEpisodeType))
 MEMORY_OWNER_TYPE_VALUES = set(get_args(MemoryOwnerType))
 MEMORY_PROVENANCE_TYPE_VALUES = set(get_args(MemoryProvenanceType))
+MEMORY_STATUS_VALUES = set(get_args(MemoryStatus))

@@ -13,6 +13,7 @@ from .contracts import (
     MemoryEpisodeType,
     MemoryOwnerType,
     MemoryProvenanceType,
+    MemoryStatus,
     RoomStatus,
     RoomType,
 )
@@ -177,6 +178,11 @@ class MemoryEventRecord(BaseModel):
     recorded_at: str
     title: str
     evidence_text: str
+    status: MemoryStatus = "active"
+    correction_reason: str | None = None
+    superseded_by_id: int | None = None
+    corrected_at: str | None = None
+    corrected_by_role: str | None = None
     metadata: dict[str, Any] | None = None
     created_at: str
     updated_at: str
@@ -207,6 +213,10 @@ class MemoryEpisodeRecord(BaseModel):
     source_record_id: str
     title: str
     summary: str
+    status: MemoryStatus = "active"
+    correction_reason: str | None = None
+    corrected_at: str | None = None
+    corrected_by_role: str | None = None
     start_at: str
     end_at: str
     metadata: dict[str, Any] | None = None
@@ -297,6 +307,18 @@ class MemoryReplayRequestInternal(BaseModel):
 
 class MemoryReplayResult(MemorySeedResult):
     pass
+
+
+class MemoryCorrectionResult(BaseModel):
+    room_id: str
+    memory_kind: str
+    memory_id: str
+    operation: str
+    previous_status: MemoryStatus
+    resulting_status: MemoryStatus
+    superseded_by_id: int | None = None
+    corrected_at: str
+    corrected_by_role: str
 
 
 class MemoryEventDetailRecord(MemoryEventRecord):

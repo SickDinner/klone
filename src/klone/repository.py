@@ -9,7 +9,7 @@ import re
 import sqlite3
 from typing import Any
 
-from .contracts import ClassificationLevel, IngestStatus
+from .contracts import ClassificationLevel, IngestStatus, MEMORY_STATUS_VALUES, MemoryStatus
 
 
 def utc_now_iso() -> str:
@@ -127,6 +127,11 @@ class KloneRepository:
                     recorded_at TEXT NOT NULL,
                     title TEXT NOT NULL,
                     evidence_text TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    correction_reason TEXT,
+                    superseded_by_id INTEGER,
+                    corrected_at TEXT,
+                    corrected_by_role TEXT,
                     metadata_json TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
@@ -169,6 +174,10 @@ class KloneRepository:
                     source_record_id TEXT NOT NULL,
                     title TEXT NOT NULL,
                     summary TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    correction_reason TEXT,
+                    corrected_at TEXT,
+                    corrected_by_role TEXT,
                     start_at TEXT NOT NULL,
                     end_at TEXT NOT NULL,
                     metadata_json TEXT,
@@ -233,6 +242,62 @@ class KloneRepository:
                     );
                 """
             )
+            self._ensure_column(
+                conn,
+                table_name="memory_events",
+                column_name="status",
+                column_sql="status TEXT NOT NULL DEFAULT 'active'",
+            )
+            self._ensure_column(
+                conn,
+                table_name="memory_events",
+                column_name="correction_reason",
+                column_sql="correction_reason TEXT",
+            )
+            self._ensure_column(
+                conn,
+                table_name="memory_events",
+                column_name="superseded_by_id",
+                column_sql="superseded_by_id INTEGER",
+            )
+            self._ensure_column(
+                conn,
+                table_name="memory_events",
+                column_name="corrected_at",
+                column_sql="corrected_at TEXT",
+            )
+            self._ensure_column(
+                conn,
+                table_name="memory_events",
+                column_name="corrected_by_role",
+                column_sql="corrected_by_role TEXT",
+            )
+            self._ensure_column(
+                conn,
+                table_name="memory_episodes",
+                column_name="status",
+                column_sql="status TEXT NOT NULL DEFAULT 'active'",
+            )
+            self._ensure_column(
+                conn,
+                table_name="memory_episodes",
+                column_name="correction_reason",
+                column_sql="correction_reason TEXT",
+            )
+            self._ensure_column(
+                conn,
+                table_name="memory_episodes",
+                column_name="corrected_at",
+                column_sql="corrected_at TEXT",
+            )
+            self._ensure_column(
+                conn,
+                table_name="memory_episodes",
+                column_name="corrected_by_role",
+                column_sql="corrected_by_role TEXT",
+            )
+            conn.execute("UPDATE memory_events SET status = 'active' WHERE status IS NULL")
+            conn.execute("UPDATE memory_episodes SET status = 'active' WHERE status IS NULL")
 
     @contextmanager
     def connection(self) -> Iterator[sqlite3.Connection]:
@@ -278,6 +343,34 @@ class KloneRepository:
 
     def _encode_metadata(self, metadata: Mapping[str, Any] | None) -> str | None:
         return json.dumps(metadata, sort_keys=True) if metadata else None
+
+    def _validate_memory_status(
+        self,
+        *,
+        status: MemoryStatus,
+        superseded_by_id: int | None = None,
+    ) -> None:
+        if status not in MEMORY_STATUS_VALUES:
+            raise ValueError(f"Unsupported memory status: {status}")
+        if status == "superseded" and superseded_by_id is None:
+            raise ValueError("Superseded memory events require superseded_by_id.")
+        if status != "superseded" and superseded_by_id is not None:
+            raise ValueError("superseded_by_id is only valid for superseded memory events.")
+
+    def _ensure_column(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        table_name: str,
+        column_name: str,
+        column_sql: str,
+    ) -> None:
+        existing_columns = {
+            row["name"] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        }
+        if column_name in existing_columns:
+            return
+        conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_sql}")
 
     # Dataset persistence
     def upsert_dataset(

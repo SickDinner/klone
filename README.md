@@ -69,6 +69,7 @@ Supervisor hallitsee liikennettä vyöhykkeiden välillä. Moduulit eivät saa l
 ├─ docs/
 │  ├─ ARCHITECTURE.md
 │  ├─ DATA_GOVERNANCE.md
+│  ├─ PHASE_2B_4_CLOSEOUT.md
 │  └─ PHASE_2A_HANDOFF.md
 ├─ src/
 │  └─ klone/

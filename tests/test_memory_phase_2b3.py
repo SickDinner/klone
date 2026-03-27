@@ -12,7 +12,7 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from klone.api import memory_episode_detail, memory_episodes, memory_event_detail, memory_events  # noqa: E402
+from klone.api import memory_episode_detail, memory_episodes, memory_event_detail, memory_events, router  # noqa: E402
 from klone.ingest import ingest_dataset  # noqa: E402
 from klone.memory import MemoryService, system_ingest_episode_id  # noqa: E402
 from klone.repository import KloneRepository  # noqa: E402
@@ -392,6 +392,25 @@ class MemoryPhase2B3Tests(unittest.TestCase):
         self.assertNotIn("linked_entities", event_list_payload)
         self.assertNotIn("provenance", episode_list_payload)
         self.assertNotIn("linked_events", episode_list_payload)
+
+    def test_memory_api_surface_remains_read_only(self) -> None:
+        memory_routes = {
+            route.path: sorted(route.methods)
+            for route in router.routes
+            if route.path.startswith("/api/memory")
+        }
+        self.assertEqual(
+            memory_routes,
+            {
+                "/api/memory/events": ["GET"],
+                "/api/memory/events/{event_id}": ["GET"],
+                "/api/memory/entities": ["GET"],
+                "/api/memory/entities/{entity_id}": ["GET"],
+                "/api/memory/episodes": ["GET"],
+                "/api/memory/episodes/{episode_id}": ["GET"],
+                "/api/memory/episodes/{episode_id}/events": ["GET"],
+            },
+        )
 
     def _get_supersession_row(
         self,

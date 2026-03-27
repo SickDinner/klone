@@ -52,3 +52,5 @@ Does not:
 - preserve invariants
 - report only what actually changed and what was actually verified
 - use English for implementation prompts
+
+See also: docs/KLONE_AGENT_CONVENTIONS.md for canonical agent names, handoff formats, response contracts, and verifier verdict vocabulary.

@@ -1,8 +1,8 @@
 # KLONE Project Status
 
 ## Current phase
-Phase 2B.4 complete.
-Next step: Phase 2C.1 Query / Retrieval primitives.
+Phase 2B.4 closeout.
+Next step after closeout: Phase 2C.1 Query / Retrieval primitives.
 
 ## Completed
 - Phase 2B.1: deterministic memory spine

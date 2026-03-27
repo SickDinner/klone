@@ -1,7 +1,7 @@
 # Current Handoff
 
 ## Current approved phase
-Phase 2C.1: Query / Retrieval primitives
+Phase 2B.4: Memory Correction Contract Closeout
 
 ## Baseline
 - 2B.1 complete
@@ -21,12 +21,14 @@ Phase 2C.1: Query / Retrieval primitives
 - do not add embeddings or agentic memory behavior
 
 ## Immediate task
-Implement correction-aware query and retrieval primitives:
-- active / rejected / superseded visibility
-- correction-aware filtering
-- lineage traversal
-- episode / event navigation
-- explainability-first query behavior
+Close out Phase 2B.4 cleanly:
+- keep correction read contract locked
+- keep migration caveat documented
+- keep replay / evidence / provenance / room isolation guarantees explicit
+- do not start Phase 2C.1 in this handoff
+
+## Next approved phase after closeout
+Phase 2C.1: Query / Retrieval primitives
 
 ## Required verification
 - compile

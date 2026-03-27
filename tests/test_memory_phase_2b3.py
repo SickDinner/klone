@@ -360,12 +360,20 @@ class MemoryPhase2B3Tests(unittest.TestCase):
             room_id=room_id,
             limit=10,
             offset=0,
+            status=None,
+            event_type=None,
+            ingest_run_id=None,
+            include_corrected=True,
             repository=self.repository,
         )
         episode_list = memory_episodes(
             room_id=room_id,
             limit=10,
             offset=0,
+            status=None,
+            episode_type=None,
+            ingest_run_id=None,
+            include_corrected=True,
             repository=self.repository,
         )
 

@@ -127,7 +127,7 @@ class KloneRepository:
                     recorded_at TEXT NOT NULL,
                     title TEXT NOT NULL,
                     evidence_text TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'active',
+                    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','rejected','superseded')),
                     correction_reason TEXT,
                     superseded_by_id INTEGER,
                     corrected_at TEXT,
@@ -174,7 +174,7 @@ class KloneRepository:
                     source_record_id TEXT NOT NULL,
                     title TEXT NOT NULL,
                     summary TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'active',
+                    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','rejected','superseded')),
                     correction_reason TEXT,
                     corrected_at TEXT,
                     corrected_by_role TEXT,
@@ -209,6 +209,17 @@ class KloneRepository:
 
                 CREATE INDEX IF NOT EXISTS idx_memory_episode_events_episode_sequence
                     ON memory_episode_events(episode_id, sequence_no ASC);
+
+                CREATE TABLE IF NOT EXISTS memory_event_supersessions (
+                    id TEXT PRIMARY KEY,
+                    room_id TEXT NOT NULL,
+                    old_event_id TEXT NOT NULL,
+                    new_event_id TEXT NOT NULL,
+                    reason TEXT,
+                    created_at TEXT NOT NULL,
+                    created_by_role TEXT NOT NULL,
+                    UNIQUE(room_id, old_event_id, new_event_id)
+                );
 
                 CREATE TABLE IF NOT EXISTS memory_provenance (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1378,20 +1389,31 @@ class KloneRepository:
     ) -> dict[str, Any] | None:
         return self.get_memory_event(event_id, room_id=room_id, conn=conn)
 
-    def update_memory_event_status(
+    def set_event_status(
         self,
-        event_id: int,
-        *,
         room_id: str,
+        event_id: int,
         status: MemoryStatus,
-        correction_reason: str | None,
-        superseded_by_id: int | None,
-        corrected_at: str | None,
-        corrected_by_role: str | None,
+        reason: str | None,
+        actor_role: str | None,
+        *,
+        superseded_by_id: int | None = None,
+        corrected_at: str | None = None,
         conn: sqlite3.Connection | None = None,
     ) -> dict[str, Any] | None:
         self._validate_memory_status(status=status, superseded_by_id=superseded_by_id)
         with self._borrowed_connection(conn) as active_conn:
+            existing_row = self.get_memory_event(event_id, room_id=room_id, conn=active_conn)
+            if existing_row is None:
+                return None
+            effective_corrected_at = corrected_at or existing_row.get("corrected_at") or utc_now_iso()
+            if (
+                existing_row["status"] == status
+                and existing_row.get("correction_reason") == reason
+                and existing_row.get("superseded_by_id") == superseded_by_id
+                and existing_row.get("corrected_by_role") == actor_role
+            ):
+                return existing_row
             active_conn.execute(
                 """
                 UPDATE memory_events
@@ -1405,10 +1427,10 @@ class KloneRepository:
                 """,
                 (
                     status,
-                    correction_reason,
+                    reason,
                     superseded_by_id,
-                    corrected_at,
-                    corrected_by_role,
+                    effective_corrected_at,
+                    actor_role,
                     utc_now_iso(),
                     event_id,
                     room_id,
@@ -1424,6 +1446,29 @@ class KloneRepository:
             ).fetchone()
             return dict(row) if row is not None else None
 
+    def update_memory_event_status(
+        self,
+        event_id: int,
+        *,
+        room_id: str,
+        status: MemoryStatus,
+        correction_reason: str | None,
+        superseded_by_id: int | None,
+        corrected_at: str | None,
+        corrected_by_role: str | None,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any] | None:
+        return self.set_event_status(
+            room_id=room_id,
+            event_id=event_id,
+            status=status,
+            reason=correction_reason,
+            actor_role=corrected_by_role,
+            superseded_by_id=superseded_by_id,
+            corrected_at=corrected_at,
+            conn=conn,
+        )
+
     def validate_same_room_event_reference(
         self,
         *,
@@ -1437,6 +1482,78 @@ class KloneRepository:
         if source_event is None or referenced_event is None:
             return None
         return referenced_event
+
+    def link_supersession(
+        self,
+        room_id: str,
+        old_event_id: int,
+        new_event_id: int,
+        reason: str | None,
+        actor_role: str,
+        *,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any]:
+        if old_event_id == new_event_id:
+            raise ValueError("A memory event cannot supersede itself.")
+        with self._borrowed_connection(conn) as active_conn:
+            old_event = self.get_memory_event(old_event_id, room_id=room_id, conn=active_conn)
+            new_event = self.get_memory_event(new_event_id, room_id=room_id, conn=active_conn)
+            if old_event is None:
+                raise ValueError(f"Memory event {old_event_id} was not found in room {room_id}.")
+            if new_event is None:
+                raise ValueError(f"Replacement memory event {new_event_id} was not found in room {room_id}.")
+
+            existing_row = active_conn.execute(
+                """
+                SELECT *
+                FROM memory_event_supersessions
+                WHERE room_id = ? AND old_event_id = ?
+                ORDER BY created_at ASC, id ASC
+                LIMIT 1
+                """,
+                (room_id, str(old_event_id)),
+            ).fetchone()
+            if existing_row is not None:
+                payload = dict(existing_row)
+                if payload["new_event_id"] != str(new_event_id):
+                    raise ValueError("Memory event is already superseded by a different replacement event.")
+                return payload
+
+            supersession_id = f"memory_event_supersession:{room_id}:{old_event_id}:{new_event_id}"
+            created_at = utc_now_iso()
+            active_conn.execute(
+                """
+                INSERT INTO memory_event_supersessions (
+                    id,
+                    room_id,
+                    old_event_id,
+                    new_event_id,
+                    reason,
+                    created_at,
+                    created_by_role
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(room_id, old_event_id, new_event_id) DO NOTHING
+                """,
+                (
+                    supersession_id,
+                    room_id,
+                    str(old_event_id),
+                    str(new_event_id),
+                    reason,
+                    created_at,
+                    actor_role,
+                ),
+            )
+            row = active_conn.execute(
+                """
+                SELECT *
+                FROM memory_event_supersessions
+                WHERE room_id = ? AND old_event_id = ? AND new_event_id = ?
+                """,
+                (room_id, str(old_event_id), str(new_event_id)),
+            ).fetchone()
+            return dict(row)
 
     def list_memory_event_entity_details(
         self,
@@ -1569,20 +1686,30 @@ class KloneRepository:
     ) -> dict[str, Any] | None:
         return self.get_memory_episode(episode_id, room_id=room_id, conn=conn)
 
-    def update_memory_episode_status(
+    def set_episode_status(
         self,
-        episode_id: str,
-        *,
         room_id: str,
+        episode_id: str,
         status: MemoryStatus,
-        correction_reason: str | None,
-        corrected_at: str | None,
-        corrected_by_role: str | None,
+        reason: str | None,
+        actor_role: str | None,
+        *,
+        corrected_at: str | None = None,
         conn: sqlite3.Connection | None = None,
     ) -> dict[str, Any] | None:
         if status not in MEMORY_STATUS_VALUES:
             raise ValueError(f"Unsupported memory status: {status}")
         with self._borrowed_connection(conn) as active_conn:
+            existing_row = self.get_memory_episode(episode_id, room_id=room_id, conn=active_conn)
+            if existing_row is None:
+                return None
+            effective_corrected_at = corrected_at or existing_row.get("corrected_at") or utc_now_iso()
+            if (
+                existing_row["status"] == status
+                and existing_row.get("correction_reason") == reason
+                and existing_row.get("corrected_by_role") == actor_role
+            ):
+                return existing_row
             active_conn.execute(
                 """
                 UPDATE memory_episodes
@@ -1595,9 +1722,9 @@ class KloneRepository:
                 """,
                 (
                     status,
-                    correction_reason,
-                    corrected_at,
-                    corrected_by_role,
+                    reason,
+                    effective_corrected_at,
+                    actor_role,
                     utc_now_iso(),
                     episode_id,
                     room_id,
@@ -1612,6 +1739,27 @@ class KloneRepository:
                 (episode_id, room_id),
             ).fetchone()
             return dict(row) if row is not None else None
+
+    def update_memory_episode_status(
+        self,
+        episode_id: str,
+        *,
+        room_id: str,
+        status: MemoryStatus,
+        correction_reason: str | None,
+        corrected_at: str | None,
+        corrected_by_role: str | None,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any] | None:
+        return self.set_episode_status(
+            room_id=room_id,
+            episode_id=episode_id,
+            status=status,
+            reason=correction_reason,
+            actor_role=corrected_by_role,
+            corrected_at=corrected_at,
+            conn=conn,
+        )
 
     def list_memory_episode_events(
         self,

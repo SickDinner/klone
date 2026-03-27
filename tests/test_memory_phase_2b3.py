@@ -12,6 +12,7 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from klone.api import memory_episode_detail, memory_episodes, memory_event_detail, memory_events  # noqa: E402
 from klone.ingest import ingest_dataset  # noqa: E402
 from klone.memory import MemoryService, system_ingest_episode_id  # noqa: E402
 from klone.repository import KloneRepository  # noqa: E402
@@ -124,6 +125,14 @@ class MemoryPhase2B3Tests(unittest.TestCase):
         self.assertTrue(started_after["corrected"])
         self.assertEqual(started_after["evidence_text"], started_before["evidence_text"])
         self.assertTrue(started_after["provenance"])
+        supersession_row = self._get_supersession_row(
+            room_id=room_id,
+            old_event_id=ingest_started["id"],
+            new_event_id=ingest_completed["id"],
+        )
+        self.assertIsNotNone(supersession_row)
+        self.assertEqual(supersession_row["reason"], "operator_supersede")
+        self.assertEqual(supersession_row["created_by_role"], "owner")
 
         self.assertEqual(episode_after["status"], "rejected")
         self.assertEqual(episode_after["correction_reason"], "operator_episode_reject")
@@ -187,6 +196,14 @@ class MemoryPhase2B3Tests(unittest.TestCase):
         self.assertEqual(completed_after_replay["provenance"], correction_state_before_replay["event_provenance"])
         self.assertEqual(episode_after_replay["provenance"], correction_state_before_replay["episode_provenance"])
         self.assertEqual(episode_id, system_ingest_episode_id(room_id=room_id, ingest_run_id=ingest_run_id))
+        self.assertEqual(
+            self._count_supersession_rows(
+                room_id=room_id,
+                old_event_id=ingest_started["id"],
+                new_event_id=ingest_completed["id"],
+            ),
+            1,
+        )
 
     def test_room_isolation_and_cross_room_supersede_blocking(self) -> None:
         restricted_result = self._ingest_dataset(
@@ -287,6 +304,130 @@ class MemoryPhase2B3Tests(unittest.TestCase):
         self.assertEqual(blocked_payload["reason"], "cross_room_supersede")
         self.assertEqual(blocked_payload["actor_role"], "owner")
         self.assertEqual(blocked_payload["superseded_by_id"], public_started["id"])
+        self.assertEqual(
+            self._count_supersession_rows(
+                room_id=restricted_room_id,
+                old_event_id=restricted_started["id"],
+                new_event_id=public_started["id"],
+            ),
+            0,
+        )
+
+    def test_detail_endpoints_expose_correction_fields_and_list_routes_stay_lean(self) -> None:
+        result = self._ingest_dataset(
+            label="Restricted Dataset",
+            classification_level="personal",
+            folder_name="api_dataset",
+            files={"note.txt": "alpha", "photo.jpg": "beta"},
+        )
+        room_id = "restricted-room"
+        ingest_run_id = result["run"]["id"]
+        episode_id = system_ingest_episode_id(room_id=room_id, ingest_run_id=ingest_run_id)
+
+        event_rows = self.repository.list_memory_events(room_id=room_id, limit=50, offset=0)
+        ingest_requested = next(row for row in event_rows if row["event_type"] == "ingest_requested")
+        ingest_started = next(row for row in event_rows if row["event_type"] == "ingest_started")
+        ingest_completed = next(row for row in event_rows if row["event_type"] == "ingest_completed")
+
+        self.memory_service.reject_event(
+            room_id=room_id,
+            event_id=ingest_requested["id"],
+            reason="operator_reject",
+        )
+        self.memory_service.reject_episode(
+            room_id=room_id,
+            episode_id=episode_id,
+            reason="operator_episode_reject",
+        )
+        self.memory_service.supersede_event(
+            room_id=room_id,
+            event_id=ingest_started["id"],
+            superseded_by_event_id=ingest_completed["id"],
+            reason="operator_supersede",
+        )
+
+        event_detail = memory_event_detail(
+            event_id=ingest_started["id"],
+            room_id=room_id,
+            repository=self.repository,
+        )
+        episode_detail = memory_episode_detail(
+            episode_id=episode_id,
+            room_id=room_id,
+            repository=self.repository,
+        )
+        event_list = memory_events(
+            room_id=room_id,
+            limit=10,
+            offset=0,
+            repository=self.repository,
+        )
+        episode_list = memory_episodes(
+            room_id=room_id,
+            limit=10,
+            offset=0,
+            repository=self.repository,
+        )
+
+        event_payload = event_detail.model_dump(mode="json")
+        episode_payload = episode_detail.model_dump(mode="json")
+        event_list_payload = event_list[0].model_dump(mode="json")
+        episode_list_payload = episode_list[0].model_dump(mode="json")
+
+        self.assertEqual(event_payload["status"], "superseded")
+        self.assertEqual(event_payload["correction_reason"], "operator_supersede")
+        self.assertIsNotNone(event_payload["corrected_at"])
+        self.assertEqual(event_payload["corrected_by_role"], "owner")
+        self.assertEqual(event_payload["superseded_by_id"], ingest_completed["id"])
+
+        self.assertEqual(episode_payload["status"], "rejected")
+        self.assertEqual(episode_payload["correction_reason"], "operator_episode_reject")
+        self.assertIsNotNone(episode_payload["corrected_at"])
+        self.assertEqual(episode_payload["corrected_by_role"], "owner")
+
+        self.assertIn("status", event_list_payload)
+        self.assertIn("status", episode_list_payload)
+        self.assertNotIn("corrected", event_list_payload)
+        self.assertNotIn("provenance", event_list_payload)
+        self.assertNotIn("linked_entities", event_list_payload)
+        self.assertNotIn("provenance", episode_list_payload)
+        self.assertNotIn("linked_events", episode_list_payload)
+
+    def _get_supersession_row(
+        self,
+        *,
+        room_id: str,
+        old_event_id: int,
+        new_event_id: int,
+    ) -> dict | None:
+        with self.repository.connection() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM memory_event_supersessions
+                WHERE room_id = ? AND old_event_id = ? AND new_event_id = ?
+                """,
+                (room_id, str(old_event_id), str(new_event_id)),
+            ).fetchone()
+            return dict(row) if row is not None else None
+
+    def _count_supersession_rows(
+        self,
+        *,
+        room_id: str,
+        old_event_id: int,
+        new_event_id: int,
+    ) -> int:
+        with self.repository.connection() as conn:
+            row = conn.execute(
+                """
+                SELECT COUNT(*) AS supersession_count
+                FROM memory_event_supersessions
+                WHERE room_id = ? AND old_event_id = ? AND new_event_id = ?
+                """,
+                (room_id, str(old_event_id), str(new_event_id)),
+            ).fetchone()
+            return int(row["supersession_count"])
 
     def _ingest_dataset(
         self,

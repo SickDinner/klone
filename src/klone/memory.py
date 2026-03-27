@@ -571,14 +571,14 @@ class MemoryService:
             raise ValueError(f"Memory event cannot be rejected from status {previous_status}.")
 
         corrected_at = utc_now_iso()
-        updated_row = self.repository.update_memory_event_status(
-            event_row["id"],
+        updated_row = self.repository.set_event_status(
             room_id=event_row["room_id"],
+            event_id=event_row["id"],
             status="rejected",
-            correction_reason=reason,
+            reason=reason,
+            actor_role=actor_role,
             superseded_by_id=None,
             corrected_at=corrected_at,
-            corrected_by_role=actor_role,
             conn=conn,
         )
         if updated_row is None:
@@ -625,13 +625,13 @@ class MemoryService:
             raise ValueError(f"Memory episode cannot be rejected from status {previous_status}.")
 
         corrected_at = utc_now_iso()
-        updated_row = self.repository.update_memory_episode_status(
-            episode_row["id"],
+        updated_row = self.repository.set_episode_status(
             room_id=episode_row["room_id"],
+            episode_id=episode_row["id"],
             status="rejected",
-            correction_reason=reason,
+            reason=reason,
+            actor_role=actor_role,
             corrected_at=corrected_at,
-            corrected_by_role=actor_role,
             conn=conn,
         )
         if updated_row is None:
@@ -669,6 +669,14 @@ class MemoryService:
                 and source_event.get("correction_reason") == reason
                 and source_event.get("corrected_by_role") == actor_role
             ):
+                self.repository.link_supersession(
+                    source_event["room_id"],
+                    source_event["id"],
+                    replacement_event["id"],
+                    reason,
+                    actor_role,
+                    conn=conn,
+                )
                 return MemoryCorrectionResult(
                     room_id=source_event["room_id"],
                     memory_kind="event",
@@ -685,14 +693,22 @@ class MemoryService:
             raise ValueError(f"Memory event cannot be superseded from status {previous_status}.")
 
         corrected_at = utc_now_iso()
-        updated_row = self.repository.update_memory_event_status(
+        self.repository.link_supersession(
+            source_event["room_id"],
             source_event["id"],
+            replacement_event["id"],
+            reason,
+            actor_role,
+            conn=conn,
+        )
+        updated_row = self.repository.set_event_status(
             room_id=source_event["room_id"],
+            event_id=source_event["id"],
             status="superseded",
-            correction_reason=reason,
+            reason=reason,
+            actor_role=actor_role,
             superseded_by_id=replacement_event["id"],
             corrected_at=corrected_at,
-            corrected_by_role=actor_role,
             conn=conn,
         )
         if updated_row is None:

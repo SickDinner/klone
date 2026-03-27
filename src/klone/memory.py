@@ -883,15 +883,6 @@ class MemoryService:
             requested_permission="write",
         )
         if decision.decision not in {"allowed", "requires_approval"}:
-            self._log_batch_blocked(
-                mode=mode,
-                room_id=room_id,
-                ingest_run_id=result.ingest_run_id,
-                room_classification=self._require_room(room_id).classification,
-                reason=decision.reason,
-                result=result,
-                conn=conn,
-            )
             raise PermissionError(decision.reason)
 
     def _ensure_room_classification(

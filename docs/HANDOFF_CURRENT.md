@@ -1,37 +1,35 @@
-# Current Handoff
+# CURRENT HANDOFF
 
-## Current approved phase
-Phase 2C.1: Query / Retrieval Primitives
+Last updated: 2026-03-27
 
-## Baseline
-- 2B.1 complete
-- 2B.2 complete
-- 2B.3 complete
-- 2B.4 complete
-- memory spine, provenance, replay, correction, and correction contract are in place
+## Verified checkpoint
 
-## Immediate goal
-Add the smallest safe query/retrieval layer on top of the stabilized memory system.
+- Branch: `main`
+- Commit: `b07714f`
+- Title: `test(memory): add correction-aware query coverage`
+- Remote state: synced with `origin/main`
+- Classification: `VERIFIED`
 
-## Approved scope
-- room-scoped query primitives
-- status-aware filtering
-- event/episode traversal
-- correction-aware retrieval
-- deterministic ordering/pagination
-- provenance-aware detail traversal
+## Evidence used
 
-## Hard constraints
-- do not modify ingest behavior
-- do not modify evidence_text
-- do not add public write endpoints
-- do not add semantic search
-- do not add embeddings
-- do not add fuzzy matching
-- do not widen correction behavior
-- preserve room scope and replay determinism
+- `git branch -vv`
+  - `* main b07714f [origin/main] test(memory): add correction-aware query coverage`
+- `.\.venv\Scripts\python -m unittest tests.test_memory_phase_2c1 -v`
+  - `OK`
+- `.\.venv\Scripts\python -m unittest tests.test_memory_phase_2b2 tests.test_memory_phase_2b3 tests.test_memory_phase_2c1 -v`
+  - `OK`
 
-## Required verification
-- compile pass
-- focused tests
-- local verification if read behavior changes
+## What landed
+
+- Added correction-aware query coverage in the test suite
+- Updated `tests/test_memory_phase_2b3.py`
+- Added `tests/test_memory_phase_2c1.py`
+
+## What is still not verified
+
+- Remote CI/check status for `b07714f`
+- Any branch protection, approval, or merge policy requirements not visible from local evidence
+
+## Immediate next step
+
+- Check remote CI/checks for `b07714f` only if required by team workflow; otherwise continue from the next scoped roadmap item

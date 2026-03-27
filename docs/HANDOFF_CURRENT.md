@@ -1,35 +1,43 @@
-# CURRENT HANDOFF
+# Current Handoff
 
-Last updated: 2026-03-27
+## Current approved phase
+Phase 2C.1: Query / Retrieval Primitives
 
-## Verified checkpoint
+## Baseline
+- 2B.1 complete
+- 2B.2 complete
+- 2B.3 complete
+- 2B.4 complete
+- 2C.1 step 1 complete:
+  - room-scoped memory event query primitive
+  - status-aware filtering
+  - deterministic ordering/pagination
+  - correction-aware query coverage
+  - tests verified
 
-- Branch: `main`
-- Commit: `b07714f`
-- Title: `test(memory): add correction-aware query coverage`
-- Remote state: synced with `origin/main`
-- Classification: `VERIFIED`
+## Immediate goal
+Implement the next smallest safe 2C.1 substep:
+episode query primitive plus episode/event traversal refinement.
 
-## Evidence used
+## Approved scope
+- room-scoped episode retrieval
+- status-aware filtering for episodes
+- deterministic ordering/pagination
+- read-only traversal between episodes and linked events
+- correction-aware visibility
+- provenance-aware detail traversal only if already supported by current shapes
 
-- `git branch -vv`
-  - `* main b07714f [origin/main] test(memory): add correction-aware query coverage`
-- `.\.venv\Scripts\python -m unittest tests.test_memory_phase_2c1 -v`
-  - `OK`
-- `.\.venv\Scripts\python -m unittest tests.test_memory_phase_2b2 tests.test_memory_phase_2b3 tests.test_memory_phase_2c1 -v`
-  - `OK`
+## Hard constraints
+- do not modify ingest behavior
+- do not modify evidence_text
+- do not add public write endpoints
+- do not add semantic search
+- do not add embeddings
+- do not add fuzzy matching
+- do not widen correction behavior
+- preserve room scope and replay determinism
 
-## What landed
-
-- Added correction-aware query coverage in the test suite
-- Updated `tests/test_memory_phase_2b3.py`
-- Added `tests/test_memory_phase_2c1.py`
-
-## What is still not verified
-
-- Remote CI/check status for `b07714f`
-- Any branch protection, approval, or merge policy requirements not visible from local evidence
-
-## Immediate next step
-
-- Check remote CI/checks for `b07714f` only if required by team workflow; otherwise continue from the next scoped roadmap item
+## Required verification
+- compile pass
+- focused tests
+- local verification if read behavior changes

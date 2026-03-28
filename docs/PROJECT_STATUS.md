@@ -3,7 +3,7 @@
 Last updated: 2026-03-28
 
 ## Current phase
-Phase A1.6 complete; no further approved post-A1 substep is defined yet
+Phase A1.7 approved; implementation pending
 
 ## Phase state
 - Phase 2B.1 complete
@@ -24,6 +24,7 @@ Phase A1.6 complete; no further approved post-A1 substep is defined yet
 - Phase A1 complete
 - Phase A1.5 complete
 - Phase A1.6 complete
+- Phase A1.7 approved
 
 ## Completed in 2B.5
 - stress verification for replay/correction/provenance/room isolation
@@ -133,8 +134,16 @@ Phase A1.6 complete; no further approved post-A1 substep is defined yet
 - focused A1.6 tests green
 - local HTTP smoke green for public room-scoped query reads and audit-chain writes
 
+## Approved for A1.7
+- first public room-scoped blob metadata detail seam
+- GET /v1/rooms/{room_id}/blobs/{blob_id}/meta only
+- support only the existing deterministic asset-backed blob metadata shell already justified by repo reality
+- preserve deterministic blob_id and linked_object_id mapping over governed asset rows
+- reuse request context and append-only control-plane audit chaining
+- no upload route, no blob mutation, no external object store semantics, and no ingest/replay/correction/evidence_text behavior changes
+
 ## Next approved substep
-- no further approved post-A1 substep is enumerated in canonical repo evidence
-- require explicit roadmap extension or approval before widening the /v1 control plane beyond the completed A1.6 room-scoped query seam
+- implement Phase A1.7 public room-scoped blob metadata detail seam at GET /v1/rooms/{room_id}/blobs/{blob_id}/meta
 - do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, or A1.6 public query seam work
+- do not add /v1/changes, /v1/objects/set, /v1/blobs/upload, or any new blob list/query route in A1.7
 

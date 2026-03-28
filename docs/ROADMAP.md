@@ -114,6 +114,15 @@ Public Room-Scoped Query Shell:
 - append-only control-plane audit chaining reused for the new route
 - no semantic search, embeddings, fuzzy matching, changes route, object set route, or blob route in this phase
 
+## Phase A1.7
+Public Room-Scoped Blob Metadata Detail:
+- GET /v1/rooms/{room_id}/blobs/{blob_id}/meta
+- read-only blob metadata detail only
+- backed by the existing local blob metadata shell and deterministic asset-backed blob ids
+- preserve linked_object_id visibility and room-scoped asset ownership
+- append-only control-plane audit chaining reused for the new route
+- no upload route, blob mutation, blob list/query route, or external object store semantics in this phase
+
 ## Not approved yet
 - semantic search
 - embeddings

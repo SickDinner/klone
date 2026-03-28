@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from .api import (
     _asset_record_from_row,
     _dataset_record_from_row,
+    _memory_episode_from_row,
     _memory_episode_detail_from_payload,
+    _memory_event_from_row,
     _memory_event_detail_from_payload,
 )
 from .guards import access_guard
@@ -61,14 +63,6 @@ def _sanitize_object_envelope(envelope: ObjectEnvelopeRecord) -> ObjectEnvelopeR
     else:
         raise HTTPException(status_code=400, detail="Unsupported object kind for public object get.")
     return envelope.model_copy(update={"record": sanitized_record})
-
-
-def _require_matching_request_id(*, payload_request_id: str, request_context: RequestContext) -> None:
-    if payload_request_id != request_context.request_id:
-        raise HTTPException(
-            status_code=400,
-            detail="payload.request_id must match the active request context request_id.",
-        )
 
 
 @router.get("/capabilities", response_model=PublicCapabilitiesResponse)
@@ -201,28 +195,59 @@ def query(
     route_path = f"/v1/rooms/{room_id}/query"
     try:
         _require_room_read(room_id=room_id, actor_role=request_context.actor_role)
-        _require_matching_request_id(
-            payload_request_id=payload.request_id,
-            request_context=request_context,
-        )
-        if payload.query_kind != "object.envelopes.list":
+        if payload.query_kind == "memory_events":
+            rows = services.memory.memory_service.query_events(
+                room_id=room_id,
+                limit=payload.limit,
+                offset=payload.offset,
+                status=payload.status,
+                event_type=payload.event_type,
+                ingest_run_id=payload.ingest_run_id,
+                include_corrected=payload.include_corrected,
+            )
+            filters = {
+                "status": payload.status,
+                "event_type": payload.event_type,
+                "ingest_run_id": payload.ingest_run_id,
+                "include_corrected": payload.include_corrected,
+            }
+            backing_routes = ["/api/memory/events"]
+            sanitized_results = [
+                _memory_event_from_row(dict(row)).model_dump(mode="json")
+                for row in rows
+            ]
+        elif payload.query_kind == "memory_episodes":
+            rows = services.memory.memory_service.query_episodes(
+                room_id=room_id,
+                limit=payload.limit,
+                offset=payload.offset,
+                status=payload.status,
+                episode_type=payload.episode_type,
+                ingest_run_id=payload.ingest_run_id,
+                include_corrected=payload.include_corrected,
+            )
+            filters = {
+                "status": payload.status,
+                "episode_type": payload.episode_type,
+                "ingest_run_id": payload.ingest_run_id,
+                "include_corrected": payload.include_corrected,
+            }
+            backing_routes = ["/api/memory/episodes"]
+            sanitized_results = [
+                _memory_episode_from_row(dict(row)).model_dump(mode="json")
+                for row in rows
+            ]
+        else:
             raise HTTPException(
                 status_code=400,
-                detail="Unsupported query_kind. The public query seam currently supports only 'object.envelopes.list'.",
+                detail="Unsupported query_kind. Supported kinds are memory_events and memory_episodes.",
             )
-        object_kind = str(payload.filters.get("object_kind", "")).strip()
-        if not object_kind:
-            raise HTTPException(
-                status_code=400,
-                detail="filters.object_kind is required for the public query seam.",
-            )
-        items, next_cursor = services.object_envelope.query_object_envelopes(
-            room_id=room_id,
-            object_kind=object_kind,
-            limit=payload.limit,
-            cursor=payload.cursor,
-        )
-        sanitized_items = [_sanitize_object_envelope(item) for item in items]
+
+        applied_filters = {
+            key: value
+            for key, value in filters.items()
+            if value is not None
+        }
         response = PublicQueryResponse(
             api_version="v1",
             request_context=RequestContextRecord(
@@ -232,27 +257,28 @@ def query(
                 actor_role=request_context.actor_role,
             ),
             room_id=room_id,
-            query_id=payload.query_id,
+            query_id=f"query:{request_context.request_id}",
             query_kind=payload.query_kind,
-            applied_filters={"object_kind": object_kind},
-            cursor=payload.cursor,
-            next_cursor=next_cursor,
-            items=sanitized_items,
+            read_only=True,
+            limit=payload.limit,
+            offset=payload.offset,
+            result_count=len(sanitized_results),
+            filters=applied_filters,
+            backing_routes=backing_routes,
+            results=sanitized_results,
         )
         services.audit.log_control_plane_event(
             event_type="v1_query_read",
             route_path=route_path,
             request_context=request_context,
             status_code=200,
-            summary="Read a room-scoped public query page.",
+            summary="Executed a room-scoped public read-only query.",
             metadata={
                 "room_id": room_id,
-                "query_id": payload.query_id,
                 "query_kind": payload.query_kind,
-                "object_kind": object_kind,
-                "result_count": len(sanitized_items),
-                "cursor": payload.cursor,
-                "next_cursor": next_cursor,
+                "result_count": len(sanitized_results),
+                "limit": payload.limit,
+                "offset": payload.offset,
             },
         )
         return response
@@ -265,9 +291,9 @@ def query(
             summary="Blocked or invalid public room-scoped query.",
             metadata={
                 "room_id": room_id,
-                "query_id": payload.query_id,
                 "query_kind": payload.query_kind,
-                "cursor": payload.cursor,
+                "limit": payload.limit,
+                "offset": payload.offset,
                 "result": "error",
                 "detail": error.detail,
             },
@@ -282,9 +308,9 @@ def query(
             summary="Rejected invalid public room-scoped query.",
             metadata={
                 "room_id": room_id,
-                "query_id": payload.query_id,
                 "query_kind": payload.query_kind,
-                "cursor": payload.cursor,
+                "limit": payload.limit,
+                "offset": payload.offset,
                 "result": "invalid_query",
                 "detail": str(error),
             },

@@ -94,6 +94,15 @@ class BlobMetadataRecord(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
+class ObjectEnvelopeRecord(BaseModel):
+    object_id: str
+    object_kind: str
+    room_id: str
+    classification_level: ClassificationLevel
+    version: int
+    summary: str | None = None
+
+
 class IngestRunRecord(BaseModel):
     id: int
     dataset_id: int
@@ -272,6 +281,7 @@ class PublicContractRecord(BaseModel):
     description: str
     route_readiness: str
     notes: list[str]
+    backing_routes: list[str] = Field(default_factory=list)
     fields: list[ContractFieldRecord]
 
 

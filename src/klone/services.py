@@ -9,7 +9,13 @@ from .guards import governance_guard_catalog
 from .memory import MemoryService
 from .repository import KloneRepository
 from .rooms import room_registry
-from .schemas import BlobMetadataRecord, ModuleCapabilityRecord, PublicCapabilityRecord, ServiceSeamRecord
+from .schemas import (
+    BlobMetadataRecord,
+    ModuleCapabilityRecord,
+    ObjectEnvelopeRecord,
+    PublicCapabilityRecord,
+    ServiceSeamRecord,
+)
 
 
 def module_registry_payload() -> list[ModuleCapabilityRecord]:
@@ -283,12 +289,171 @@ class BlobService:
         return self._record_from_asset_row(row)
 
 
+class ObjectEnvelopeService:
+    VERSION = 1
+
+    def __init__(self, repository: KloneRepository) -> None:
+        self.repository = repository
+        self.memory_service = MemoryService(repository)
+
+    def seam_descriptor(self) -> ServiceSeamRecord:
+        return ServiceSeamRecord(
+            id="object-envelope-service",
+            name="ObjectEnvelopeService",
+            implementation="in_process_local_shell",
+            status="local_envelope_shell",
+            notes=[
+                "Projects existing governed dataset, asset, memory event, and memory episode reads into a deterministic local object envelope shell.",
+                "Reuses existing read routes and does not add a public /v1 object route.",
+            ],
+        )
+
+    def public_capabilities(self) -> list[PublicCapabilityRecord]:
+        return [
+            PublicCapabilityRecord(
+                id="object.envelope.dataset",
+                name="Dataset Object Envelope",
+                category="object_shell",
+                path="/api/datasets",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=True,
+                status="available_via_existing_read_routes",
+                description="Project governed dataset rows into the local object envelope shell.",
+                backed_by=["ObjectEnvelopeService", "PolicyService"],
+            ),
+            PublicCapabilityRecord(
+                id="object.envelope.asset",
+                name="Asset Object Envelope",
+                category="object_shell",
+                path="/api/assets",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=True,
+                status="available_via_existing_read_routes",
+                description="Project governed asset rows into the local object envelope shell.",
+                backed_by=["ObjectEnvelopeService", "PolicyService"],
+            ),
+            PublicCapabilityRecord(
+                id="object.envelope.memory_event",
+                name="Memory Event Object Envelope",
+                category="object_shell",
+                path="/api/memory/events",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=True,
+                status="available_via_existing_read_routes",
+                description="Project governed memory event rows into the local object envelope shell.",
+                backed_by=["ObjectEnvelopeService", "MemoryFacade"],
+            ),
+            PublicCapabilityRecord(
+                id="object.envelope.memory_episode",
+                name="Memory Episode Object Envelope",
+                category="object_shell",
+                path="/api/memory/episodes",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=True,
+                status="available_via_existing_read_routes",
+                description="Project governed memory episode rows into the local object envelope shell.",
+                backed_by=["ObjectEnvelopeService", "MemoryFacade"],
+            ),
+        ]
+
+    def list_dataset_envelopes(self, *, room_id: str) -> list[ObjectEnvelopeRecord]:
+        rows = self.repository.list_datasets(room_id=room_id)
+        return [
+            ObjectEnvelopeRecord(
+                object_id=f"dataset:{row['id']}",
+                object_kind="dataset",
+                room_id=str(row["room_id"]),
+                classification_level=str(row["classification_level"]),
+                version=self.VERSION,
+                summary=str(row["label"]),
+            )
+            for row in rows
+        ]
+
+    def list_asset_envelopes(
+        self,
+        *,
+        room_id: str,
+        dataset_id: int | None = None,
+        limit: int = 40,
+    ) -> list[ObjectEnvelopeRecord]:
+        rows = self.repository.list_assets(room_id=room_id, dataset_id=dataset_id, limit=limit)
+        return [
+            ObjectEnvelopeRecord(
+                object_id=f"asset:{row['id']}",
+                object_kind="asset",
+                room_id=str(row["room_id"]),
+                classification_level=str(row["classification_level"]),
+                version=self.VERSION,
+                summary=str(row["relative_path"]),
+            )
+            for row in rows
+        ]
+
+    def list_memory_event_envelopes(
+        self,
+        *,
+        room_id: str,
+        limit: int = 40,
+        offset: int = 0,
+        include_corrected: bool = True,
+    ) -> list[ObjectEnvelopeRecord]:
+        rows = self.memory_service.query_events(
+            room_id=room_id,
+            limit=limit,
+            offset=offset,
+            include_corrected=include_corrected,
+        )
+        return [
+            ObjectEnvelopeRecord(
+                object_id=f"memory_event:{row['id']}",
+                object_kind="memory_event",
+                room_id=str(row["room_id"]),
+                classification_level=str(row["classification_level"]),
+                version=self.VERSION,
+                summary=str(row["title"]),
+            )
+            for row in rows
+        ]
+
+    def list_memory_episode_envelopes(
+        self,
+        *,
+        room_id: str,
+        limit: int = 40,
+        offset: int = 0,
+        include_corrected: bool = True,
+    ) -> list[ObjectEnvelopeRecord]:
+        rows = self.memory_service.query_episodes(
+            room_id=room_id,
+            limit=limit,
+            offset=offset,
+            include_corrected=include_corrected,
+        )
+        return [
+            ObjectEnvelopeRecord(
+                object_id=f"memory_episode:{row['id']}",
+                object_kind="memory_episode",
+                room_id=str(row["room_id"]),
+                classification_level=str(row["classification_level"]),
+                version=self.VERSION,
+                summary=str(row["title"]),
+            )
+            for row in rows
+        ]
+
+
 @dataclass(frozen=True)
 class ServiceContainer:
     memory: MemoryFacade
     policy: PolicyService
     audit: AuditService
     blob: BlobService
+    object_envelope: ObjectEnvelopeService
 
     @classmethod
     def build(cls, repository: KloneRepository) -> "ServiceContainer":
@@ -297,6 +462,7 @@ class ServiceContainer:
             policy=PolicyService(),
             audit=AuditService(repository),
             blob=BlobService(repository),
+            object_envelope=ObjectEnvelopeService(repository),
         )
 
     def seam_descriptors(self) -> list[ServiceSeamRecord]:
@@ -310,10 +476,11 @@ class ServiceContainer:
                 status="active",
                 notes=[
                     "Reuses the append-only deterministic audit pipeline already in the monolith.",
-                    "No new write authority is exposed through /v1 in A1.1.",
+                    "No new write authority is exposed through /v1.",
                 ],
             ),
             self.blob.seam_descriptor(),
+            self.object_envelope.seam_descriptor(),
         ]
 
     def public_capabilities(self) -> list[PublicCapabilityRecord]:
@@ -333,6 +500,7 @@ class ServiceContainer:
             *self.policy.public_capabilities(),
             *self.memory.public_capabilities(),
             *self.blob.public_capabilities(),
+            *self.object_envelope.public_capabilities(),
             PublicCapabilityRecord(
                 id="audit.preview.read",
                 name="Audit Preview",

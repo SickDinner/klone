@@ -23,6 +23,7 @@ Nykyinen kanoninen tila on:
 - `A1.1 public control-plane seam kickoff complete`
 - `A1.2 append-only audit chain foundation complete`
 - `A1.3 local blob metadata shell complete`
+- `A1.4 local object envelope shell complete`
 
 Uutta tässä versiossa:
 
@@ -40,6 +41,10 @@ Uutta tässä versiossa:
   `BlobService` projisoi nyt olemassa olevat `assets`-rivit deterministisiksi `blob:asset:<id>` metadata-recordeiksi ilman uusia `/v1` blob-routeja
 - `blob capability mapping`
   `/v1/capabilities` näyttää nyt, että nykyinen blob-shell nojaa olemassa oleviin `/api/assets`- ja `/api/assets/{asset_id}`-read-routeihin
+- `local object envelope shell`
+  `ObjectEnvelopeService` projisoi nyt olemassa olevat dataset-, asset-, memory event- ja memory episode -read-mallit deterministisiksi local object envelope -riveiksi ilman uutta `/v1/objects/get`-routea
+- `object shell readiness`
+  `/v1/capabilities` näyttää nyt object-shellin backing-routet ja olemassa olevien governed read-routejen kautta näkyvän readiness-tilan
 
 Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, joka näkyy käyttöliittymässä asti:
 

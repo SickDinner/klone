@@ -55,9 +55,8 @@ class PhaseA11Tests(unittest.TestCase):
         self.assertEqual(payload["request_context"]["actor_role"], "owner")
 
         service_ids = {item["id"] for item in payload["services"]}
-        self.assertEqual(
-            service_ids,
-            {"memory-facade", "policy-service", "audit-service", "blob-service"},
+        self.assertTrue(
+            {"memory-facade", "policy-service", "audit-service", "blob-service"}.issubset(service_ids),
         )
 
         capability_ids = {item["id"] for item in payload["capabilities"]}

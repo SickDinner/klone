@@ -10,11 +10,19 @@ def contract_registry_payload() -> list[PublicContractRecord]:
             name="Object Shell",
             category="object",
             status="contract_shell",
-            route_readiness="no_public_route_yet",
+            route_readiness="available_via_existing_read_routes",
             description="Stable read-model shell for governed objects exposed through future /v1 object surfaces.",
             notes=[
                 "Defines the canonical object envelope before any public object mutation routes exist.",
                 "Must remain compatible with room scoping and evidence immutability rules.",
+                "Current local envelope visibility is projected through existing governed read routes only.",
+                "No public /v1 object route exists yet.",
+            ],
+            backing_routes=[
+                "/api/datasets",
+                "/api/assets",
+                "/api/memory/events",
+                "/api/memory/episodes",
             ],
             fields=[
                 ContractFieldRecord(

@@ -3,7 +3,7 @@
 Last updated: 2026-03-28
 
 ## Current phase
-Phase A1.4 approved; implementation pending
+Phase A1.4 complete; next-step selection in progress
 
 ## Phase state
 - Phase 2B.1 complete
@@ -20,7 +20,7 @@ Phase A1.4 approved; implementation pending
 - Phase A1.1 complete
 - Phase A1.2 complete
 - Phase A1.3 complete
-- Phase A1.4 approved
+- Phase A1.4 complete
 
 ## Completed in 2B.5
 - stress verification for replay/correction/provenance/room isolation
@@ -99,15 +99,17 @@ Phase A1.4 approved; implementation pending
 - full unittest suite green
 - local HTTP smoke green for blob-service seam visibility
 
-## Approved for A1.4
+## Completed in A1.4
 - local object envelope shell via existing read routes
 - deterministic read-only projection for dataset, asset, memory_event, and memory_episode
 - room-scoped underlying reads only
-- /v1/capabilities may expose readiness, but no public /v1/objects/get route yet
+- /v1/capabilities exposes readiness and object-shell backing routes, but no public /v1/objects/get route exists
 - no ingest, replay, correction, or evidence_text behavior changes
+- focused A1.4 tests green
+- full unittest suite green
 
 ## Next approved substep
-- implement Phase A1.4 local object envelope shell via existing read routes
-- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, or A1.3 blob metadata shell work
+- identify the next exact approved phase/substep after Phase A1.4 from verified repo evidence only
+- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, or A1.4 object envelope shell work
 - do not add /v1/objects/get, /v1/query, /v1/changes, or any write surface in A1.4
 

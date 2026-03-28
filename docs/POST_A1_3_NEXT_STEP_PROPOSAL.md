@@ -37,13 +37,15 @@ That means:
 
 ## Recommended next candidate
 
-### Candidate: `A1.4 local object shell projection via existing governed routes`
+### Candidate: `A1.4 object shell capability mapping via existing governed routes`
 
-This is the smallest plausible next control-plane seam because it stays within the existing design language:
+This revised candidate is smaller and safer than the original object-projection idea because it stays entirely at the control-plane visibility level:
 
 - read-only only
 - uses existing governed routes
 - no new `/v1` object route yet
+- no new object projection service yet
+- no new object-shell response model yet
 - no write surface
 - no semantic retrieval widening
 
@@ -51,25 +53,25 @@ It is also safer than a query-shell or change-shell expansion:
 
 - `query-shell` risks widening retrieval semantics too early
 - `change-shell` risks colliding with correction/replay/audit invariants
-- `object-shell` can stay purely descriptive and deterministic
+- `object-shell` can begin as a deterministic capability declaration before any runtime projection exists
 
 ## Proposed A1.4 objective
 
-Project a stable read-only object shell over already existing governed resources without introducing a new public `/v1` object endpoint.
+Expose deterministic object-shell capability mapping through `GET /v1/capabilities` without introducing a new public `/v1` object endpoint, object projection route, or object-shell runtime service.
 
 ## Proposed A1.4 allowed scope
 
-- add a deterministic object-shell record model if needed
-- map existing governed rows into object-shell projections
+- refine the existing object contract shell metadata if needed
 - surface capability visibility through `GET /v1/capabilities`
-- reuse existing `/api/datasets`, `/api/assets`, `/api/memory/events`, and `/api/memory/episodes` read routes where appropriate
+- map existing governed route families to object-shell categories in a deterministic way
+- reuse existing `/api/datasets`, `/api/assets`, `/api/memory/events`, and `/api/memory/episodes` read routes as backing surfaces only
 - keep all behavior additive and read-only
 
 ## Proposed A1.4 required outcomes
 
 - stable public object-shell identity rules are explicit
-- object-shell projection is deterministic over existing governed rows
 - `/v1/capabilities` shows which existing routes currently back object-shell visibility
+- object-shell visibility remains declarative and capability-only in this phase
 - no new `/v1` object route is added
 - room scope and classification remain explicit
 - no mutation authority is introduced
@@ -81,12 +83,15 @@ Project a stable read-only object shell over already existing governed resources
 - full unittest suite stays green
 - `/v1` route surface remains unchanged
 - capability exposure is deterministic
+- no new runtime object projection surface exists after the change
 - no replay/correction/provenance regressions
 
 ## Proposed A1.4 non-goals
 
 - no `/v1/objects/get`
 - no `/v1/objects/set`
+- no new object projection service
+- no object-shell list/detail response surface
 - no semantic search
 - no fuzzy matching
 - no embeddings
@@ -117,6 +122,14 @@ Reason:
 - A1.3 deliberately proved blob metadata over existing asset routes first
 - adding `/v1/blobs/{blob_id}/meta` now would widen the public control plane without clear need
 
+### Defer: full object-shell projection
+
+Reason:
+
+- larger than necessary for the next control-plane seam
+- easier to introduce duplicate semantics with existing dataset/asset/memory read surfaces
+- should only happen after object capability mapping is accepted and tested first
+
 ## Exact supervisor prompt
 
 Use this only if you want to ratify a next approved phase:
@@ -127,7 +140,7 @@ Read docs/PROJECT_STATUS.md first, docs/HANDOFF_CURRENT.md second, then docs/ROA
 Use verified repo evidence only.
 
 Task:
-Determine whether the proposed A1.4 local object shell projection is the next smallest approved control-plane substep.
+Determine whether the proposed A1.4 object shell capability mapping is the next smallest approved control-plane substep.
 
 Return exactly:
 1. current phase
@@ -146,4 +159,4 @@ If the project should keep moving without breaking its own discipline, the next 
 
 1. review this proposal as `KLONE Supervisor` or `KLONE Architect`
 2. if accepted, update canonical docs to approve `A1.4`
-3. only then implement the smallest object-shell projection slice
+3. only then implement the smallest object-shell capability-mapping slice

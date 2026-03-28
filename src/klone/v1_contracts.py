@@ -87,11 +87,19 @@ def contract_registry_payload() -> list[PublicContractRecord]:
             name="Query Shell",
             category="query",
             status="contract_shell",
-            route_readiness="no_public_route_yet",
+            route_readiness="public_read_only_query_available",
             description="Stable query envelope for future public read flows without committing to search semantics.",
             notes=[
                 "Does not imply semantic search, embeddings, or fuzzy matching.",
                 "The shell exists to keep query inputs deterministic and auditable.",
+                "POST /v1/rooms/{room_id}/query is the first public read-only query route.",
+            ],
+            backing_routes=[
+                "/v1/rooms/{room_id}/query",
+                "/api/datasets",
+                "/api/assets",
+                "/api/memory/events",
+                "/api/memory/episodes",
             ],
             fields=[
                 ContractFieldRecord(
@@ -123,6 +131,12 @@ def contract_registry_payload() -> list[PublicContractRecord]:
                     field_type="string",
                     required=False,
                     description="Pagination or traversal continuation token.",
+                ),
+                ContractFieldRecord(
+                    name="limit",
+                    field_type="integer",
+                    required=False,
+                    description="Bounded result size for the current room-scoped query.",
                 ),
                 ContractFieldRecord(
                     name="request_id",

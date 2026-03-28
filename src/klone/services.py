@@ -299,6 +299,7 @@ class BlobService:
 
 class _ObjectEnvelopeProjector:
     VERSION = 1
+    SUPPORTED_OBJECT_KINDS = ("dataset", "asset", "memory_event", "memory_episode")
 
     def __init__(self, repository: KloneRepository) -> None:
         self.repository = repository
@@ -312,12 +313,24 @@ class _ObjectEnvelopeProjector:
             status="local_envelope_shell",
             notes=[
                 "Projects existing governed dataset, asset, memory event, and memory episode reads into a deterministic local object envelope shell.",
-                "Reuses existing read routes and the public read-only object-get seam without adding write authority.",
+                "Reuses existing read routes plus the public read-only object-get and query seams without adding write authority.",
             ],
         )
 
     def public_capabilities(self) -> list[PublicCapabilityRecord]:
         return [
+            PublicCapabilityRecord(
+                id="v1.query.read",
+                name="V1 Room Query",
+                category="query",
+                path="/v1/rooms/{room_id}/query",
+                methods=["POST"],
+                read_only=True,
+                room_scoped=True,
+                status="available",
+                description="List room-scoped object envelopes through the versioned public control-plane query seam.",
+                backed_by=["ObjectEnvelopeService", "PolicyService", "AuditService"],
+            ),
             PublicCapabilityRecord(
                 id="v1.objects.get",
                 name="V1 Room Object Get",
@@ -559,6 +572,40 @@ class _ObjectEnvelopeProjector:
             "Unsupported object kind. Supported kinds are dataset, asset, memory_event, and memory_episode."
         )
 
+    def query_object_envelopes(
+        self,
+        *,
+        room_id: str,
+        object_kind: str,
+        limit: int = 20,
+        cursor: str | None = None,
+    ) -> tuple[list[ObjectEnvelopeRecord], str | None]:
+        if object_kind not in self.SUPPORTED_OBJECT_KINDS:
+            raise ValueError(
+                "Unsupported object kind. Supported kinds are dataset, asset, memory_event, and memory_episode."
+            )
+        offset = self._parse_cursor(cursor)
+        page_limit = limit + 1
+        if object_kind == "dataset":
+            all_rows = self.list_dataset_envelopes(room_id=room_id)
+            return self._slice_page(all_rows, offset=offset, limit=limit)
+        if object_kind == "asset":
+            all_rows = self.list_asset_envelopes(room_id=room_id, limit=offset + page_limit)
+            return self._slice_page(all_rows, offset=offset, limit=limit)
+        if object_kind == "memory_event":
+            rows = self.list_memory_event_envelopes(
+                room_id=room_id,
+                limit=page_limit,
+                offset=offset,
+            )
+            return self._page_from_window(rows, offset=offset, limit=limit)
+        rows = self.list_memory_episode_envelopes(
+            room_id=room_id,
+            limit=page_limit,
+            offset=offset,
+        )
+        return self._page_from_window(rows, offset=offset, limit=limit)
+
     def _build_object_envelope(
         self,
         *,
@@ -581,6 +628,35 @@ class _ObjectEnvelopeProjector:
             backing_routes=backing_routes,
             record=record,
         )
+
+    @staticmethod
+    def _parse_cursor(cursor: str | None) -> int:
+        if cursor is None:
+            return 0
+        if not cursor.isdigit():
+            raise ValueError("cursor must be a non-negative integer string.")
+        return int(cursor)
+
+    @staticmethod
+    def _slice_page(
+        rows: list[ObjectEnvelopeRecord],
+        *,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[ObjectEnvelopeRecord], str | None]:
+        window = rows[offset : offset + limit + 1]
+        return _ObjectEnvelopeProjector._page_from_window(window, offset=offset, limit=limit)
+
+    @staticmethod
+    def _page_from_window(
+        window: list[ObjectEnvelopeRecord],
+        *,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[ObjectEnvelopeRecord], str | None]:
+        if len(window) > limit:
+            return window[:limit], str(offset + limit)
+        return window, None
 
 
 @dataclass(frozen=True)

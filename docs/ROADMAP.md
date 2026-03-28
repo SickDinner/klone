@@ -104,6 +104,16 @@ Public Room-Scoped Object Get:
 - append-only control-plane audit chaining reused for the new route
 - no query route, changes route, object set route, or blob route in this phase
 
+## Phase A1.6
+Public Room-Scoped Query Shell:
+- POST /v1/rooms/{room_id}/query
+- read-only query only
+- supported query kinds only: memory_events and memory_episodes
+- backed by the existing deterministic governed memory list reads
+- preserve status-aware filtering, deterministic ordering, and pagination semantics
+- append-only control-plane audit chaining reused for the new route
+- no semantic search, embeddings, fuzzy matching, changes route, object set route, or blob route in this phase
+
 ## Not approved yet
 - semantic search
 - embeddings

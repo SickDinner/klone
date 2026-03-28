@@ -19,10 +19,10 @@
             <p id="hypervisor-answer">Loading control-plane status...</p>
           </article>
           <article class="panel">
-            <h2>Phase 2A Focus</h2>
+            <h2>Current Focus</h2>
             <ul class="plain-list">
               <li>Dataset intake stays room-aware and audited.</li>
-              <li>Indexed assets remain tied to datasets, classifications, and rooms.</li>
+              <li>Memory reads stay room-scoped, provenance-backed, and correction-aware.</li>
               <li>Governance is visible in the UI, not hidden behind internal assumptions.</li>
             </ul>
           </article>
@@ -152,6 +152,94 @@
             <p>Recent audit events for ingest and room-governed operations.</p>
           </div>
           <div class="stack" id="audit-list"></div>
+        </article>
+      </section>
+
+      <section class="section two-up">
+        <article class="panel">
+          <div class="section-head">
+            <h2>Memory Explorer</h2>
+            <p>Room-scoped event browsing over the read-only memory spine.</p>
+          </div>
+          <form id="memory-filter-form" class="form-stack">
+            <div class="toolbar">
+              <label class="field field-inline">
+                <span>Room</span>
+                <select id="memory-room-filter"></select>
+              </label>
+              <label class="field field-inline">
+                <span>Status</span>
+                <select id="memory-status-filter">
+                  <option value="">all</option>
+                  <option value="active">active</option>
+                  <option value="rejected">rejected</option>
+                  <option value="superseded">superseded</option>
+                </select>
+              </label>
+              <label class="field field-inline">
+                <span>Event Type</span>
+                <input id="memory-event-type-filter" type="text" placeholder="ingest_started" />
+              </label>
+              <label class="field field-inline">
+                <span>Ingest Run</span>
+                <input id="memory-ingest-run-filter" type="number" min="1" placeholder="run id" />
+              </label>
+              <label class="checkbox-field">
+                <input id="memory-include-corrected" type="checkbox" checked />
+                <span>Include corrected rows</span>
+              </label>
+              <button class="button button-secondary" id="memory-refresh" type="submit">Load Memory</button>
+            </div>
+          </form>
+          <div class="stack" id="memory-events"></div>
+        </article>
+
+        <article class="panel">
+          <div class="section-head">
+            <h2>Episodes</h2>
+            <p>Episode traversal and correction state over the same selected room.</p>
+          </div>
+          <div class="toolbar">
+            <label class="field field-inline">
+              <span>Episode Type</span>
+              <input id="memory-episode-type-filter" type="text" placeholder="system_ingest_run" />
+            </label>
+          </div>
+          <div class="stack" id="memory-episodes"></div>
+        </article>
+      </section>
+
+      <section class="section two-up">
+        <article class="panel">
+          <div class="section-head">
+            <h2>Memory Detail</h2>
+            <p>Read-only event or episode detail with provenance and correction visibility.</p>
+          </div>
+          <div id="memory-detail" class="detail-card empty-state">Select a memory event or episode.</div>
+        </article>
+
+        <article class="panel">
+          <div class="section-head">
+            <h2>Context and Read-Only Answer</h2>
+            <p>Safe context packaging and bounded answer preview over the selected memory scope.</p>
+          </div>
+          <form id="memory-question-form" class="form-stack">
+            <label class="field">
+              <span>Question</span>
+              <input
+                id="memory-question"
+                type="text"
+                value="Summarize this context"
+                placeholder="Summarize this context"
+              />
+            </label>
+            <div class="form-actions">
+              <button class="button button-secondary" id="memory-context-refresh" type="button">Refresh Context</button>
+              <button class="button" id="memory-answer-refresh" type="submit">Refresh Answer</button>
+            </div>
+          </form>
+          <div id="memory-context" class="detail-card empty-state">No memory context loaded yet.</div>
+          <div id="memory-answer" class="detail-card empty-state">No memory answer generated yet.</div>
         </article>
       </section>
 

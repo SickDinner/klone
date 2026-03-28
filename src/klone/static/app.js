@@ -6,6 +6,15 @@ const state = {
   datasets: [],
   audit: [],
   ingestStatus: null,
+  memory: {
+    roomId: "",
+    events: [],
+    episodes: [],
+    selection: null,
+    detail: null,
+    contextPayload: null,
+    answer: null,
+  },
 };
 
 function escapeHtml(value) {
@@ -337,6 +346,227 @@ function populateDatasetFilter(datasets) {
   select.value = datasets.some((dataset) => String(dataset.id) === current) ? current : "";
 }
 
+function populateMemoryRoomFilter(rooms) {
+  const select = document.querySelector("#memory-room-filter");
+  const current = state.memory.roomId || select.value;
+  const fallbackRoomId = rooms.find((room) => room.id === "restricted-room")?.id || rooms[0]?.id || "";
+  select.innerHTML = rooms
+    .map((room) => `<option value="${escapeHtml(room.id)}">${escapeHtml(room.label)}</option>`)
+    .join("");
+  select.value = rooms.some((room) => room.id === current) ? current : fallbackRoomId;
+  state.memory.roomId = select.value;
+}
+
+function renderMemoryEvents(events) {
+  const root = document.querySelector("#memory-events");
+  if (!events.length) {
+    root.innerHTML = '<div class="empty-state">No memory events match the current filters.</div>';
+    return;
+  }
+  root.innerHTML = events
+    .map((event) => {
+      const selected =
+        state.memory.selection?.kind === "event" &&
+        String(state.memory.selection.id) === String(event.id);
+      return `
+        <article class="stack-item ${selected ? "memory-selected" : ""}">
+          <small>${escapeHtml(event.event_type)}</small>
+          <h3>${escapeHtml(event.title)}</h3>
+          <p>${escapeHtml(event.evidence_text)}</p>
+          <div class="meta">${chips([
+            `status: ${event.status}`,
+            `occurred_at: ${formatTime(event.occurred_at)}`,
+            `provenance_refs: ${event.provenance_summary?.source_refs?.length || 0}`,
+          ])}</div>
+          <button class="link-button memory-link" data-memory-kind="event" data-memory-id="${event.id}" type="button">
+            Inspect event
+          </button>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderMemoryEpisodes(episodes) {
+  const root = document.querySelector("#memory-episodes");
+  if (!episodes.length) {
+    root.innerHTML = '<div class="empty-state">No memory episodes match the current filters.</div>';
+    return;
+  }
+  root.innerHTML = episodes
+    .map((episode) => {
+      const selected =
+        state.memory.selection?.kind === "episode" &&
+        String(state.memory.selection.id) === String(episode.id);
+      return `
+        <article class="stack-item ${selected ? "memory-selected" : ""}">
+          <small>${escapeHtml(episode.episode_type)}</small>
+          <h3>${escapeHtml(episode.title)}</h3>
+          <p>${escapeHtml(episode.summary)}</p>
+          <div class="meta">${chips([
+            `status: ${episode.status}`,
+            `start_at: ${formatTime(episode.start_at)}`,
+            `end_at: ${formatTime(episode.end_at)}`,
+            `provenance_refs: ${episode.provenance_summary?.source_refs?.length || 0}`,
+          ])}</div>
+          <button class="link-button memory-link" data-memory-kind="episode" data-memory-id="${escapeHtml(episode.id)}" type="button">
+            Inspect episode
+          </button>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderMemoryDetail(kind, detail) {
+  const root = document.querySelector("#memory-detail");
+  if (!detail) {
+    root.className = "detail-card empty-state";
+    root.textContent = "Select a memory event or episode.";
+    return;
+  }
+
+  const provenanceItems = (detail.provenance || [])
+    .map(
+      (item) =>
+        `<li><strong>${escapeHtml(item.provenance_type)}</strong>: ${escapeHtml(item.source_table)}:${escapeHtml(item.source_record_id)}</li>`,
+    )
+    .join("");
+  const correctionSummary =
+    kind === "event"
+      ? [
+          `status: ${detail.status}`,
+          `superseded_by_id: ${detail.superseded_by_id ?? "none"}`,
+          `corrected_by_role: ${detail.corrected_by_role || "none"}`,
+        ]
+      : [
+          `status: ${detail.status}`,
+          `corrected_by_role: ${detail.corrected_by_role || "none"}`,
+          `linked_events: ${detail.linked_events?.length || 0}`,
+        ];
+  const linkedSection =
+    kind === "event"
+      ? `
+        <li><strong>linked_entities</strong>: ${(detail.linked_entities || [])
+          .map((item) => `${escapeHtml(item.entity_type)}:${escapeHtml(item.canonical_name)}`)
+          .join(", ") || "none"}</li>
+        <li><strong>episode_memberships</strong>: ${(detail.episode_memberships || [])
+          .map((item) => escapeHtml(item.episode.id))
+          .join(", ") || "none"}</li>
+      `
+      : `
+        <li><strong>linked_events</strong>: ${(detail.linked_events || [])
+          .map((item) => `${escapeHtml(item.event.event_type)}:${escapeHtml(item.event.id)}`)
+          .join(", ") || "none"}</li>
+      `;
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>${escapeHtml(detail.title)}</h3>
+    <p>${escapeHtml(kind === "event" ? detail.evidence_text : detail.summary)}</p>
+    <div class="meta">${chips([
+      `kind: ${kind}`,
+      ...correctionSummary,
+      `source_refs: ${detail.provenance_summary?.source_refs?.length || 0}`,
+    ])}</div>
+    <ul class="detail-list">
+      <li><strong>id</strong>: ${escapeHtml(detail.id)}</li>
+      <li><strong>room_id</strong>: ${escapeHtml(detail.room_id)}</li>
+      <li><strong>classification_level</strong>: ${escapeHtml(detail.classification_level)}</li>
+      <li><strong>recorded_at</strong>: ${escapeHtml(formatTime(detail.recorded_at || detail.created_at))}</li>
+      ${linkedSection}
+      <li><strong>provenance</strong>: ${provenanceItems ? `<ul class="detail-list nested-list">${provenanceItems}</ul>` : "none"}</li>
+    </ul>
+  `;
+}
+
+function renderMemoryContext(contextPayload) {
+  const root = document.querySelector("#memory-context");
+  if (!contextPayload) {
+    root.className = "detail-card empty-state";
+    root.textContent = "No memory context loaded yet.";
+    return;
+  }
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>Context Payload</h3>
+    <p>Scope ${escapeHtml(contextPayload.query_scope.scope_kind)} over room ${escapeHtml(contextPayload.room_id)}.</p>
+    <div class="meta">${chips([
+      `included: ${contextPayload.included_context.length}`,
+      `excluded: ${contextPayload.excluded_context.length}`,
+      `warnings: ${contextPayload.warnings.length}`,
+      `memory_write_enabled: ${contextPayload.memory_write_enabled}`,
+    ])}</div>
+    <ul class="detail-list">
+      <li><strong>included_context</strong>: ${contextPayload.included_context
+        .map((item) => `${escapeHtml(item.memory_kind)}:${escapeHtml(item.memory_id)} (${escapeHtml(item.inclusion_reason)})`)
+        .join(", ") || "none"}</li>
+      <li><strong>excluded_context</strong>: ${contextPayload.excluded_context
+        .map((item) => `${escapeHtml(item.memory_kind)}:${escapeHtml(item.memory_id || "n/a")} (${escapeHtml(item.exclusion_reason)})`)
+        .join(", ") || "none"}</li>
+      <li><strong>source_refs</strong>: ${contextPayload.context_package.provenance_summary.source_refs
+        .map((item) => escapeHtml(item))
+        .join(", ") || "none"}</li>
+      <li><strong>warnings</strong>: ${contextPayload.warnings.map((item) => escapeHtml(item)).join(", ") || "none"}</li>
+    </ul>
+  `;
+}
+
+function renderMemoryAnswer(answer) {
+  const root = document.querySelector("#memory-answer");
+  if (!answer) {
+    root.className = "detail-card empty-state";
+    root.textContent = "No memory answer generated yet.";
+    return;
+  }
+
+  const contentBlocks = answer.source_backed_content.length
+    ? answer.source_backed_content
+        .map(
+          (item) => `
+            <li>
+              <strong>${escapeHtml(item.content)}</strong>
+              <div class="meta">${chips(item.source_refs)}</div>
+            </li>
+          `,
+        )
+        .join("")
+    : "<li>No source-backed content returned.</li>";
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>Read-Only Answer</h3>
+    <p>${escapeHtml(answer.question)}</p>
+    <div class="meta">${chips([
+      `supported: ${answer.supported}`,
+      `llm_call_performed: ${answer.llm_call_performed}`,
+      `memory_write_enabled: ${answer.memory_write_enabled}`,
+    ])}</div>
+    <ul class="detail-list">
+      ${contentBlocks}
+      <li><strong>derived_explanation</strong>: ${escapeHtml(answer.derived_explanation || "none")}</li>
+      <li><strong>uncertainty</strong>: ${answer.uncertainty.map((item) => escapeHtml(item)).join(", ") || "none"}</li>
+      <li><strong>limitations</strong>: ${answer.limitations.map((item) => escapeHtml(item)).join(", ") || "none"}</li>
+    </ul>
+  `;
+}
+
+function selectedMemoryScopeParams() {
+  const selection = state.memory.selection;
+  const roomId = state.memory.roomId || document.querySelector("#memory-room-filter").value;
+  if (!selection || !roomId) {
+    return null;
+  }
+  const params = new URLSearchParams({ room_id: roomId });
+  if (selection.kind === "event") {
+    params.set("event_id", String(selection.id));
+  } else {
+    params.set("episode_id", String(selection.id));
+  }
+  return params;
+}
+
 async function refreshAssetBrowser() {
   const roomId = document.querySelector("#asset-room-filter").value;
   const datasetId = document.querySelector("#asset-dataset-filter").value;
@@ -357,6 +587,185 @@ async function loadAssetDetail(assetId) {
     renderAssetDetail(asset);
   } catch (error) {
     document.querySelector("#asset-detail").textContent = error.message;
+  }
+}
+
+async function loadMemorySelection(kind, id, options = {}) {
+  const { refreshAnswer = true } = options;
+  const roomId = state.memory.roomId || document.querySelector("#memory-room-filter").value;
+  if (!roomId) {
+    return;
+  }
+
+  state.memory.selection = { kind, id: String(id) };
+  renderMemoryEvents(state.memory.events);
+  renderMemoryEpisodes(state.memory.episodes);
+
+  const scopeParams = new URLSearchParams({ room_id: roomId });
+  if (kind === "event") {
+    scopeParams.set("event_id", String(id));
+  } else {
+    scopeParams.set("episode_id", String(id));
+  }
+
+  const detailUrl =
+    kind === "event"
+      ? `/api/memory/events/${id}?room_id=${encodeURIComponent(roomId)}`
+      : `/api/memory/episodes/${encodeURIComponent(id)}?room_id=${encodeURIComponent(roomId)}`;
+
+  try {
+    const [detail, contextPayload] = await Promise.all([
+      fetchJson(detailUrl),
+      fetchJson(`/api/memory/context/payload?${scopeParams.toString()}`),
+    ]);
+    state.memory.detail = detail;
+    state.memory.contextPayload = contextPayload;
+    renderMemoryDetail(kind, detail);
+    renderMemoryContext(contextPayload);
+    if (refreshAnswer) {
+      await refreshMemoryAnswer();
+    }
+  } catch (error) {
+    document.querySelector("#memory-detail").className = "detail-card empty-state";
+    document.querySelector("#memory-detail").textContent = error.message;
+  }
+}
+
+async function refreshMemoryAnswer(event) {
+  if (event) {
+    event.preventDefault();
+  }
+  const params = selectedMemoryScopeParams();
+  if (!params) {
+    renderMemoryAnswer(null);
+    return;
+  }
+  const questionInput = document.querySelector("#memory-question");
+  const question = questionInput.value.trim() || "Summarize this context";
+  params.set("question", question);
+  try {
+    const answer = await fetchJson(`/api/memory/context/answer?${params.toString()}`);
+    state.memory.answer = answer;
+    renderMemoryAnswer(answer);
+  } catch (error) {
+    document.querySelector("#memory-answer").className = "detail-card empty-state";
+    document.querySelector("#memory-answer").textContent = error.message;
+  }
+}
+
+async function refreshMemoryContextOnly() {
+  const params = selectedMemoryScopeParams();
+  if (!params) {
+    renderMemoryContext(null);
+    return;
+  }
+  try {
+    const payload = await fetchJson(`/api/memory/context/payload?${params.toString()}`);
+    state.memory.contextPayload = payload;
+    renderMemoryContext(payload);
+  } catch (error) {
+    document.querySelector("#memory-context").className = "detail-card empty-state";
+    document.querySelector("#memory-context").textContent = error.message;
+  }
+}
+
+function chooseMemorySelection(events, episodes) {
+  const current = state.memory.selection;
+  if (current) {
+    const stillExists =
+      current.kind === "event"
+        ? events.some((event) => String(event.id) === String(current.id))
+        : episodes.some((episode) => String(episode.id) === String(current.id));
+    if (stillExists) {
+      return current;
+    }
+  }
+  if (events.length) {
+    return { kind: "event", id: String(events[0].id) };
+  }
+  if (episodes.length) {
+    return { kind: "episode", id: String(episodes[0].id) };
+  }
+  return null;
+}
+
+async function refreshMemoryExplorer(event) {
+  if (event) {
+    event.preventDefault();
+  }
+
+  const roomId = document.querySelector("#memory-room-filter").value;
+  if (!roomId) {
+    renderMemoryEvents([]);
+    renderMemoryEpisodes([]);
+    renderMemoryDetail(null, null);
+    renderMemoryContext(null);
+    renderMemoryAnswer(null);
+    return;
+  }
+
+  state.memory.roomId = roomId;
+  const status = document.querySelector("#memory-status-filter").value;
+  const eventType = document.querySelector("#memory-event-type-filter").value.trim();
+  const episodeType = document.querySelector("#memory-episode-type-filter").value.trim();
+  const ingestRunId = document.querySelector("#memory-ingest-run-filter").value.trim();
+  const includeCorrected = document.querySelector("#memory-include-corrected").checked;
+
+  const eventParams = new URLSearchParams({
+    room_id: roomId,
+    limit: "24",
+    offset: "0",
+  });
+  const episodeParams = new URLSearchParams({
+    room_id: roomId,
+    limit: "24",
+    offset: "0",
+  });
+
+  if (status) {
+    eventParams.set("status", status);
+    episodeParams.set("status", status);
+  }
+  if (eventType) {
+    eventParams.set("event_type", eventType);
+  }
+  if (episodeType) {
+    episodeParams.set("episode_type", episodeType);
+  }
+  if (ingestRunId) {
+    eventParams.set("ingest_run_id", ingestRunId);
+    episodeParams.set("ingest_run_id", ingestRunId);
+  }
+  if (!includeCorrected) {
+    eventParams.set("include_corrected", "false");
+    episodeParams.set("include_corrected", "false");
+  }
+
+  try {
+    const [events, episodes] = await Promise.all([
+      fetchJson(`/api/memory/events?${eventParams.toString()}`),
+      fetchJson(`/api/memory/episodes?${episodeParams.toString()}`),
+    ]);
+    state.memory.events = events;
+    state.memory.episodes = episodes;
+    renderMemoryEvents(events);
+    renderMemoryEpisodes(episodes);
+
+    const nextSelection = chooseMemorySelection(events, episodes);
+    if (nextSelection) {
+      await loadMemorySelection(nextSelection.kind, nextSelection.id, { refreshAnswer: true });
+    } else {
+      state.memory.selection = null;
+      state.memory.detail = null;
+      state.memory.contextPayload = null;
+      state.memory.answer = null;
+      renderMemoryDetail(null, null);
+      renderMemoryContext(null);
+      renderMemoryAnswer(null);
+    }
+  } catch (error) {
+    document.querySelector("#memory-detail").className = "detail-card empty-state";
+    document.querySelector("#memory-detail").textContent = error.message;
   }
 }
 
@@ -391,7 +800,9 @@ async function refreshMissionControl() {
   renderIngestRuns(ingestStatus);
   populateRoomFilter(rooms);
   populateDatasetFilter(datasets);
+  populateMemoryRoomFilter(rooms);
   await refreshAssetBrowser();
+  await refreshMemoryExplorer();
 }
 
 async function submitIngestForm(event) {
@@ -430,6 +841,25 @@ function bindEvents() {
       return;
     }
     loadAssetDetail(button.dataset.assetId);
+  });
+
+  document.querySelector("#memory-filter-form").addEventListener("submit", refreshMemoryExplorer);
+  document.querySelector("#memory-room-filter").addEventListener("change", refreshMemoryExplorer);
+  document.querySelector("#memory-context-refresh").addEventListener("click", refreshMemoryContextOnly);
+  document.querySelector("#memory-question-form").addEventListener("submit", refreshMemoryAnswer);
+  document.querySelector("#memory-events").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-memory-kind='event']");
+    if (!button) {
+      return;
+    }
+    loadMemorySelection("event", button.dataset.memoryId);
+  });
+  document.querySelector("#memory-episodes").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-memory-kind='episode']");
+    if (!button) {
+      return;
+    }
+    loadMemorySelection("episode", button.dataset.memoryId);
   });
 }
 

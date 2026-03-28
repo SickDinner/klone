@@ -29,10 +29,19 @@ from .schemas import (
     MemoryEventEpisodeMembershipRecord,
     MemoryEpisodeMemberRecord,
     MemoryEpisodeRecord,
+    MemoryContextCorrectionSummaryRecord,
+    MemoryContextPackageRecord,
+    MemoryContextQueryScopeRecord,
+    MemoryContextSupersessionLinkRecord,
     MemoryEventDetailRecord,
     MemoryEventProvenanceDetailRecord,
     MemoryEventRecord,
     MemoryLinkedEntityRecord,
+    MemoryLlmAnswerRecord,
+    MemoryLlmAnswerSourceRecord,
+    MemoryLlmContextExclusionRecord,
+    MemoryLlmContextInclusionRecord,
+    MemoryLlmContextPayloadRecord,
     MemoryProvenanceRecord,
     MemoryProvenanceSummaryRecord,
     MemoryEventSupersessionRecord,
@@ -304,6 +313,74 @@ def _memory_episode_provenance_detail_from_payload(
     return MemoryEpisodeProvenanceDetailRecord.model_validate(hydrated)
 
 
+def _memory_context_query_scope_from_payload(payload: dict[str, Any]) -> MemoryContextQueryScopeRecord:
+    return MemoryContextQueryScopeRecord.model_validate(payload)
+
+
+def _memory_context_supersession_from_payload(
+    payload: dict[str, Any],
+) -> MemoryContextSupersessionLinkRecord:
+    return MemoryContextSupersessionLinkRecord.model_validate(payload)
+
+
+def _memory_context_correction_summary_from_payload(
+    payload: dict[str, Any],
+) -> MemoryContextCorrectionSummaryRecord:
+    hydrated = dict(payload)
+    hydrated["supersession_links"] = [
+        _memory_context_supersession_from_payload(item)
+        for item in hydrated.get("supersession_links", [])
+    ]
+    return MemoryContextCorrectionSummaryRecord.model_validate(hydrated)
+
+
+def _memory_context_package_from_payload(payload: dict[str, Any]) -> MemoryContextPackageRecord:
+    hydrated = dict(payload)
+    hydrated["query_scope"] = _memory_context_query_scope_from_payload(hydrated["query_scope"])
+    hydrated["included_events"] = [
+        _memory_event_detail_from_payload(item) for item in hydrated.get("included_events", [])
+    ]
+    hydrated["included_episodes"] = [
+        _memory_episode_detail_from_payload(item)
+        for item in hydrated.get("included_episodes", [])
+    ]
+    hydrated["provenance_summary"] = _memory_provenance_summary_from_payload(
+        hydrated.get("provenance_summary", {})
+    )
+    hydrated["correction_summary"] = _memory_context_correction_summary_from_payload(
+        hydrated.get("correction_summary", {})
+    )
+    return MemoryContextPackageRecord.model_validate(hydrated)
+
+
+def _memory_llm_context_payload_from_payload(
+    payload: dict[str, Any],
+) -> MemoryLlmContextPayloadRecord:
+    hydrated = dict(payload)
+    hydrated["query_scope"] = _memory_context_query_scope_from_payload(hydrated["query_scope"])
+    hydrated["context_package"] = _memory_context_package_from_payload(hydrated["context_package"])
+    hydrated["included_context"] = [
+        MemoryLlmContextInclusionRecord.model_validate(item)
+        for item in hydrated.get("included_context", [])
+    ]
+    hydrated["excluded_context"] = [
+        MemoryLlmContextExclusionRecord.model_validate(item)
+        for item in hydrated.get("excluded_context", [])
+    ]
+    return MemoryLlmContextPayloadRecord.model_validate(hydrated)
+
+
+def _memory_llm_answer_from_payload(payload: dict[str, Any]) -> MemoryLlmAnswerRecord:
+    hydrated = dict(payload)
+    hydrated["query_scope"] = _memory_context_query_scope_from_payload(hydrated["query_scope"])
+    hydrated["context_payload"] = _memory_llm_context_payload_from_payload(hydrated["context_payload"])
+    hydrated["source_backed_content"] = [
+        MemoryLlmAnswerSourceRecord.model_validate(item)
+        for item in hydrated.get("source_backed_content", [])
+    ]
+    return MemoryLlmAnswerRecord.model_validate(hydrated)
+
+
 def _internal_run_from_row(row: dict[str, Any]) -> InternalRunRecord:
     payload = _decode_metadata(dict(row))
     return InternalRunRecord.model_validate(payload)
@@ -323,6 +400,23 @@ def _module_registry_payload() -> list[ModuleCapabilityRecord]:
         )
         for module in SYSTEM_BLUEPRINT.modules
     ]
+
+
+def _resolve_memory_scope(
+    *,
+    event_id: int | None,
+    episode_id: str | None,
+) -> tuple[int | None, str | None]:
+    if (event_id is None) == (episode_id is None):
+        raise HTTPException(status_code=400, detail="Exactly one of event_id or episode_id is required.")
+    return event_id, episode_id
+
+
+def _memory_service_http_error(error: ValueError) -> HTTPException:
+    message = str(error)
+    if "was not found" in message:
+        return HTTPException(status_code=404, detail=message)
+    return HTTPException(status_code=400, detail=message)
 
 
 @router.get("/health")
@@ -659,6 +753,68 @@ def memory_episode_events(
         offset=offset,
     )
     return [_memory_episode_member_from_payload(item) for item in members]
+
+
+@router.get("/memory/context/package", response_model=MemoryContextPackageRecord)
+def memory_context_package(
+    room_id: str = Query(..., min_length=1),
+    event_id: int | None = Query(default=None, ge=1),
+    episode_id: str | None = Query(default=None, min_length=1),
+    repository: KloneRepository = Depends(get_repository),
+) -> MemoryContextPackageRecord:
+    room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
+    event_id, episode_id = _resolve_memory_scope(event_id=event_id, episode_id=episode_id)
+    try:
+        package = MemoryService(repository).assemble_context_package(
+            room_id=room.id,
+            event_id=event_id,
+            episode_id=episode_id,
+        )
+    except ValueError as error:
+        raise _memory_service_http_error(error) from error
+    return _memory_context_package_from_payload(package.model_dump(mode="json"))
+
+
+@router.get("/memory/context/payload", response_model=MemoryLlmContextPayloadRecord)
+def memory_context_payload(
+    room_id: str = Query(..., min_length=1),
+    event_id: int | None = Query(default=None, ge=1),
+    episode_id: str | None = Query(default=None, min_length=1),
+    repository: KloneRepository = Depends(get_repository),
+) -> MemoryLlmContextPayloadRecord:
+    room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
+    event_id, episode_id = _resolve_memory_scope(event_id=event_id, episode_id=episode_id)
+    try:
+        payload = MemoryService(repository).prepare_llm_context_payload(
+            room_id=room.id,
+            event_id=event_id,
+            episode_id=episode_id,
+        )
+    except ValueError as error:
+        raise _memory_service_http_error(error) from error
+    return _memory_llm_context_payload_from_payload(payload.model_dump(mode="json"))
+
+
+@router.get("/memory/context/answer", response_model=MemoryLlmAnswerRecord)
+def memory_context_answer(
+    question: str = Query(..., min_length=1, max_length=240),
+    room_id: str = Query(..., min_length=1),
+    event_id: int | None = Query(default=None, ge=1),
+    episode_id: str | None = Query(default=None, min_length=1),
+    repository: KloneRepository = Depends(get_repository),
+) -> MemoryLlmAnswerRecord:
+    room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
+    event_id, episode_id = _resolve_memory_scope(event_id=event_id, episode_id=episode_id)
+    try:
+        answer = MemoryService(repository).generate_read_only_llm_answer(
+            room_id=room.id,
+            question=question,
+            event_id=event_id,
+            episode_id=episode_id,
+        )
+    except ValueError as error:
+        raise _memory_service_http_error(error) from error
+    return _memory_llm_answer_from_payload(answer.model_dump(mode="json"))
 
 
 @router.post("/ingest/scan", response_model=IngestExecutionResponse)

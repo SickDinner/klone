@@ -25,6 +25,7 @@ Nykyinen kanoninen tila on:
 - `A1.3 local blob metadata shell complete`
 - `A1.4 local object envelope shell complete`
 - `A1.5 public room-scoped object get complete`
+- `A1.6 public room-scoped query shell complete`
 
 Uutta tässä versiossa:
 
@@ -48,6 +49,8 @@ Uutta tässä versiossa:
   `/v1/capabilities` näyttää nyt object-shellin backing-routet ja olemassa olevien governed read-routejen kautta näkyvän readiness-tilan
 - `public room-scoped object get`
   `POST /v1/rooms/{room_id}/objects/get` lukee nyt yksittäisen room-scoped object envelope -rivin versionoidun public control-plane seamin kautta ja reuseaa append-only audit chainin
+- `public room-scoped query shell`
+  `POST /v1/rooms/{room_id}/query` ajaa nyt deterministiset room-scoped `memory_events`- ja `memory_episodes`-haut versionoidun public control-plane seamin kautta ilman semantic searchia tai write-surfacea
 
 Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, joka näkyy käyttöliittymässä asti:
 
@@ -173,12 +176,13 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 - `GET /api/memory/context/answer`
 - `GET /v1/capabilities`
 - `POST /v1/rooms/{room_id}/objects/get`
+- `POST /v1/rooms/{room_id}/query`
 - `POST /api/ingest/scan`
 
 ## Seuraavat järkevät rakennusvaiheet
 
-1. Seuraava post-A1-vaihe: älä widennä `/v1`-pintaa A1.5:n jälkeen ennen kuin seuraava vaihe on eksplisiittisesti hyväksytty kanonisissa docs-tiedostoissa.
-2. Memory Explorerin jatko A1.5:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
+1. Seuraava post-A1-vaihe: älä widennä `/v1`-pintaa A1.6:n jälkeen ennen kuin seuraava vaihe on eksplisiittisesti hyväksytty kanonisissa docs-tiedostoissa.
+2. Memory Explorerin jatko A1.6:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
 3. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
 4. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
 5. Constitution Layer: hitaasti muuttuvat parametrit, provenance ja change logit.

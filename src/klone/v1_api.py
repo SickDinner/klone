@@ -275,7 +275,7 @@ def query(
             results=sanitized_results,
         )
         services.audit.log_control_plane_event(
-            event_type="v1_query",
+            event_type="v1_query_read",
             route_path=route_path,
             request_context=request_context,
             status_code=200,
@@ -292,7 +292,7 @@ def query(
         return response
     except HTTPException as error:
         services.audit.log_control_plane_event(
-            event_type="v1_query",
+            event_type="v1_query_read",
             route_path=route_path,
             request_context=request_context,
             status_code=error.status_code,
@@ -309,7 +309,7 @@ def query(
         raise
     except ValueError as error:
         services.audit.log_control_plane_event(
-            event_type="v1_query",
+            event_type="v1_query_read",
             route_path=route_path,
             request_context=request_context,
             status_code=400,

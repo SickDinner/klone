@@ -33,78 +33,62 @@ class PhaseA16Tests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def test_v1_query_returns_room_scoped_memory_event_and_episode_lists(self) -> None:
-        ingest_result = self._ingest_dataset(
-            label="Query Fixture",
+    def test_v1_query_returns_memory_events_with_status_filters_and_stable_ordering(self) -> None:
+        first = self._ingest_dataset(
+            label="A16 Events One",
             classification_level="personal",
-            folder_name="query_fixture",
-            files={"note.txt": "alpha"},
+            folder_name="a16_events_one",
+            files={"one.txt": "alpha"},
         )
-        room_id = ingest_result["dataset"]["room_id"]
+        second = self._ingest_dataset(
+            label="A16 Events Two",
+            classification_level="personal",
+            folder_name="a16_events_two",
+            files={"two.txt": "beta"},
+        )
+        self.assertEqual(first["dataset"]["room_id"], second["dataset"]["room_id"])
+        room_id = first["dataset"]["room_id"]
         self._seed_room(room_id)
-        app = create_app(self._settings_for("phase_a1_6.sqlite"))
 
-        event_response = asyncio.run(
+        event_count_before = len(self.repository.list_memory_events(room_id=room_id, limit=100, offset=0))
+        rejected_id = self.repository.list_memory_events(room_id=room_id, limit=1, offset=0)[0]["id"]
+        MemoryService(self.repository).reject_event(
+            room_id=room_id,
+            event_id=rejected_id,
+            reason="fixture_reject",
+        )
+        counts_before = self.repository.counts_for_room(room_id=room_id)
+
+        app = create_app(self._settings_for("phase_a1_6.sqlite"))
+        active_page_a = asyncio.run(
             self._perform_request(
                 app,
                 method="POST",
                 path=f"/v1/rooms/{room_id}/query",
-                body={"query_kind": "memory_events", "limit": 10, "offset": 0},
+                body={
+                    "query_kind": "memory_events",
+                    "limit": 2,
+                    "offset": 0,
+                    "include_corrected": False,
+                },
+                headers={"x-request-id": "req:a16-events-a", "x-trace-id": "trace:a16-events-a"},
             )
         )
-        episode_response = asyncio.run(
+        active_page_b = asyncio.run(
             self._perform_request(
                 app,
                 method="POST",
                 path=f"/v1/rooms/{room_id}/query",
-                body={"query_kind": "memory_episodes", "limit": 10, "offset": 0},
+                body={
+                    "query_kind": "memory_events",
+                    "limit": 2,
+                    "offset": 0,
+                    "include_corrected": False,
+                },
+                headers={"x-request-id": "req:a16-events-b", "x-trace-id": "trace:a16-events-b"},
             )
         )
-
-        self.assertEqual(event_response["status_code"], 200)
-        self.assertEqual(event_response["json"]["room_id"], room_id)
-        self.assertEqual(event_response["json"]["query_kind"], "memory_events")
-        self.assertGreaterEqual(event_response["json"]["result_count"], 1)
-        self.assertEqual(len(event_response["json"]["results"]), event_response["json"]["result_count"])
-        self.assertIn("id", event_response["json"]["results"][0])
-        self.assertIn("provenance_summary", event_response["json"]["results"][0])
-
-        self.assertEqual(episode_response["status_code"], 200)
-        self.assertEqual(episode_response["json"]["query_kind"], "memory_episodes")
-        self.assertGreaterEqual(episode_response["json"]["result_count"], 1)
-        self.assertEqual(len(episode_response["json"]["results"]), episode_response["json"]["result_count"])
-        self.assertIn("id", episode_response["json"]["results"][0])
-        self.assertIn("provenance_summary", episode_response["json"]["results"][0])
-
-    def test_v1_query_preserves_deterministic_memory_list_semantics(self) -> None:
-        ingest_result = self._ingest_dataset(
-            label="Deterministic Query Fixture",
-            classification_level="personal",
-            folder_name="deterministic_query_fixture",
-            files={"note.txt": "alpha"},
-        )
-        room_id = ingest_result["dataset"]["room_id"]
-        self._seed_room(room_id)
-        memory_service = MemoryService(self.repository)
-        app = create_app(self._settings_for("phase_a1_6.sqlite"))
-
-        expected_events = memory_service.query_events(
-            room_id=room_id,
-            limit=5,
-            offset=0,
-            status="active",
-            include_corrected=False,
-        )
-        expected_episodes = memory_service.query_episodes(
-            room_id=room_id,
-            limit=5,
-            offset=0,
-            status="active",
-            episode_type="system_ingest_run",
-            include_corrected=False,
-        )
-
-        event_response = asyncio.run(
+        rejected_page = asyncio.run(
             self._perform_request(
                 app,
                 method="POST",
@@ -113,12 +97,115 @@ class PhaseA16Tests(unittest.TestCase):
                     "query_kind": "memory_events",
                     "limit": 5,
                     "offset": 0,
-                    "status": "active",
-                    "include_corrected": False,
+                    "status": "rejected",
                 },
+                headers={"x-request-id": "req:a16-events-c", "x-trace-id": "trace:a16-events-c"},
             )
         )
-        episode_response = asyncio.run(
+
+        self.assertEqual(active_page_a["status_code"], 200)
+        self.assertEqual(active_page_b["status_code"], 200)
+        self.assertEqual(rejected_page["status_code"], 200)
+        self.assertEqual(active_page_a["json"]["backing_routes"], ["/api/memory/events"])
+        self.assertEqual(active_page_a["json"]["query_id"], "query:req:a16-events-a")
+        self.assertEqual(active_page_a["json"]["results"], active_page_b["json"]["results"])
+        self.assertTrue(all(item["room_id"] == room_id for item in active_page_a["json"]["results"]))
+        self.assertTrue(all(item["status"] == "active" for item in active_page_a["json"]["results"]))
+        self.assertTrue(all("provenance_summary" in item for item in active_page_a["json"]["results"]))
+        self.assertEqual(rejected_page["json"]["filters"]["status"], "rejected")
+        self.assertEqual(rejected_page["json"]["results"][0]["id"], rejected_id)
+        self.assertEqual(rejected_page["json"]["results"][0]["status"], "rejected")
+
+        counts_after = self.repository.counts_for_room(room_id=room_id)
+        self.assertEqual(counts_before["dataset_count"], counts_after["dataset_count"])
+        self.assertEqual(counts_before["asset_count"], counts_after["asset_count"])
+        self.assertEqual(
+            event_count_before,
+            len(self.repository.list_memory_events(room_id=room_id, limit=100, offset=0)),
+        )
+
+    def test_v1_query_returns_memory_episodes_with_stable_pagination(self) -> None:
+        first = self._ingest_dataset(
+            label="A16 Episodes One",
+            classification_level="personal",
+            folder_name="a16_episodes_one",
+            files={"one.txt": "alpha"},
+        )
+        second = self._ingest_dataset(
+            label="A16 Episodes Two",
+            classification_level="personal",
+            folder_name="a16_episodes_two",
+            files={"two.txt": "beta"},
+        )
+        self.assertEqual(first["dataset"]["room_id"], second["dataset"]["room_id"])
+        room_id = first["dataset"]["room_id"]
+        self._seed_room(room_id)
+        memory_service = MemoryService(self.repository)
+        expected_first_page = memory_service.query_episodes(
+            room_id=room_id,
+            limit=1,
+            offset=0,
+            include_corrected=True,
+        )
+        expected_second_page = memory_service.query_episodes(
+            room_id=room_id,
+            limit=1,
+            offset=1,
+            include_corrected=True,
+        )
+
+        episode_rows = self.repository.list_memory_episodes(room_id=room_id, limit=10, offset=0)
+        rejected_episode_id = episode_rows[-1]["id"]
+        MemoryService(self.repository).reject_episode(
+            room_id=room_id,
+            episode_id=rejected_episode_id,
+            reason="fixture_reject_episode",
+        )
+
+        app = create_app(self._settings_for("phase_a1_6.sqlite"))
+        first_page = asyncio.run(
+            self._perform_request(
+                app,
+                method="POST",
+                path=f"/v1/rooms/{room_id}/query",
+                body={
+                    "query_kind": "memory_episodes",
+                    "limit": 1,
+                    "offset": 0,
+                    "include_corrected": True,
+                },
+                headers={"x-request-id": "req:a16-episodes-a"},
+            )
+        )
+        first_page_repeat = asyncio.run(
+            self._perform_request(
+                app,
+                method="POST",
+                path=f"/v1/rooms/{room_id}/query",
+                body={
+                    "query_kind": "memory_episodes",
+                    "limit": 1,
+                    "offset": 0,
+                    "include_corrected": True,
+                },
+                headers={"x-request-id": "req:a16-episodes-a-repeat"},
+            )
+        )
+        second_page = asyncio.run(
+            self._perform_request(
+                app,
+                method="POST",
+                path=f"/v1/rooms/{room_id}/query",
+                body={
+                    "query_kind": "memory_episodes",
+                    "limit": 1,
+                    "offset": 1,
+                    "include_corrected": True,
+                },
+                headers={"x-request-id": "req:a16-episodes-b"},
+            )
+        )
+        rejected_page = asyncio.run(
             self._perform_request(
                 app,
                 method="POST",
@@ -127,96 +214,142 @@ class PhaseA16Tests(unittest.TestCase):
                     "query_kind": "memory_episodes",
                     "limit": 5,
                     "offset": 0,
-                    "status": "active",
-                    "episode_type": "system_ingest_run",
-                    "include_corrected": False,
+                    "status": "rejected",
                 },
+                headers={"x-request-id": "req:a16-episodes-c"},
             )
         )
 
-        self.assertEqual(event_response["status_code"], 200)
-        self.assertEqual(
-            [item["id"] for item in event_response["json"]["results"]],
-            [item["id"] for item in expected_events],
-        )
-        self.assertEqual(
-            event_response["json"]["filters"],
-            {"status": "active", "include_corrected": False},
-        )
+        self.assertEqual(first_page["status_code"], 200)
+        self.assertEqual(first_page_repeat["status_code"], 200)
+        self.assertEqual(second_page["status_code"], 200)
+        self.assertEqual(rejected_page["status_code"], 200)
+        self.assertEqual(first_page["json"]["backing_routes"], ["/api/memory/episodes"])
+        self.assertEqual(first_page["json"]["results"], first_page_repeat["json"]["results"])
+        self.assertNotEqual(first_page["json"]["results"][0]["id"], second_page["json"]["results"][0]["id"])
+        self.assertEqual(first_page["json"]["filters"], {"include_corrected": True})
+        self.assertEqual(first_page["json"]["results"][0]["id"], expected_first_page[0]["id"])
+        self.assertEqual(first_page["json"]["results"][0]["title"], expected_first_page[0]["title"])
+        self.assertEqual(second_page["json"]["results"][0]["id"], expected_second_page[0]["id"])
+        self.assertEqual(second_page["json"]["results"][0]["title"], expected_second_page[0]["title"])
+        self.assertTrue(first_page["json"]["results"][0]["title"].startswith("system_ingest_run:"))
+        self.assertTrue(second_page["json"]["results"][0]["title"].startswith("system_ingest_run:"))
+        self.assertEqual(rejected_page["json"]["results"][0]["id"], rejected_episode_id)
+        self.assertEqual(rejected_page["json"]["results"][0]["status"], "rejected")
 
-        self.assertEqual(episode_response["status_code"], 200)
-        self.assertEqual(
-            [item["id"] for item in episode_response["json"]["results"]],
-            [item["id"] for item in expected_episodes],
-        )
-        self.assertEqual(
-            episode_response["json"]["filters"],
-            {
-                "status": "active",
-                "episode_type": "system_ingest_run",
-                "include_corrected": False,
-            },
-        )
-
-    def test_v1_query_rejects_invalid_query_kind_and_audits_failures(self) -> None:
-        ingest_result = self._ingest_dataset(
-            label="Invalid Query Fixture",
+    def test_v1_query_preserves_room_isolation_and_blocks_mismatched_filter_shape(self) -> None:
+        restricted = self._ingest_dataset(
+            label="A16 Restricted",
             classification_level="personal",
-            folder_name="invalid_query_fixture",
+            folder_name="a16_restricted",
+            files={"restricted.txt": "alpha"},
+        )
+        public = self._ingest_dataset(
+            label="A16 Public",
+            classification_level="public",
+            folder_name="a16_public",
+            files={"public.txt": "beta"},
+        )
+        self._seed_room(restricted["dataset"]["room_id"])
+        self._seed_room(public["dataset"]["room_id"])
+
+        app = create_app(self._settings_for("phase_a1_6.sqlite"))
+        public_query = asyncio.run(
+            self._perform_request(
+                app,
+                method="POST",
+                path=f"/v1/rooms/{public['dataset']['room_id']}/query",
+                body={"query_kind": "memory_events", "limit": 20, "offset": 0},
+                headers={"x-request-id": "req:a16-room"},
+            )
+        )
+        invalid_query = asyncio.run(
+            self._perform_request(
+                app,
+                method="POST",
+                path=f"/v1/rooms/{restricted['dataset']['room_id']}/query",
+                body={"query_kind": "memory_episodes", "event_type": "ingest_started"},
+                headers={"x-request-id": "req:a16-invalid"},
+            )
+        )
+
+        self.assertEqual(public_query["status_code"], 200)
+        self.assertTrue(
+            all(item["room_id"] == public["dataset"]["room_id"] for item in public_query["json"]["results"])
+        )
+        self.assertFalse(
+            any(item["room_id"] == restricted["dataset"]["room_id"] for item in public_query["json"]["results"])
+        )
+        self.assertEqual(invalid_query["status_code"], 400)
+        self.assertIn("event_type is only supported for memory_events queries", invalid_query["json"]["detail"])
+
+    def test_v1_query_writes_audit_chain_and_capabilities_expose_query_shell(self) -> None:
+        ingest_result = self._ingest_dataset(
+            label="A16 Audit",
+            classification_level="personal",
+            folder_name="a16_audit",
             files={"note.txt": "alpha"},
         )
         room_id = ingest_result["dataset"]["room_id"]
         self._seed_room(room_id)
         app = create_app(self._settings_for("phase_a1_6.sqlite"))
 
-        valid = asyncio.run(
+        query_response = asyncio.run(
             self._perform_request(
                 app,
                 method="POST",
                 path=f"/v1/rooms/{room_id}/query",
-                body={"query_kind": "memory_events", "limit": 5, "offset": 0},
-                headers={"x-request-id": "req:a16-1", "x-trace-id": "trace:a16-1"},
+                body={"query_kind": "memory_events"},
+                headers={
+                    "x-request-id": "req:a16-1",
+                    "x-trace-id": "trace:a16-1",
+                    "x-klone-principal": "owner:a16",
+                    "x-klone-role": "owner",
+                },
             )
         )
-        invalid = asyncio.run(
+        blocked_response = asyncio.run(
             self._perform_request(
                 app,
                 method="POST",
                 path=f"/v1/rooms/{room_id}/query",
-                body={"query_kind": "memory_entities", "limit": 5, "offset": 0},
-                headers={"x-request-id": "req:a16-2", "x-trace-id": "trace:a16-2"},
+                body={"query_kind": "memory_episodes", "event_type": "ingest_started"},
+                headers={
+                    "x-request-id": "req:a16-2",
+                    "x-trace-id": "trace:a16-2",
+                    "x-klone-principal": "owner:a16",
+                    "x-klone-role": "owner",
+                },
             )
         )
+        capabilities = asyncio.run(self._perform_request(app, method="GET", path="/v1/capabilities"))
 
-        self.assertEqual(valid["status_code"], 200)
-        self.assertEqual(invalid["status_code"], 422)
+        self.assertEqual(query_response["status_code"], 200)
+        self.assertEqual(blocked_response["status_code"], 400)
+        self.assertEqual(capabilities["status_code"], 200)
 
-        query_rows = [
-            row
-            for row in self.repository.list_control_plane_audit_chain(limit=10)
-            if row["event_type"] == "v1_query_read"
-        ]
-        self.assertGreaterEqual(len(query_rows), 1)
-        latest = query_rows[0]
-        self.assertEqual(latest["request_id"], "req:a16-1")
-        self.assertEqual(latest["status_code"], 200)
-        self.assertEqual(latest["route_path"], f"/v1/rooms/{room_id}/query")
+        capability_map = {item["id"]: item for item in capabilities["json"]["capabilities"]}
+        self.assertEqual(capability_map["v1.query.read"]["path"], "/v1/rooms/{room_id}/query")
+        self.assertEqual(capability_map["v1.query.read"]["methods"], ["POST"])
+        self.assertTrue(capability_map["v1.query.read"]["read_only"])
+        self.assertTrue(capability_map["v1.query.read"]["room_scoped"])
 
-    def test_v1_capabilities_exposes_public_query_route_and_contract(self) -> None:
-        app = create_app(self._settings_for("phase_a1_6.sqlite"))
-        observed = asyncio.run(self._perform_request(app, method="GET", path="/v1/capabilities"))
+        contract_map = {item["id"]: item for item in capabilities["json"]["contracts"]}
+        self.assertEqual(contract_map["query-shell"]["route_readiness"], "public_read_only_query_available")
+        self.assertEqual(
+            contract_map["query-shell"]["backing_routes"],
+            ["/v1/rooms/{room_id}/query", "/api/memory/events", "/api/memory/episodes"],
+        )
 
-        self.assertEqual(observed["status_code"], 200)
-        payload = observed["json"]
-        capabilities = {item["id"]: item for item in payload["capabilities"]}
-        self.assertEqual(capabilities["v1.query.read"]["path"], "/v1/rooms/{room_id}/query")
-        self.assertEqual(capabilities["v1.query.read"]["methods"], ["POST"])
-        self.assertTrue(capabilities["v1.query.read"]["read_only"])
-        self.assertTrue(capabilities["v1.query.read"]["room_scoped"])
-
-        contracts = {item["id"]: item for item in payload["contracts"]}
-        self.assertEqual(contracts["query-shell"]["route_readiness"], "public_read_only_query_available")
-        self.assertIn("/v1/rooms/{room_id}/query", contracts["query-shell"]["backing_routes"])
+        chain_rows = self.repository.list_control_plane_audit_chain(limit=10)
+        query_rows = [row for row in chain_rows if row["event_type"] == "v1_query_read"]
+        self.assertGreaterEqual(len(query_rows), 2)
+        self.assertEqual(query_rows[0]["request_id"], "req:a16-2")
+        self.assertEqual(query_rows[0]["status_code"], 400)
+        self.assertEqual(query_rows[0]["route_path"], f"/v1/rooms/{room_id}/query")
+        self.assertEqual(query_rows[1]["request_id"], "req:a16-1")
+        self.assertEqual(query_rows[1]["status_code"], 200)
+        self.assertEqual(query_rows[0]["prev_event_hash"], query_rows[1]["event_hash"])
 
     def test_v1_surface_contains_capabilities_object_get_and_query(self) -> None:
         v1_routes = {
@@ -312,9 +445,10 @@ class PhaseA16Tests(unittest.TestCase):
         return ingest_dataset(self.repository, request)
 
     def _seed_room(self, room_id: str) -> None:
+        audit_rows = self.repository.list_audit_events(room_id=room_id, limit=20)
         MemoryService(self.repository).seed_from_audit_events(
             room_id=room_id,
-            audit_event_ids=[row["id"] for row in self.repository.list_audit_events(room_id=room_id, limit=20)],
+            audit_event_ids=[row["id"] for row in audit_rows],
         )
 
     def _settings_for(self, database_name: str) -> Settings:

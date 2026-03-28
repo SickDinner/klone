@@ -143,7 +143,7 @@ Phase A1.7 complete; no further approved post-A1 substep is defined yet
 - no upload route, no blob mutation, no external object store semantics, and no ingest/replay/correction/evidence_text behavior changes
 - focused A1.7 tests green
 - full unittest suite green
-- compile pass green for blob-route closeout
+- local HTTP smoke green for public room-scoped blob metadata detail and audit-chain writes
 
 ## Next approved substep
 - no further approved post-A1 substep is enumerated in canonical repo evidence

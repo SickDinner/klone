@@ -20,7 +20,7 @@ Phase A1.7 closeout complete / awaiting next approved phase
 
 ## Immediate goal
 Phase A1.7 is complete. No further approved post-A1 substep is enumerated in canonical repo evidence.
-Await explicit roadmap extension or approval before widening the control plane. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, or A1.7 public blob-meta seam work.
+Await explicit roadmap extension or approval before widening the control plane. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, or A1.7 public blob metadata detail seam work.
 
 ## Approved scope
 - canonical docs closeout after completed Phase A1.7
@@ -48,7 +48,7 @@ Await explicit roadmap extension or approval before widening the control plane. 
 - do not regress the public room-scoped read-only object-get seam at `/v1/rooms/{room_id}/objects/get`
 - do not regress the public room-scoped read-only query seam at `/v1/rooms/{room_id}/query`
 - do not add semantic search, fuzzy matching, embeddings, or query-time synthesis
-- do not add /v1/changes, /v1/objects/set, /v1/blobs/upload, or any new blob list/query route beyond the completed A1.7 blob-get seam
+- do not add /v1/changes, /v1/objects/set, /v1/blobs/upload, or any new blob list/query route beyond the completed A1.7 blob metadata seam
 - do not widen supported query kinds beyond `memory_events` and `memory_episodes` without a new approved phase
 - do not widen supported object kinds beyond `dataset`, `asset`, `memory_event`, and `memory_episode` without a new approved phase
 - do not widen blob semantics beyond deterministic metadata detail over existing asset-backed rows

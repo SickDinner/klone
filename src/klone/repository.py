@@ -30,6 +30,7 @@ EXPECTED_TABLES = (
     "audit_events",
     "control_plane_audit_chain",
     "datasets",
+    "ingest_run_manifests",
     "ingest_runs",
     "internal_runs",
     "memory_entities",
@@ -98,6 +99,19 @@ class KloneRepository:
                     summary TEXT
                 );
 
+                CREATE TABLE IF NOT EXISTS ingest_run_manifests (
+                    ingest_run_id INTEGER PRIMARY KEY REFERENCES ingest_runs(id),
+                    dataset_id INTEGER NOT NULL REFERENCES datasets(id),
+                    room_id TEXT NOT NULL,
+                    normalized_root_path TEXT NOT NULL,
+                    total_size_bytes INTEGER NOT NULL DEFAULT 0,
+                    sample_limit INTEGER NOT NULL DEFAULT 12,
+                    asset_kind_breakdown_json TEXT,
+                    sample_assets_json TEXT,
+                    warnings_json TEXT,
+                    created_at TEXT NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS assets (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     dataset_id INTEGER NOT NULL REFERENCES datasets(id),
@@ -128,6 +142,8 @@ class KloneRepository:
                 CREATE INDEX IF NOT EXISTS idx_assets_dataset_id ON assets(dataset_id);
                 CREATE INDEX IF NOT EXISTS idx_assets_sha256 ON assets(sha256);
                 CREATE INDEX IF NOT EXISTS idx_runs_dataset_id ON ingest_runs(dataset_id);
+                CREATE INDEX IF NOT EXISTS idx_ingest_run_manifests_room_created_at
+                    ON ingest_run_manifests(room_id, created_at DESC, ingest_run_id DESC);
 
                 CREATE TABLE IF NOT EXISTS audit_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1255,9 +1271,14 @@ class KloneRepository:
         with self.connection() as conn:
             rows = conn.execute(
                 """
-                SELECT ir.*, d.label AS dataset_label
+                SELECT ir.*,
+                       d.label AS dataset_label,
+                       d.classification_level,
+                       d.collection,
+                       CASE WHEN irm.ingest_run_id IS NULL THEN 0 ELSE 1 END AS has_manifest
                 FROM ingest_runs ir
                 JOIN datasets d ON d.id = ir.dataset_id
+                LEFT JOIN ingest_run_manifests irm ON irm.ingest_run_id = ir.id
                 WHERE ir.room_id = ?
                 ORDER BY ir.started_at DESC
                 LIMIT ?
@@ -1275,9 +1296,14 @@ class KloneRepository:
         with self._borrowed_connection(conn) as active_conn:
             row = active_conn.execute(
                 """
-                SELECT ir.*, d.label AS dataset_label
+                SELECT ir.*,
+                       d.label AS dataset_label,
+                       d.classification_level,
+                       d.collection,
+                       CASE WHEN irm.ingest_run_id IS NULL THEN 0 ELSE 1 END AS has_manifest
                 FROM ingest_runs ir
                 JOIN datasets d ON d.id = ir.dataset_id
+                LEFT JOIN ingest_run_manifests irm ON irm.ingest_run_id = ir.id
                 WHERE ir.room_id = ?
                 ORDER BY ir.started_at DESC
                 LIMIT 1
@@ -1296,12 +1322,100 @@ class KloneRepository:
         with self._borrowed_connection(conn) as active_conn:
             row = active_conn.execute(
                 """
-                SELECT ir.*, d.label AS dataset_label
+                SELECT ir.*,
+                       d.label AS dataset_label,
+                       d.classification_level,
+                       d.collection,
+                       CASE WHEN irm.ingest_run_id IS NULL THEN 0 ELSE 1 END AS has_manifest
                 FROM ingest_runs ir
                 JOIN datasets d ON d.id = ir.dataset_id
+                LEFT JOIN ingest_run_manifests irm ON irm.ingest_run_id = ir.id
                 WHERE ir.id = ? AND ir.room_id = ?
                 """,
                 (run_id, room_id),
+            ).fetchone()
+            return dict(row) if row is not None else None
+
+    def record_ingest_run_manifest(
+        self,
+        *,
+        ingest_run_id: int,
+        dataset_id: int,
+        room_id: str,
+        normalized_root_path: str,
+        total_size_bytes: int,
+        sample_limit: int,
+        asset_kind_breakdown: list[Mapping[str, Any]],
+        sample_assets: list[Mapping[str, Any]],
+        warnings: list[str],
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any]:
+        with self._borrowed_connection(conn) as active_conn:
+            created_at = utc_now_iso()
+            active_conn.execute(
+                """
+                INSERT INTO ingest_run_manifests (
+                    ingest_run_id,
+                    dataset_id,
+                    room_id,
+                    normalized_root_path,
+                    total_size_bytes,
+                    sample_limit,
+                    asset_kind_breakdown_json,
+                    sample_assets_json,
+                    warnings_json,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(ingest_run_id) DO UPDATE SET
+                    dataset_id = excluded.dataset_id,
+                    room_id = excluded.room_id,
+                    normalized_root_path = excluded.normalized_root_path,
+                    total_size_bytes = excluded.total_size_bytes,
+                    sample_limit = excluded.sample_limit,
+                    asset_kind_breakdown_json = excluded.asset_kind_breakdown_json,
+                    sample_assets_json = excluded.sample_assets_json,
+                    warnings_json = excluded.warnings_json
+                """,
+                (
+                    ingest_run_id,
+                    dataset_id,
+                    room_id,
+                    normalized_root_path,
+                    total_size_bytes,
+                    sample_limit,
+                    json.dumps(asset_kind_breakdown, sort_keys=True),
+                    json.dumps(sample_assets, sort_keys=True),
+                    json.dumps(warnings, sort_keys=True),
+                    created_at,
+                ),
+            )
+            row = active_conn.execute(
+                """
+                SELECT *
+                FROM ingest_run_manifests
+                WHERE ingest_run_id = ?
+                """,
+                (ingest_run_id,),
+            ).fetchone()
+            return dict(row)
+
+    def get_ingest_run_manifest(
+        self,
+        run_id: int,
+        *,
+        room_id: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any] | None:
+        with self._borrowed_connection(conn) as active_conn:
+            row = active_conn.execute(
+                """
+                SELECT irm.*
+                FROM ingest_run_manifests irm
+                JOIN ingest_runs ir ON ir.id = irm.ingest_run_id
+                WHERE irm.ingest_run_id = ? AND irm.room_id = ? AND ir.room_id = ?
+                """,
+                (run_id, room_id, room_id),
             ).fetchone()
             return dict(row) if row is not None else None
 

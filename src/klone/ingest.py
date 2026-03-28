@@ -5,7 +5,7 @@ import hashlib
 import mimetypes
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from .audit import AuditService
 from .contracts import AssetKind, ClassificationLevel, IngestStatus
@@ -127,6 +127,40 @@ def build_asset_payload(
     }
 
 
+def plan_asset_ingest(
+    repository: KloneRepository,
+    *,
+    dataset_id: int | None,
+    asset_payload: Mapping[str, Any],
+    conn,
+) -> dict[str, Any]:
+    existing_asset = (
+        repository.get_asset_by_dataset_path(
+            dataset_id,
+            path=str(asset_payload["path"]),
+            conn=conn,
+        )
+        if dataset_id is not None
+        else None
+    )
+    canonical = repository.find_duplicate_asset_candidate(
+        sha256=str(asset_payload["sha256"]),
+        dataset_id=dataset_id,
+        path=str(asset_payload["path"]),
+        conn=conn,
+    )
+    planned_action = "new"
+    if existing_asset is not None:
+        planned_action = "updated" if existing_asset["sha256"] != asset_payload["sha256"] else "unchanged"
+    return {
+        "planned_action": planned_action,
+        "dedup_status": "duplicate" if canonical is not None else "unique",
+        "canonical_asset_id": canonical["id"] if canonical is not None else None,
+        "canonical_dataset_label": canonical["dataset_label"] if canonical is not None else None,
+        "canonical_relative_path": canonical["relative_path"] if canonical is not None else None,
+    }
+
+
 def preview_ingest_manifest(
     repository: KloneRepository,
     request: DatasetIngestRequest,
@@ -174,26 +208,14 @@ def preview_ingest_manifest(
             asset_kind = asset_payload["asset_kind"]
             kind_breakdown[asset_kind]["count"] += 1
             kind_breakdown[asset_kind]["total_size_bytes"] += int(asset_payload["size_bytes"])
-
-            existing_asset = (
-                repository.get_asset_by_dataset_path(
-                    existing_dataset_id,
-                    path=str(asset_payload["path"]),
-                    conn=conn,
-                )
-                if existing_dataset_id is not None
-                else None
-            )
-            canonical = repository.find_duplicate_asset_candidate(
-                sha256=str(asset_payload["sha256"]),
+            plan = plan_asset_ingest(
+                repository,
                 dataset_id=existing_dataset_id,
-                path=str(asset_payload["path"]),
+                asset_payload=asset_payload,
                 conn=conn,
             )
-            dedup_status = "duplicate" if canonical is not None else "unique"
-            planned_action = "new"
-            if existing_asset is not None:
-                planned_action = "updated" if existing_asset["sha256"] != asset_payload["sha256"] else "unchanged"
+            planned_action = plan["planned_action"]
+            dedup_status = plan["dedup_status"]
 
             if planned_action == "new":
                 planned_new_assets += 1
@@ -214,9 +236,9 @@ def preview_ingest_manifest(
                         "size_bytes": asset_payload["size_bytes"],
                         "planned_action": planned_action,
                         "dedup_status": dedup_status,
-                        "canonical_asset_id": canonical["id"] if canonical is not None else None,
-                        "canonical_dataset_label": canonical["dataset_label"] if canonical is not None else None,
-                        "canonical_relative_path": canonical["relative_path"] if canonical is not None else None,
+                        "canonical_asset_id": plan["canonical_asset_id"],
+                        "canonical_dataset_label": plan["canonical_dataset_label"],
+                        "canonical_relative_path": plan["canonical_relative_path"],
                     }
                 )
 
@@ -276,6 +298,7 @@ def ingest_dataset(
     request: DatasetIngestRequest,
     *,
     trigger_source: str = "manual",
+    manifest_sample_limit: int = 12,
 ) -> dict[str, Any]:
     root_path = normalize_root_path(request.root_path)
     files, walk_errors = iter_files(root_path)
@@ -413,14 +436,26 @@ def ingest_dataset(
         unchanged_assets = 0
         duplicates_detected = 0
         errors_detected = len(walk_errors)
+        total_size_bytes = 0
+        kind_breakdown: dict[AssetKind, dict[str, int]] = {
+            asset_kind: {"count": 0, "total_size_bytes": 0}
+            for asset_kind in ASSET_KIND_ORDER
+        }
+        sample_assets: list[dict[str, Any]] = []
 
-        for file_path in files:
+        for file_path in sorted(files, key=lambda item: str(item.relative_to(root_path)).lower()):
             try:
                 asset_payload = build_asset_payload(
                     file_path,
                     root_path=root_path,
                     collection=request.collection,
                     classification_level=request.classification_level,
+                )
+                plan = plan_asset_ingest(
+                    repository,
+                    dataset_id=dataset["id"],
+                    asset_payload=asset_payload,
+                    conn=conn,
                 )
                 result = repository.upsert_asset(
                     dataset["id"],
@@ -429,6 +464,10 @@ def ingest_dataset(
                     conn=conn,
                 )
                 assets_indexed += 1
+                total_size_bytes += int(asset_payload["size_bytes"])
+                asset_kind = asset_payload["asset_kind"]
+                kind_breakdown[asset_kind]["count"] += 1
+                kind_breakdown[asset_kind]["total_size_bytes"] += int(asset_payload["size_bytes"])
                 if result["action"] == "new":
                     new_assets += 1
                 elif result["action"] == "updated":
@@ -437,6 +476,21 @@ def ingest_dataset(
                     unchanged_assets += 1
                 if result["is_duplicate"]:
                     duplicates_detected += 1
+                if len(sample_assets) < manifest_sample_limit:
+                    sample_assets.append(
+                        {
+                            "relative_path": asset_payload["relative_path"],
+                            "file_name": asset_payload["file_name"],
+                            "asset_kind": asset_payload["asset_kind"],
+                            "mime_type": asset_payload["mime_type"],
+                            "size_bytes": asset_payload["size_bytes"],
+                            "planned_action": result["action"],
+                            "dedup_status": plan["dedup_status"],
+                            "canonical_asset_id": plan["canonical_asset_id"],
+                            "canonical_dataset_label": plan["canonical_dataset_label"],
+                            "canonical_relative_path": plan["canonical_relative_path"],
+                        }
+                    )
             except OSError as error:
                 errors_detected += 1
                 walk_errors.append(f"{file_path}: {error}")
@@ -465,6 +519,26 @@ def ingest_dataset(
             dataset["id"],
             scan_state=final_status,
             last_scan_at=completed_run["completed_at"],
+            conn=conn,
+        )
+        repository.record_ingest_run_manifest(
+            ingest_run_id=completed_run["id"],
+            dataset_id=dataset["id"],
+            room_id=room_id,
+            normalized_root_path=str(root_path),
+            total_size_bytes=total_size_bytes,
+            sample_limit=manifest_sample_limit,
+            asset_kind_breakdown=[
+                {
+                    "asset_kind": asset_kind,
+                    "count": summary["count"],
+                    "total_size_bytes": summary["total_size_bytes"],
+                }
+                for asset_kind, summary in kind_breakdown.items()
+                if summary["count"] > 0
+            ],
+            sample_assets=sample_assets,
+            warnings=walk_errors[-25:],
             conn=conn,
         )
         ingest_completed_event = audit_service.log_event(

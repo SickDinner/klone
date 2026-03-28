@@ -22,6 +22,8 @@ from .schemas import (
     GovernanceGuardRecord,
     IngestExecutionResponse,
     IngestPreflightResponse,
+    IngestRunRecord,
+    IngestRunManifestResponse,
     IngestStatusResponse,
     InternalRunRecord,
     MemoryEntityRecord,
@@ -387,6 +389,41 @@ def _internal_run_from_row(row: dict[str, Any]) -> InternalRunRecord:
     return InternalRunRecord.model_validate(payload)
 
 
+def _ingest_run_manifest_from_payload(
+    *,
+    run_payload: dict[str, Any],
+    manifest_payload: dict[str, Any],
+) -> IngestRunManifestResponse:
+    decision = output_guard.evaluate(classification_level=run_payload["classification_level"])
+    normalized_root_path = str(manifest_payload["normalized_root_path"])
+    sample_assets = json.loads(manifest_payload["sample_assets_json"] or "[]")
+    if decision.decision == "summary_only":
+        normalized_root_path = "[summary-only]"
+        redacted_assets: list[dict[str, Any]] = []
+        for item in sample_assets:
+            redacted = dict(item)
+            redacted["relative_path"] = "[summary-only]"
+            redacted["file_name"] = "[summary-only]"
+            if redacted.get("canonical_dataset_label") is not None:
+                redacted["canonical_dataset_label"] = "[summary-only]"
+            if redacted.get("canonical_relative_path") is not None:
+                redacted["canonical_relative_path"] = "[summary-only]"
+            redacted_assets.append(redacted)
+        sample_assets = redacted_assets
+
+    return IngestRunManifestResponse.model_validate(
+        {
+            "run": IngestRunRecord.model_validate(run_payload),
+            "normalized_root_path": normalized_root_path,
+            "total_size_bytes": manifest_payload["total_size_bytes"],
+            "asset_kind_breakdown": json.loads(manifest_payload["asset_kind_breakdown_json"] or "[]"),
+            "sample_limit": manifest_payload["sample_limit"],
+            "sample_assets": sample_assets,
+            "warnings": json.loads(manifest_payload["warnings_json"] or "[]"),
+        }
+    )
+
+
 def _module_registry_payload() -> list[ModuleCapabilityRecord]:
     return [
         ModuleCapabilityRecord(
@@ -590,6 +627,25 @@ def ingest_status(
         latest_run=recent_runs[0] if recent_runs else None,
         recent_runs=recent_runs,
     )
+
+
+@router.get("/ingest/runs/{run_id}/manifest", response_model=IngestRunManifestResponse)
+def ingest_run_manifest(
+    run_id: int,
+    repository: KloneRepository = Depends(get_repository),
+) -> IngestRunManifestResponse:
+    for room in _resolve_rooms(requested_room_id=None, permission="summarize"):
+        run_payload = repository.get_ingest_run(run_id, room_id=room.id)
+        if run_payload is None:
+            continue
+        manifest_payload = repository.get_ingest_run_manifest(run_id, room_id=room.id)
+        if manifest_payload is None:
+            raise HTTPException(status_code=404, detail=f"Ingest run manifest {run_id} was not found.")
+        return _ingest_run_manifest_from_payload(
+            run_payload=run_payload,
+            manifest_payload=manifest_payload,
+        )
+    raise HTTPException(status_code=404, detail=f"Ingest run {run_id} was not found.")
 
 
 @router.post("/ingest/preflight", response_model=IngestPreflightResponse)

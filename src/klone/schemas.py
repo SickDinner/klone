@@ -111,6 +111,8 @@ class IngestRunRecord(BaseModel):
     dataset_id: int
     dataset_label: str
     room_id: str
+    classification_level: ClassificationLevel | None = None
+    collection: str | None = None
     status: IngestStatus
     trigger_source: str
     started_at: str
@@ -123,6 +125,7 @@ class IngestRunRecord(BaseModel):
     duplicates_detected: int
     errors_detected: int
     summary: str | None = None
+    has_manifest: bool = False
 
 
 class IngestManifestKindRecord(BaseModel):
@@ -414,6 +417,16 @@ class IngestPreflightResponse(BaseModel):
     planned_updated_assets: int
     planned_unchanged_assets: int
     duplicates_detected: int
+    asset_kind_breakdown: list[IngestManifestKindRecord]
+    sample_limit: int
+    sample_assets: list[IngestManifestSampleRecord]
+    warnings: list[str]
+
+
+class IngestRunManifestResponse(BaseModel):
+    run: IngestRunRecord
+    normalized_root_path: str
+    total_size_bytes: int
     asset_kind_breakdown: list[IngestManifestKindRecord]
     sample_limit: int
     sample_assets: list[IngestManifestSampleRecord]

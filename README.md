@@ -29,6 +29,7 @@ Nykyinen kanoninen tila on:
 - `A1.7 public room-scoped blob metadata detail complete`
 - `A1.8 public room-scoped audit preview query kind complete`
 - `G1.1 read-only ingest preflight manifest complete`
+- `G1.2 bounded ingest run manifest history complete`
 
 Uutta tässä versiossa:
 
@@ -62,6 +63,10 @@ Uutta tässä versiossa:
   `POST /api/ingest/preflight` näyttää nyt ennen varsinaista scania normalisoidun root-polun, room/guard-päätökset, asset-kind-jakauman, planned new/updated/unchanged -laskurit, duplicate-ehdokkaat ja sample-assetit ilman write-sivuvaikutuksia
 - `mission control preview flow`
   Dataset Intake -paneeli tukee nyt `Preview Manifest` -askelta ennen `Scan Dataset` -ajoa
+- `ingest run manifest history`
+  `GET /api/ingest/runs/{run_id}/manifest` näyttää nyt bounded snapshotin toteutuneesta ingest-ajosta, mukaan lukien total size, kind breakdown, sample-assetit ja warnings-listan
+- `mission control inspect flow`
+  Ingest Runs -paneeli tukee nyt `Inspect Manifest` -näkymää ja avaa onnistuneen scanin jälkeen juuri syntyneen manifestin automaattisesti
 
 Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, joka näkyy käyttöliittymässä asti:
 
@@ -172,6 +177,7 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 - `GET /api/assets`
 - `GET /api/assets/{asset_id}`
 - `POST /api/ingest/preflight`
+- `GET /api/ingest/runs/{run_id}/manifest`
 - `GET /api/ingest/status`
 - `GET /api/audit`
 - `GET /api/memory/events`
@@ -195,7 +201,7 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ## Seuraavat järkevät rakennusvaiheet
 
-1. Seuraava G1-vaihe: resumable ingest queue ja manifest-historia vasta kun se hyväksytään erikseen kanonisissa docs-tiedostoissa.
+1. Seuraava G1-vaihe: resumable ingest queue vasta kun se hyväksytään erikseen kanonisissa docs-tiedostoissa.
 2. Memory Explorerin jatko A1.8:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
 3. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
 4. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.

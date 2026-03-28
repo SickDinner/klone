@@ -138,6 +138,7 @@ Public Room-Scoped Audit Preview Query Kind:
 Governed Ingest Spine:
 - make ingest visible before writes rather than treating scan as a blind submit
 - keep classification, room routing, dedup, and planned asset actions inspectable
+- preserve bounded manifest history for completed ingest runs
 - extend the Mission Control intake experience without introducing async workers yet
 - preserve current deterministic local ingest semantics and audit-backed scan execution
 
@@ -151,8 +152,20 @@ Read-Only Ingest Preflight Manifest:
 - expose bounded asset-kind breakdown plus bounded sample asset rows
 - Mission Control intake UI shows the manifest before the user starts the actual scan
 
+## Phase G1.2
+Bounded Ingest Run Manifest History:
+- GET /api/ingest/runs/{run_id}/manifest
+- read-only manifest history only
+- persist a bounded manifest snapshot when a real ingest run completes
+- preserve per-run manifest visibility even after later rescans mutate current asset rows
+- expose total_size_bytes, asset-kind breakdown, bounded sample assets, and warnings for the stored run snapshot
+- use summarize-compatible room access rather than raw asset read requirements
+- Mission Control ingest-run history can inspect stored manifest snapshots
+- no resumable queue, no background worker orchestration, and no preview persistence in this phase
+
 ## Not approved yet
 - A1.9 public room-scoped change preview seam
+- G1.3 resumable ingest queue
 - semantic search
 - embeddings
 - OCR/transcription

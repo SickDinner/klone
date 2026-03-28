@@ -7,6 +7,7 @@ const state = {
   audit: [],
   ingestStatus: null,
   ingestPreview: null,
+  ingestManifest: null,
   memory: {
     roomId: "",
     events: [],
@@ -335,11 +336,88 @@ function renderIngestRuns(ingestStatus) {
             `files: ${run.files_discovered}`,
             `indexed: ${run.assets_indexed}`,
             `duplicates: ${run.duplicates_detected}`,
+            `manifest: ${run.has_manifest ? "available" : "missing"}`,
           ])}</div>
+          <div class="meta">
+            <button class="link-button" data-ingest-run-id="${run.id}" type="button" ${run.has_manifest ? "" : "disabled"}>Inspect Manifest</button>
+          </div>
         </article>
       `,
     )
     .join("");
+}
+
+function renderIngestRunManifest(manifest) {
+  const root = document.querySelector("#ingest-run-detail");
+  if (!manifest) {
+    root.className = "detail-card empty-state";
+    root.textContent = "Select an ingest run manifest.";
+    return;
+  }
+
+  const breakdownMarkup = manifest.asset_kind_breakdown?.length
+    ? `<ul class="manifest-list">${manifest.asset_kind_breakdown
+        .map(
+          (item) =>
+            `<li><strong>${escapeHtml(item.asset_kind)}</strong>: ${item.count} files, ${formatBytes(item.total_size_bytes)}</li>`,
+        )
+        .join("")}</ul>`
+    : '<div class="empty-state">No asset-kind breakdown stored.</div>';
+
+  const sampleMarkup = manifest.sample_assets?.length
+    ? `<ul class="manifest-list">${manifest.sample_assets
+        .map((item) => {
+          const canonical =
+            item.canonical_dataset_label && item.canonical_relative_path
+              ? `duplicate of ${item.canonical_dataset_label}/${item.canonical_relative_path}`
+              : item.dedup_status === "duplicate"
+                ? `duplicate of asset ${item.canonical_asset_id}`
+                : "unique";
+          return `<li><strong>${escapeHtml(item.relative_path)}</strong>: ${escapeHtml(item.planned_action)}, ${escapeHtml(item.asset_kind)}, ${formatBytes(item.size_bytes)} (${escapeHtml(canonical)})</li>`;
+        })
+        .join("")}</ul>`
+    : '<div class="empty-state">No sample assets stored for this run.</div>';
+
+  const warningMarkup = manifest.warnings?.length
+    ? `<ul class="manifest-list">${manifest.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>`
+    : '<div class="empty-state">No manifest warnings stored.</div>';
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>Run ${manifest.run.id} Manifest</h3>
+    <p>${escapeHtml(manifest.run.dataset_label)} in ${escapeHtml(manifest.run.room_id)} captured a bounded snapshot of what this ingest run processed.</p>
+    <div class="meta">${chips([
+      `status: ${manifest.run.status}`,
+      `classification: ${manifest.run.classification_level || "unknown"}`,
+      `collection: ${manifest.run.collection || "unknown"}`,
+      `files: ${manifest.run.files_discovered}`,
+      `indexed: ${manifest.run.assets_indexed}`,
+      `new: ${manifest.run.new_assets}`,
+      `updated: ${manifest.run.updated_assets}`,
+      `unchanged: ${manifest.run.unchanged_assets}`,
+      `duplicates: ${manifest.run.duplicates_detected}`,
+      `size: ${formatBytes(manifest.total_size_bytes)}`,
+    ])}</div>
+    <ul class="detail-list">
+      <li><strong>normalized_root_path</strong>: ${escapeHtml(manifest.normalized_root_path)}</li>
+      <li><strong>started_at</strong>: ${escapeHtml(formatTime(manifest.run.started_at))}</li>
+      <li><strong>completed_at</strong>: ${escapeHtml(formatTime(manifest.run.completed_at))}</li>
+    </ul>
+    <div class="preview-grid">
+      <section class="preview-block">
+        <h4>Kind Breakdown</h4>
+        ${breakdownMarkup}
+      </section>
+      <section class="preview-block">
+        <h4>Sample Assets</h4>
+        ${sampleMarkup}
+      </section>
+    </div>
+    <section class="preview-block warning-list">
+      <h4>Warnings</h4>
+      ${warningMarkup}
+    </section>
+  `;
 }
 
 function renderAssets(assets) {
@@ -961,11 +1039,25 @@ async function refreshMissionControl() {
   renderPhases(blueprint.build_phases);
   renderIngestRuns(ingestStatus);
   renderIngestPreview(state.ingestPreview);
+  renderIngestRunManifest(state.ingestManifest);
   populateRoomFilter(rooms);
   populateDatasetFilter(datasets);
   populateMemoryRoomFilter(rooms);
   await refreshAssetBrowser();
   await refreshMemoryExplorer();
+}
+
+async function loadIngestRunManifest(runId) {
+  try {
+    const manifest = await fetchJson(`/api/ingest/runs/${runId}/manifest`);
+    state.ingestManifest = manifest;
+    renderIngestRunManifest(manifest);
+  } catch (error) {
+    state.ingestManifest = null;
+    const root = document.querySelector("#ingest-run-detail");
+    root.className = "detail-card";
+    root.textContent = error.message;
+  }
 }
 
 function collectIngestPayload(form) {
@@ -1019,6 +1111,7 @@ async function submitIngestForm(event) {
     });
     feedback.textContent = `Ingest ${result.run.status}: ${result.run.summary}`;
     await refreshMissionControl();
+    await loadIngestRunManifest(result.run.id);
   } catch (error) {
     feedback.textContent = error.message;
   } finally {
@@ -1032,6 +1125,13 @@ function bindEvents() {
   document.querySelector("#asset-refresh").addEventListener("click", refreshAssetBrowser);
   document.querySelector("#asset-room-filter").addEventListener("change", refreshAssetBrowser);
   document.querySelector("#asset-dataset-filter").addEventListener("change", refreshAssetBrowser);
+  document.querySelector("#ingest-runs").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-ingest-run-id]");
+    if (!button || button.disabled) {
+      return;
+    }
+    loadIngestRunManifest(button.dataset.ingestRunId);
+  });
   document.querySelector("#asset-table").addEventListener("click", (event) => {
     const button = event.target.closest("[data-asset-id]");
     if (!button) {

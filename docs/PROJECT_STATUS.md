@@ -3,7 +3,7 @@
 Last updated: 2026-03-28
 
 ## Current phase
-Phase G1.1 complete; no further approved G1 substep is defined yet
+Phase G1.2 complete; no further approved G1 substep is defined yet
 
 ## Phase state
 - Phase 2B.1 complete
@@ -28,6 +28,7 @@ Phase G1.1 complete; no further approved G1 substep is defined yet
 - Phase A1.8 complete
 - Phase G1 approved
 - Phase G1.1 complete
+- Phase G1.2 complete
 
 ## Completed in 2B.5
 - stress verification for replay/correction/provenance/room isolation
@@ -171,8 +172,19 @@ Phase G1.1 complete; no further approved G1 substep is defined yet
 - full unittest suite green
 - compile pass green
 
+## Completed in G1.2
+- first bounded ingest run manifest history surface
+- GET /api/ingest/runs/{run_id}/manifest exposes a stored manifest snapshot for a completed run
+- ingest completion now persists bounded manifest history with total_size_bytes, asset-kind breakdown, sample assets, and warnings
+- run manifests remain readable even after later rescans mutate current asset rows
+- ingest status/list payloads now surface has_manifest visibility for run history
+- Mission Control ingest-run history now supports Inspect Manifest and auto-opens the latest successful scan result
+- focused G1.2 tests green
+- regression slice for G1.1 green
+- compile pass green
+
 ## Next approved substep
 - no further approved G1 substep is enumerated in canonical repo evidence
-- require explicit roadmap extension or approval before widening the ingest spine beyond the completed G1.1 preflight manifest seam
-- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, or G1.1 preflight manifest work
+- require explicit roadmap extension or approval before widening the ingest spine beyond the completed G1.2 manifest history seam
+- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, G1.1 preflight manifest work, or G1.2 manifest history work
 

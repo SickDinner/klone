@@ -1,5 +1,7 @@
 # Current Handoff
 
+Last updated: 2026-03-28
+
 ## Current approved phase
 Post-2C.1 closeout / next-step selection
 

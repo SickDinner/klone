@@ -1,9 +1,9 @@
 # PROJECT STATUS
 
-Last updated: 2026-03-27
+Last updated: 2026-03-28
 
 ## Current phase
-Phase 2C.1 complete
+Phase 2C.1 complete; next-step selection in progress
 
 ## Phase state
 - Phase 2B.1 complete
@@ -31,7 +31,6 @@ Phase 2C.1 complete
 - episode query primitive
 - episode-side deterministic filtering
 - episode/event traversal refinement
-- query/list provenance summary exposure
 - query/list provenance summary exposure
 
 ## Next approved substep

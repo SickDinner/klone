@@ -8,7 +8,10 @@ from fastapi.staticfiles import StaticFiles
 from .api import router as api_router
 from .config import Settings, load_settings, settings
 from .contracts import APP_VERSION, BOOTSTRAP_TASK_ID
+from .request_context import build_request_context
 from .repository import KloneRepository, utc_now_iso
+from .services import ServiceContainer
+from .v1_api import router as v1_router
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -53,6 +56,7 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
         app.state.runtime_config = resolved_settings.runtime_snapshot()
         app.state.bootstrap_report = bootstrap_report
         app.state.latest_internal_run = latest_internal_run
+        app.state.services = ServiceContainer.build(repository)
         yield
 
     app = FastAPI(
@@ -62,8 +66,19 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = resolved_settings
+
+    @app.middleware("http")
+    async def request_context_middleware(request, call_next):
+        request_context = build_request_context(request)
+        request.state.request_context = request_context
+        response = await call_next(request)
+        for header_name, header_value in request_context.as_headers().items():
+            response.headers[header_name] = header_value
+        return response
+
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     app.include_router(api_router)
+    app.include_router(v1_router)
 
     @app.get("/", include_in_schema=False)
     def dashboard() -> FileResponse:

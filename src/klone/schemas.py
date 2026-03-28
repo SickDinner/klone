@@ -191,6 +191,42 @@ class InternalRunRecord(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
+class RequestContextRecord(BaseModel):
+    request_id: str
+    trace_id: str
+    principal: str
+    actor_role: str
+
+
+class ServiceSeamRecord(BaseModel):
+    id: str
+    name: str
+    implementation: str
+    status: str
+    notes: list[str]
+
+
+class PublicCapabilityRecord(BaseModel):
+    id: str
+    name: str
+    category: str
+    path: str
+    methods: list[str]
+    read_only: bool
+    room_scoped: bool
+    status: str
+    description: str
+    backed_by: list[str]
+
+
+class PublicCapabilitiesResponse(BaseModel):
+    api_version: str
+    request_context: RequestContextRecord
+    services: list[ServiceSeamRecord]
+    module_registry: list[ModuleCapabilityRecord]
+    capabilities: list[PublicCapabilityRecord]
+
+
 class MissionControlStatus(BaseModel):
     app_name: str
     app_version: str

@@ -20,7 +20,16 @@
 Nykyinen kanoninen tila on:
 
 - `Phase A1 approved`
-- `A1.1 public control-plane seam kickoff pending implementation`
+- `A1.1 public control-plane seam kickoff complete`
+
+Uutta tässä versiossa:
+
+- `public v1 seam`
+  versionoitu `GET /v1/capabilities` nykyisen järjestelmän näkyvyyden päälle
+- `request context`
+  `request_id`, `trace_id`, `principal` ja `actor_role` kulkevat nyt pyynnön mukana
+- `service boundaries`
+  `MemoryFacade`, `PolicyService`, `AuditService` ja `BlobService` näkyvät nyt eksplisiittisinä in-process seameina
 
 Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, joka näkyy käyttöliittymässä asti:
 
@@ -92,9 +101,12 @@ Supervisor hallitsee liikennettä vyöhykkeiden välillä. Moduulit eivät saa l
 │     ├─ ingest.py
 │     ├─ main.py
 │     ├─ models.py
+│     ├─ request_context.py
 │     ├─ repository.py
 │     ├─ rooms.py
 │     ├─ schemas.py
+│     ├─ services.py
+│     ├─ v1_api.py
 │     └─ static/
 │        ├─ app.js
 │        ├─ index.html
@@ -141,13 +153,14 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 - `GET /api/memory/context/package`
 - `GET /api/memory/context/payload`
 - `GET /api/memory/context/answer`
+- `GET /v1/capabilities`
 - `POST /api/ingest/scan`
 
 ## Seuraavat järkevät rakennusvaiheet
 
-1. Public control-plane seam: request/trace context sekä read-only `GET /v1/capabilities` nykyisen FastAPI-sovelluksen sisällä.
-2. Pienimmät in-process service seamit vain A1.1:n tarpeeseen: `MemoryFacade`, `PolicyService`, `AuditService`, `BlobService`.
-3. Memory Explorerin jatko vasta A1.1:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
-4. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
-5. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
-6. Constitution Layer: hitaasti muuttuvat parametrit, provenance ja change logit.
+1. Seuraava A1-alivaihe: valitse verified repo evidence -pohjalta seuraava pienin `/v1`-seam ilman write-surface wideningia.
+2. Memory Explorerin jatko A1.1:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
+3. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
+4. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
+5. Constitution Layer: hitaasti muuttuvat parametrit, provenance ja change logit.
+6. Syvempi ingest: OCR, transkriptio, extraction pipeline -tilat ja parempi dedup.

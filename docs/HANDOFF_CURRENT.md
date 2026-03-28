@@ -3,19 +3,20 @@
 Last updated: 2026-03-28
 
 ## Current approved phase
-Post-2C.5 closeout / next-step selection
+Post-A1.1 closeout / next-step selection
 
 ## Baseline
 - 2B.1 through 2B.5 complete
 - memory spine, provenance, replay, correction, contract lock, and stress verification are in place
 - read-only query, context, provenance-detail, bounded-answer, and Memory Explorer surfaces exist in repo reality
+- A1.1 request context, service seams, and GET /v1/capabilities exist in repo reality
 
 ## Immediate goal
-Phase 2C.5 is complete. Identify the next exact approved phase/substep from verified repo evidence only.
-Do not reopen completed 2C retrieval, context, provenance, bounded-answer, or Memory Explorer work.
+Phase A1.1 is complete. Identify the next exact approved phase/substep from verified repo evidence only.
+Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, or A1.1 seam work.
 
 ## Approved scope
-- canonical docs closeout after completed Phase 2C.5
+- canonical docs closeout after completed Phase A1.1
 - next-step selection from verified repo evidence only
 - duplicate-work prevention
 - no unrelated runtime behavior
@@ -32,6 +33,8 @@ Do not reopen completed 2C retrieval, context, provenance, bounded-answer, or Me
 - do not add direct LLM-to-database authority
 - preserve room scope and replay determinism
 - do not regress the read-only context/answer contract
+- do not regress the request-context seam
+- do not add /v1 query, /v1 changes, /v1 objects/set, or /v1 blobs/upload yet
 
 ## Required verification
 - compile pass

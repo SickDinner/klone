@@ -3,7 +3,7 @@
 Last updated: 2026-03-28
 
 ## Current phase
-Phase 2C.5 complete; next-step selection in progress
+Phase A1.1 complete; next-step selection in progress
 
 ## Phase state
 - Phase 2B.1 complete
@@ -16,6 +16,8 @@ Phase 2C.5 complete; next-step selection in progress
 - Phase 2C.3 complete
 - Phase 2C.4 complete
 - Phase 2C.5 complete
+- Phase A1 approved
+- Phase A1.1 complete
 
 ## Completed in 2B.5
 - stress verification for replay/correction/provenance/room isolation
@@ -66,14 +68,17 @@ Phase 2C.5 complete; next-step selection in progress
 - focused route coverage for the new read-only surface
 - full unittest suite green after surface update
 
+## Completed in A1.1
+- request context middleware with request_id / trace_id / principal / actor_role placeholders
+- request context headers on existing and new routes
+- explicit in-process service seams for MemoryFacade / PolicyService / AuditService / BlobService
+- versioned public GET /v1/capabilities route
+- focused A1.1 tests green
+- full unittest suite green
+- local HTTP smoke green for /v1/capabilities
+
 ## Next approved substep
-- identify the next exact approved phase/substep after Phase 2C.5 from verified repo evidence only
-- do not reopen completed 2C retrieval, context, provenance, bounded-answer, or Memory Explorer work
-
-
-
-
-
-
-
+- identify the next exact approved phase/substep after Phase A1.1 from verified repo evidence only
+- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, or A1.1 seam work
+- do not add /v1 query/object/changes/blob mutation endpoints yet
 

@@ -68,6 +68,24 @@ Bounded Read-Only Answer Surfaces:
 - unsupported question gating
 - room-isolated answer generation
 
+## Phase 2C.5
+Public Read-Only Delivery Surface:
+- public read-only context package API route
+- public read-only LLM context payload API route
+- public bounded read-only memory answer API route
+- Mission Control Memory Explorer UI
+- focused route coverage for the new read-only surface
+
+## Phase A1
+Public Control-Plane Skeleton:
+- versioned /v1 API shell inside the existing FastAPI app
+- request context with request_id / trace_id / principal placeholder
+- in-process service seams for MemoryFacade / PolicyService / AuditService / BlobService
+- stable object/query/changes/blob contracts
+- append-only audit chain reuse/extension
+- local blob metadata shell
+- no distributed split, broker, gRPC, OIDC provider integration, or external object store requirement yet
+
 ## Not approved yet
 - semantic search
 - embeddings

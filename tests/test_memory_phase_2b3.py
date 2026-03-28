@@ -410,6 +410,9 @@ class MemoryPhase2B3Tests(unittest.TestCase):
         self.assertEqual(
             memory_routes,
             {
+                "/api/memory/context/answer": ["GET"],
+                "/api/memory/context/package": ["GET"],
+                "/api/memory/context/payload": ["GET"],
                 "/api/memory/events": ["GET"],
                 "/api/memory/events/{event_id}": ["GET"],
                 "/api/memory/events/{event_id}/provenance": ["GET"],

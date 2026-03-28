@@ -46,6 +46,28 @@ Query / Retrieval Primitives:
 - provenance-aware retrieval
 - deterministic ordering and pagination
 
+## Phase 2C.2
+Read-Only Context Package Assembly:
+- deterministic context package assembly
+- room-scoped event/episode context packaging
+- correction summary exposure
+- provenance summary exposure
+
+## Phase 2C.3
+Read-Only LLM Context Payload:
+- deterministic payload construction
+- explicit included/excluded context visibility
+- read-only interface shell
+- memory write path disabled
+
+## Phase 2C.4
+Bounded Read-Only Answer Surfaces:
+- event provenance detail retrieval
+- episode provenance detail retrieval
+- bounded source-linked answer path
+- unsupported question gating
+- room-isolated answer generation
+
 ## Not approved yet
 - semantic search
 - embeddings

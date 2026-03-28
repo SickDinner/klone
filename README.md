@@ -17,7 +17,7 @@
 
 ## Nykyinen vaihe
 
-Tässä versiossa Phase 2A on toteutettu rungoksi asti:
+Tässä versiossa Phase 2C.5 näkyy jo käyttöliittymässä asti:
 
 - `dataset intake`
   paikallisen kansion skannaus, luokittelu, hashit ja metadata
@@ -31,6 +31,10 @@ Tässä versiossa Phase 2A on toteutettu rungoksi asti:
   access, classification, audit ja output toimivat sääntöpohjaisina tarkistuksina
 - `mission control UI`
   dataset intake, dataset list, asset browser, room registry, governance guards, audit preview
+- `memory explorer UI`
+  room-scoped events, episodes, detail-paneeli, context payload ja bounded read-only answer preview
+- `memory context APIs`
+  read-only context package, LLM context payload ja source-linked answer route
 
 Käytännössä oikea tie on:
 
@@ -104,7 +108,7 @@ uvicorn klone.main:app --reload
 
 Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
-## Phase 2A API
+## Nykyinen API
 
 - `GET /api/health`
 - `GET /api/status`
@@ -120,11 +124,23 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 - `GET /api/assets/{asset_id}`
 - `GET /api/ingest/status`
 - `GET /api/audit`
+- `GET /api/memory/events`
+- `GET /api/memory/events/{event_id}`
+- `GET /api/memory/events/{event_id}/provenance`
+- `GET /api/memory/entities`
+- `GET /api/memory/entities/{entity_id}`
+- `GET /api/memory/episodes`
+- `GET /api/memory/episodes/{episode_id}`
+- `GET /api/memory/episodes/{episode_id}/provenance`
+- `GET /api/memory/episodes/{episode_id}/events`
+- `GET /api/memory/context/package`
+- `GET /api/memory/context/payload`
+- `GET /api/memory/context/answer`
 - `POST /api/ingest/scan`
 
 ## Seuraavat järkevät rakennusvaiheet
 
-1. Memory Core: raw `Event`, `Entity` ja `Episode` -mallit sekä timeline retrieval.
+1. Memory Explorerin jatko: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
 2. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
 3. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
 4. Constitution Layer: hitaasti muuttuvat parametrit, provenance ja change logit.

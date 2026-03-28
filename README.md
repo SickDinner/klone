@@ -21,6 +21,7 @@ Nykyinen kanoninen tila on:
 
 - `Phase A1 approved`
 - `A1.1 public control-plane seam kickoff complete`
+- `A1.2 append-only audit chain foundation complete`
 
 Uutta tässä versiossa:
 
@@ -30,6 +31,10 @@ Uutta tässä versiossa:
   `request_id`, `trace_id`, `principal` ja `actor_role` kulkevat nyt pyynnön mukana
 - `service boundaries`
   `MemoryFacade`, `PolicyService`, `AuditService` ja `BlobService` näkyvät nyt eksplisiittisinä in-process seameina
+- `contract shells`
+  stable `object`, `query`, `change` ja `blob` contract shellit näkyvät nyt `/v1/capabilities`-vastauksessa
+- `append-only control-plane audit chain`
+  `/v1/capabilities` kirjoittaa nyt deterministisen audit-ketjun `request_id`, `trace_id`, `principal` ja hash-linkityksen kanssa
 
 Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, joka näkyy käyttöliittymässä asti:
 
@@ -159,7 +164,7 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 ## Seuraavat järkevät rakennusvaiheet
 
 1. Seuraava A1-alivaihe: valitse verified repo evidence -pohjalta seuraava pienin `/v1`-seam ilman write-surface wideningia.
-2. Memory Explorerin jatko A1.1:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
+2. Memory Explorerin jatko A1.2:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
 3. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
 4. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
 5. Constitution Layer: hitaasti muuttuvat parametrit, provenance ja change logit.

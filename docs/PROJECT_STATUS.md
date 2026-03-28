@@ -3,7 +3,7 @@
 Last updated: 2026-03-28
 
 ## Current phase
-Phase A1.1 complete; next-step selection in progress
+Phase A1.2 complete; next-step selection in progress
 
 ## Phase state
 - Phase 2B.1 complete
@@ -18,6 +18,7 @@ Phase A1.1 complete; next-step selection in progress
 - Phase 2C.5 complete
 - Phase A1 approved
 - Phase A1.1 complete
+- Phase A1.2 complete
 
 ## Completed in 2B.5
 - stress verification for replay/correction/provenance/room isolation
@@ -77,8 +78,18 @@ Phase A1.1 complete; next-step selection in progress
 - full unittest suite green
 - local HTTP smoke green for /v1/capabilities
 
+## Completed in A1.2
+- stable public object/query/change/blob contract shells published through GET /v1/capabilities
+- append-only public control-plane audit chain for GET /v1/capabilities
+- request_id / trace_id / principal / actor_role captured in chained control-plane audit rows
+- deterministic prev_event_hash -> event_hash linking
+- no new /v1 routes added
+- focused A1.2 tests green
+- full unittest suite green
+- local HTTP smoke green for audit-chain linkage
+
 ## Next approved substep
-- identify the next exact approved phase/substep after Phase A1.1 from verified repo evidence only
-- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, or A1.1 seam work
+- identify the next exact approved phase/substep after Phase A1.2 from verified repo evidence only
+- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, or A1.2 audit/contract-shell work
 - do not add /v1 query/object/changes/blob mutation endpoints yet
 

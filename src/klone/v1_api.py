@@ -24,7 +24,9 @@ def capabilities(
     services: ServiceContainer = Depends(get_service_container),
     request_context: RequestContext = Depends(get_request_context),
 ) -> PublicCapabilitiesResponse:
-    return PublicCapabilitiesResponse(
+    contract_registry = contract_registry_payload()
+    capabilities_payload = services.public_capabilities()
+    response = PublicCapabilitiesResponse(
         api_version="v1",
         request_context=RequestContextRecord(
             request_id=request_context.request_id,
@@ -34,6 +36,19 @@ def capabilities(
         ),
         services=services.seam_descriptors(),
         module_registry=module_registry_payload(),
-        capabilities=services.public_capabilities(),
-        contracts=contract_registry_payload(),
+        capabilities=capabilities_payload,
+        contracts=contract_registry,
     )
+    services.audit.log_control_plane_event(
+        event_type="v1_capabilities_read",
+        route_path="/v1/capabilities",
+        request_context=request_context,
+        status_code=200,
+        summary="Read the public v1 capabilities seam.",
+        metadata={
+            "capability_count": len(capabilities_payload),
+            "contract_count": len(contract_registry),
+            "service_count": len(response.services),
+        },
+    )
+    return response

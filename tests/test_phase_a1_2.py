@@ -48,6 +48,55 @@ class PhaseA12Tests(unittest.TestCase):
         self.assertEqual(blob_contract["route_readiness"], "metadata_only_no_public_upload")
         self.assertIn("No /v1 blobs upload route exists yet.", blob_contract["notes"])
 
+    def test_v1_capabilities_writes_append_only_control_plane_audit_chain(self) -> None:
+        app = create_app(self._settings_for("phase_a1_2_audit.sqlite"))
+
+        first = asyncio.run(
+            self._perform_request(
+                app,
+                path="/v1/capabilities",
+                headers={
+                    "x-request-id": "req:a12-1",
+                    "x-trace-id": "trace:a12-1",
+                    "x-klone-principal": "owner:alpha",
+                    "x-klone-role": "owner",
+                },
+            )
+        )
+        second = asyncio.run(
+            self._perform_request(
+                app,
+                path="/v1/capabilities",
+                headers={
+                    "x-request-id": "req:a12-2",
+                    "x-trace-id": "trace:a12-2",
+                    "x-klone-principal": "owner:beta",
+                    "x-klone-role": "owner",
+                },
+            )
+        )
+
+        self.assertEqual(first["status_code"], 200)
+        self.assertEqual(second["status_code"], 200)
+
+        app = create_app(self._settings_for("phase_a1_2_audit.sqlite"))
+        chain_rows = asyncio.run(self._read_control_plane_chain(app))
+
+        self.assertEqual(len(chain_rows), 2)
+
+        latest, older = chain_rows[0], chain_rows[1]
+        self.assertEqual(latest["request_id"], "req:a12-2")
+        self.assertEqual(latest["trace_id"], "trace:a12-2")
+        self.assertEqual(latest["principal"], "owner:beta")
+        self.assertEqual(latest["actor_role"], "owner")
+        self.assertEqual(latest["event_type"], "v1_capabilities_read")
+        self.assertEqual(latest["route_path"], "/v1/capabilities")
+        self.assertEqual(latest["status_code"], 200)
+        self.assertEqual(latest["prev_event_hash"], older["event_hash"])
+        self.assertNotEqual(latest["event_hash"], older["event_hash"])
+        self.assertIsNone(older["prev_event_hash"])
+        self.assertEqual(older["request_id"], "req:a12-1")
+
     def test_v1_surface_remains_single_route_after_contract_registry_addition(self) -> None:
         v1_routes = {
             route.path: sorted(route.methods)
@@ -56,9 +105,19 @@ class PhaseA12Tests(unittest.TestCase):
         }
         self.assertEqual(v1_routes, {"/v1/capabilities": ["GET"]})
 
-    async def _perform_request(self, app, *, path: str) -> dict[str, object]:
+    async def _perform_request(
+        self,
+        app,
+        *,
+        path: str,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, object]:
         async with app.router.lifespan_context(app):
             events: list[dict] = []
+            header_items = [
+                (key.lower().encode("utf-8"), value.encode("utf-8"))
+                for key, value in (headers or {}).items()
+            ]
             scope = {
                 "type": "http",
                 "asgi": {"version": "3.0"},
@@ -68,7 +127,7 @@ class PhaseA12Tests(unittest.TestCase):
                 "path": path,
                 "raw_path": path.encode("utf-8"),
                 "query_string": b"",
-                "headers": [],
+                "headers": header_items,
                 "client": ("127.0.0.1", 50002),
                 "server": ("testserver", 80),
                 "app": app,
@@ -92,6 +151,10 @@ class PhaseA12Tests(unittest.TestCase):
                 "status_code": response_start["status"],
                 "json": json.loads(response_body.decode("utf-8")),
             }
+
+    async def _read_control_plane_chain(self, app) -> list[dict[str, object]]:
+        async with app.router.lifespan_context(app):
+            return app.state.repository.list_control_plane_audit_chain(limit=10)
 
     def _settings_for(self, database_name: str) -> Settings:
         database_path = self.root / database_name

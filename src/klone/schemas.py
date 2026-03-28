@@ -105,6 +105,23 @@ class AuditEventRecord(BaseModel):
     created_at: str
 
 
+class ControlPlaneAuditRecord(BaseModel):
+    id: int
+    event_type: str
+    route_path: str
+    actor: str
+    actor_role: str
+    principal: str
+    request_id: str
+    trace_id: str
+    status_code: int
+    summary: str
+    metadata: dict[str, Any] | None = None
+    prev_event_hash: str | None = None
+    event_hash: str
+    created_at: str
+
+
 class RoomRecord(BaseModel):
     id: str
     label: str

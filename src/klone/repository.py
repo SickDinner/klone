@@ -28,6 +28,7 @@ from .contracts import (
 EXPECTED_TABLES = (
     "assets",
     "audit_events",
+    "control_plane_audit_chain",
     "datasets",
     "ingest_runs",
     "internal_runs",
@@ -143,6 +144,26 @@ class KloneRepository:
 
                 CREATE INDEX IF NOT EXISTS idx_audit_events_created_at
                     ON audit_events(created_at DESC);
+
+                CREATE TABLE IF NOT EXISTS control_plane_audit_chain (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT NOT NULL,
+                    route_path TEXT NOT NULL,
+                    actor TEXT NOT NULL,
+                    actor_role TEXT NOT NULL,
+                    principal TEXT NOT NULL,
+                    request_id TEXT NOT NULL,
+                    trace_id TEXT NOT NULL,
+                    status_code INTEGER NOT NULL,
+                    summary TEXT NOT NULL,
+                    metadata_json TEXT,
+                    prev_event_hash TEXT,
+                    event_hash TEXT NOT NULL UNIQUE,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_control_plane_audit_chain_created_at
+                    ON control_plane_audit_chain(created_at DESC, id DESC);
 
                 CREATE TABLE IF NOT EXISTS internal_runs (
                     id TEXT PRIMARY KEY,
@@ -409,6 +430,39 @@ class KloneRepository:
 
     def _encode_metadata(self, metadata: Mapping[str, Any] | None) -> str | None:
         return json.dumps(metadata, sort_keys=True) if metadata else None
+
+    def _compute_control_plane_event_hash(
+        self,
+        *,
+        event_type: str,
+        route_path: str,
+        actor: str,
+        actor_role: str,
+        principal: str,
+        request_id: str,
+        trace_id: str,
+        status_code: int,
+        summary: str,
+        metadata_json: str | None,
+        prev_event_hash: str | None,
+        created_at: str,
+    ) -> str:
+        payload = {
+            "event_type": event_type,
+            "route_path": route_path,
+            "actor": actor,
+            "actor_role": actor_role,
+            "principal": principal,
+            "request_id": request_id,
+            "trace_id": trace_id,
+            "status_code": status_code,
+            "summary": summary,
+            "metadata_json": metadata_json,
+            "prev_event_hash": prev_event_hash,
+            "created_at": created_at,
+        }
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return __import__("hashlib").sha256(canonical.encode("utf-8")).hexdigest()
 
     def _validate_memory_status(
         self,
@@ -839,6 +893,88 @@ class KloneRepository:
             ).fetchone()
             return dict(row)
 
+    def record_control_plane_audit_event(
+        self,
+        *,
+        event_type: str,
+        route_path: str,
+        actor: str,
+        actor_role: str,
+        principal: str,
+        request_id: str,
+        trace_id: str,
+        status_code: int,
+        summary: str,
+        metadata: Mapping[str, Any] | None = None,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any]:
+        with self._borrowed_connection(conn) as active_conn:
+            created_at = utc_now_iso()
+            metadata_json = self._encode_metadata(metadata)
+            previous_row = active_conn.execute(
+                """
+                SELECT event_hash
+                FROM control_plane_audit_chain
+                ORDER BY id DESC
+                LIMIT 1
+                """
+            ).fetchone()
+            prev_event_hash = str(previous_row["event_hash"]) if previous_row is not None else None
+            event_hash = self._compute_control_plane_event_hash(
+                event_type=event_type,
+                route_path=route_path,
+                actor=actor,
+                actor_role=actor_role,
+                principal=principal,
+                request_id=request_id,
+                trace_id=trace_id,
+                status_code=status_code,
+                summary=summary,
+                metadata_json=metadata_json,
+                prev_event_hash=prev_event_hash,
+                created_at=created_at,
+            )
+            cursor = active_conn.execute(
+                """
+                INSERT INTO control_plane_audit_chain (
+                    event_type,
+                    route_path,
+                    actor,
+                    actor_role,
+                    principal,
+                    request_id,
+                    trace_id,
+                    status_code,
+                    summary,
+                    metadata_json,
+                    prev_event_hash,
+                    event_hash,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event_type,
+                    route_path,
+                    actor,
+                    actor_role,
+                    principal,
+                    request_id,
+                    trace_id,
+                    status_code,
+                    summary,
+                    metadata_json,
+                    prev_event_hash,
+                    event_hash,
+                    created_at,
+                ),
+            )
+            row = active_conn.execute(
+                "SELECT * FROM control_plane_audit_chain WHERE id = ?",
+                (cursor.lastrowid,),
+            ).fetchone()
+            return dict(row)
+
     # Asset persistence
     def upsert_asset(
         self,
@@ -1161,6 +1297,19 @@ class KloneRepository:
                 ORDER BY created_at ASC, id ASC
                 """,
                 (room_id,),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def list_control_plane_audit_chain(self, *, limit: int = 25) -> list[dict[str, Any]]:
+        with self.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM control_plane_audit_chain
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (limit,),
             ).fetchall()
             return [dict(row) for row in rows]
 

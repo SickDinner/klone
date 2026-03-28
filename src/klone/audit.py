@@ -8,7 +8,8 @@ from typing import Any
 from .contracts import ClassificationLevel
 from .guards import audit_guard
 from .repository import KloneRepository
-from .schemas import AuditEventRecord
+from .request_context import RequestContext
+from .schemas import AuditEventRecord, ControlPlaneAuditRecord
 
 
 class AuditService:
@@ -52,3 +53,41 @@ class AuditService:
         if metadata_json:
             payload["metadata"] = json.loads(metadata_json)
         return AuditEventRecord.model_validate(payload)
+
+    def log_control_plane_event(
+        self,
+        *,
+        event_type: str,
+        route_path: str,
+        request_context: RequestContext,
+        status_code: int,
+        summary: str,
+        metadata: Mapping[str, Any] | None = None,
+        conn: sqlite3.Connection | None = None,
+    ) -> ControlPlaneAuditRecord:
+        decision = audit_guard.evaluate(
+            event_type=event_type,
+            actor=request_context.principal,
+            target_type="control_plane_route",
+            summary=summary,
+            metadata=metadata,
+        )
+        if decision.decision != "allowed":
+            raise ValueError(decision.reason)
+        payload = self.repository.record_control_plane_audit_event(
+            event_type=event_type,
+            route_path=route_path,
+            actor=request_context.principal,
+            actor_role=request_context.actor_role,
+            principal=request_context.principal,
+            request_id=request_context.request_id,
+            trace_id=request_context.trace_id,
+            status_code=status_code,
+            summary=summary,
+            metadata=metadata,
+            conn=conn,
+        )
+        metadata_json = payload.pop("metadata_json", None)
+        if metadata_json:
+            payload["metadata"] = json.loads(metadata_json)
+        return ControlPlaneAuditRecord.model_validate(payload)

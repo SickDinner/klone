@@ -17,7 +17,12 @@
 
 ## Nykyinen vaihe
 
-Tässä versiossa Phase 2C.5 näkyy jo käyttöliittymässä asti:
+Nykyinen kanoninen tila on:
+
+- `Phase A1 approved`
+- `A1.1 public control-plane seam kickoff pending implementation`
+
+Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, joka näkyy käyttöliittymässä asti:
 
 - `dataset intake`
   paikallisen kansion skannaus, luokittelu, hashit ja metadata
@@ -140,9 +145,9 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ## Seuraavat järkevät rakennusvaiheet
 
-1. Memory Explorerin jatko: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
-2. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
-3. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
-4. Constitution Layer: hitaasti muuttuvat parametrit, provenance ja change logit.
-5. Syvempi ingest: OCR, transkriptio, extraction pipeline -tilat ja parempi dedup.
-6. Hypervisor eval/debug: laajemmat policy-tracet, approval-flowt ja owner override -näkymät.
+1. Public control-plane seam: request/trace context sekä read-only `GET /v1/capabilities` nykyisen FastAPI-sovelluksen sisällä.
+2. Pienimmät in-process service seamit vain A1.1:n tarpeeseen: `MemoryFacade`, `PolicyService`, `AuditService`, `BlobService`.
+3. Memory Explorerin jatko vasta A1.1:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
+4. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
+5. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
+6. Constitution Layer: hitaasti muuttuvat parametrit, provenance ja change logit.

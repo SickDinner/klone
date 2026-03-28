@@ -78,13 +78,14 @@ class PhaseA13Tests(unittest.TestCase):
         self.assertEqual(capabilities["blob.metadata.list"]["status"], "available_via_asset_routes")
         self.assertEqual(capabilities["blob.metadata.detail"]["methods"], ["GET"])
 
-    def test_v1_surface_remains_single_read_only_capabilities_route_after_a1_3(self) -> None:
+    def test_v1_surface_includes_current_blob_object_and_query_routes(self) -> None:
         v1_routes = {
             route.path: sorted(route.methods)
             for route in v1_router.routes
             if route.path.startswith("/v1")
         }
         self.assertEqual(v1_routes["/v1/capabilities"], ["GET"])
+        self.assertEqual(v1_routes["/v1/rooms/{room_id}/blobs/get"], ["POST"])
         self.assertEqual(v1_routes["/v1/rooms/{room_id}/objects/get"], ["POST"])
         self.assertEqual(v1_routes["/v1/rooms/{room_id}/query"], ["POST"])
 

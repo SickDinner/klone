@@ -221,13 +221,14 @@ class PhaseA15Tests(unittest.TestCase):
         self.assertEqual(contracts["object-shell"]["route_readiness"], "public_read_only_get_available")
         self.assertIn("/v1/rooms/{room_id}/objects/get", contracts["object-shell"]["backing_routes"])
 
-    def test_v1_surface_contains_only_capabilities_and_object_get(self) -> None:
+    def test_v1_surface_contains_blob_get_object_get_and_query(self) -> None:
         v1_routes = {
             route.path: sorted(route.methods)
             for route in v1_router.routes
             if route.path.startswith("/v1")
         }
         self.assertEqual(v1_routes["/v1/capabilities"], ["GET"])
+        self.assertEqual(v1_routes["/v1/rooms/{room_id}/blobs/get"], ["POST"])
         self.assertEqual(v1_routes["/v1/rooms/{room_id}/objects/get"], ["POST"])
         self.assertEqual(v1_routes["/v1/rooms/{room_id}/query"], ["POST"])
 

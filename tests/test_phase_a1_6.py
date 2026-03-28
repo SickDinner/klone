@@ -351,13 +351,14 @@ class PhaseA16Tests(unittest.TestCase):
         self.assertEqual(query_rows[1]["status_code"], 200)
         self.assertEqual(query_rows[0]["prev_event_hash"], query_rows[1]["event_hash"])
 
-    def test_v1_surface_contains_capabilities_object_get_and_query(self) -> None:
+    def test_v1_surface_contains_blob_get_object_get_and_query(self) -> None:
         v1_routes = {
             route.path: sorted(route.methods)
             for route in v1_router.routes
             if route.path.startswith("/v1")
         }
         self.assertEqual(v1_routes["/v1/capabilities"], ["GET"])
+        self.assertEqual(v1_routes["/v1/rooms/{room_id}/blobs/get"], ["POST"])
         self.assertEqual(v1_routes["/v1/rooms/{room_id}/objects/get"], ["POST"])
         self.assertEqual(v1_routes["/v1/rooms/{room_id}/query"], ["POST"])
 

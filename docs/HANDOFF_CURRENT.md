@@ -3,7 +3,7 @@
 Last updated: 2026-03-28
 
 ## Current approved phase
-Phase A1 closeout complete / awaiting next approved phase
+Phase A1.4: Local Object Envelope Shell
 
 ## Baseline
 - 2B.1 through 2B.5 complete
@@ -12,15 +12,19 @@ Phase A1 closeout complete / awaiting next approved phase
 - A1.1 request context, service seams, and GET /v1/capabilities exist in repo reality
 - A1.2 contract shells and append-only control-plane audit chain exist in repo reality
 - A1.3 local blob metadata shell exists in repo reality without adding a new /v1 blob route
+- object-shell contract already exists in /v1/capabilities but is not yet materialized as a local object envelope projection
 
 ## Immediate goal
-Phase A1 is fully closed. No further approved post-A1 substep is enumerated in repo evidence.
-Await explicit roadmap extension or approval before widening the control plane. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, or A1.3 blob metadata shell work.
+Implement the smallest approved A1.4 step only:
+local object envelope shell via existing read routes.
+Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, or A1.3 blob metadata shell work.
 
 ## Approved scope
-- canonical docs closeout after completed Phase A1
-- verified confirmation that no further post-A1 approved substep is currently defined
-- duplicate-work prevention
+- deterministic read-only object envelope projection
+- existing object kinds only: dataset, asset, memory_event, memory_episode
+- room-scoped underlying reads only
+- capability/readiness visibility through /v1/capabilities only
+- reuse existing routes and service seams
 - no unrelated runtime behavior
 - no unrelated API widening
 
@@ -38,11 +42,12 @@ Await explicit roadmap extension or approval before widening the control plane. 
 - do not regress the request-context seam
 - do not regress the contract shells or append-only audit-chain linkage on /v1/capabilities
 - do not regress the local blob metadata shell or its capability exposure via existing asset routes
+- do not add public /v1/objects/get yet
 - do not add /v1 query, /v1 changes, /v1 objects/get, /v1 objects/set, /v1 blobs/upload, or /v1/blobs/{blob_id}/meta yet
 
 ## Required verification
 - compile pass
-- focused tests
+- focused A1 tests
 - local verification if read behavior changes
 
 

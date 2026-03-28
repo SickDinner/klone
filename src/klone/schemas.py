@@ -285,27 +285,6 @@ class PublicQueryResponse(BaseModel):
     results: list[dict[str, Any]]
 
 
-class PublicQueryRequest(BaseModel):
-    query_id: str = Field(..., min_length=1, max_length=120)
-    query_kind: str = Field(..., min_length=1, max_length=120)
-    request_id: str = Field(..., min_length=1, max_length=120)
-    filters: dict[str, Any] = Field(default_factory=dict)
-    cursor: str | None = None
-    limit: int = Field(default=20, ge=1, le=50)
-
-
-class PublicQueryResponse(BaseModel):
-    api_version: str
-    request_context: RequestContextRecord
-    room_id: str
-    query_id: str
-    query_kind: str
-    applied_filters: dict[str, Any]
-    cursor: str | None = None
-    next_cursor: str | None = None
-    items: list[ObjectEnvelopeRecord]
-
-
 class ServiceSeamRecord(BaseModel):
     id: str
     name: str

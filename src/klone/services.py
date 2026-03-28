@@ -325,24 +325,12 @@ class _ObjectEnvelopeProjector:
             status="local_envelope_shell",
             notes=[
                 "Projects existing governed dataset, asset, memory event, and memory episode reads into a deterministic local object envelope shell.",
-                "Reuses existing read routes plus the public read-only object-get and query seams without adding write authority.",
+                "Reuses existing read routes plus the public read-only object-get seam without adding write authority.",
             ],
         )
 
     def public_capabilities(self) -> list[PublicCapabilityRecord]:
         return [
-            PublicCapabilityRecord(
-                id="v1.query.read",
-                name="V1 Room Query",
-                category="query",
-                path="/v1/rooms/{room_id}/query",
-                methods=["POST"],
-                read_only=True,
-                room_scoped=True,
-                status="available",
-                description="List room-scoped object envelopes through the versioned public control-plane query seam.",
-                backed_by=["ObjectEnvelopeService", "PolicyService", "AuditService"],
-            ),
             PublicCapabilityRecord(
                 id="v1.objects.get",
                 name="V1 Room Object Get",

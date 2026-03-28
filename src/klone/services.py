@@ -5,7 +5,7 @@ import json
 
 from .audit import AuditService
 from .blueprint import SYSTEM_BLUEPRINT
-from .guards import governance_guard_catalog
+from .guards import governance_guard_catalog, output_guard
 from .memory import MemoryService
 from .repository import KloneRepository
 from .rooms import room_registry
@@ -206,13 +206,25 @@ class BlobService:
             status="local_metadata_shell",
             notes=[
                 "Projects the existing governed assets table into a local-first blob metadata shell.",
-                "Reuses existing /api/assets and /api/assets/{asset_id} read routes without adding a new /v1 blob route.",
+                "Reuses existing /api/assets and /api/assets/{asset_id} read routes and backs POST /v1/rooms/{room_id}/blobs/get.",
                 "No public /v1 blobs upload or /v1/blobs/{blob_id}/meta route exists yet.",
             ],
         )
 
     def public_capabilities(self) -> list[PublicCapabilityRecord]:
         return [
+            PublicCapabilityRecord(
+                id="v1.blobs.get",
+                name="V1 Room Blob Get",
+                category="blob",
+                path="/v1/rooms/{room_id}/blobs/get",
+                methods=["POST"],
+                read_only=True,
+                room_scoped=True,
+                status="available",
+                description="Read one room-scoped blob metadata record through the versioned public control-plane seam.",
+                backed_by=["BlobService", "PolicyService", "AuditService"],
+            ),
             PublicCapabilityRecord(
                 id="blob.metadata.list",
                 name="Blob Metadata List",
@@ -259,6 +271,8 @@ class BlobService:
     def _record_from_asset_row(self, row: dict[str, object]) -> BlobMetadataRecord:
         metadata_json = row.get("metadata_json")
         metadata = json.loads(metadata_json) if isinstance(metadata_json, str) and metadata_json else None
+        if output_guard.evaluate(classification_level=str(row["classification_level"])).decision == "summary_only":
+            metadata = {"policy": "summary_only"}
         canonical_asset_id = row.get("canonical_asset_id")
         canonical_blob_id = (
             self.blob_id_for_asset(int(canonical_asset_id))

@@ -248,6 +248,17 @@ class RequestContextRecord(BaseModel):
     actor_role: str
 
 
+class PublicBlobGetRequest(BaseModel):
+    blob_id: str = Field(..., min_length=1)
+
+
+class PublicBlobGetResponse(BaseModel):
+    api_version: str
+    request_context: RequestContextRecord
+    room_id: str
+    blob: BlobMetadataRecord
+
+
 class PublicObjectGetRequest(BaseModel):
     object_id: str = Field(..., min_length=1)
 

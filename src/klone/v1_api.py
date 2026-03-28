@@ -15,6 +15,8 @@ from .request_context import RequestContext
 from .rooms import room_registry
 from .schemas import (
     ObjectEnvelopeRecord,
+    PublicBlobGetRequest,
+    PublicBlobGetResponse,
     PublicCapabilitiesResponse,
     PublicObjectGetRequest,
     PublicObjectGetResponse,
@@ -112,6 +114,86 @@ def capabilities(
         },
     )
     return response
+
+
+@router.post("/rooms/{room_id}/blobs/get", response_model=PublicBlobGetResponse)
+def blob_get(
+    room_id: str,
+    payload: PublicBlobGetRequest,
+    services: ServiceContainer = Depends(get_service_container),
+    request_context: RequestContext = Depends(get_request_context),
+) -> PublicBlobGetResponse:
+    route_path = f"/v1/rooms/{room_id}/blobs/get"
+    try:
+        _require_room_read(room_id=room_id, actor_role=request_context.actor_role)
+        blob = services.blob.get_blob_metadata(blob_id=payload.blob_id, room_id=room_id)
+        if blob is None:
+            services.audit.log_control_plane_event(
+                event_type="v1_blob_get",
+                route_path=route_path,
+                request_context=request_context,
+                status_code=404,
+                summary="Attempted to read a public room-scoped blob metadata record that was not found.",
+                metadata={"room_id": room_id, "blob_id": payload.blob_id, "result": "not_found"},
+            )
+            raise HTTPException(status_code=404, detail=f"Blob {payload.blob_id} was not found.")
+
+        response = PublicBlobGetResponse(
+            api_version="v1",
+            request_context=RequestContextRecord(
+                request_id=request_context.request_id,
+                trace_id=request_context.trace_id,
+                principal=request_context.principal,
+                actor_role=request_context.actor_role,
+            ),
+            room_id=room_id,
+            blob=blob,
+        )
+        services.audit.log_control_plane_event(
+            event_type="v1_blob_get",
+            route_path=route_path,
+            request_context=request_context,
+            status_code=200,
+            summary="Read a public room-scoped blob metadata record.",
+            metadata={
+                "room_id": room_id,
+                "blob_id": payload.blob_id,
+                "linked_object_id": blob.linked_object_id,
+                "result": "ok",
+            },
+        )
+        return response
+    except HTTPException as error:
+        if error.status_code in {400, 403}:
+            services.audit.log_control_plane_event(
+                event_type="v1_blob_get",
+                route_path=route_path,
+                request_context=request_context,
+                status_code=error.status_code,
+                summary="Blocked or invalid public room-scoped blob metadata read.",
+                metadata={
+                    "room_id": room_id,
+                    "blob_id": payload.blob_id,
+                    "result": "error",
+                    "detail": error.detail,
+                },
+            )
+        raise
+    except ValueError as error:
+        services.audit.log_control_plane_event(
+            event_type="v1_blob_get",
+            route_path=route_path,
+            request_context=request_context,
+            status_code=400,
+            summary="Rejected invalid public room-scoped blob metadata read.",
+            metadata={
+                "room_id": room_id,
+                "blob_id": payload.blob_id,
+                "result": "invalid_blob_id",
+                "detail": str(error),
+            },
+        )
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @router.post("/rooms/{room_id}/objects/get", response_model=PublicObjectGetResponse)

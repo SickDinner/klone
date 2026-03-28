@@ -27,6 +27,7 @@ Nykyinen kanoninen tila on:
 - `A1.5 public room-scoped object get complete`
 - `A1.6 public room-scoped query shell complete`
 - `A1.7 public room-scoped blob metadata detail complete`
+- `A1.8 public room-scoped audit preview query kind complete`
 
 Uutta tässä versiossa:
 
@@ -51,9 +52,11 @@ Uutta tässä versiossa:
 - `public room-scoped object get`
   `POST /v1/rooms/{room_id}/objects/get` lukee nyt yksittäisen room-scoped object envelope -rivin versionoidun public control-plane seamin kautta ja reuseaa append-only audit chainin
 - `public room-scoped query shell`
-  `POST /v1/rooms/{room_id}/query` ajaa nyt deterministiset room-scoped `memory_events`- ja `memory_episodes`-haut versionoidun public control-plane seamin kautta ilman semantic searchia tai write-surfacea
+  `POST /v1/rooms/{room_id}/query` ajaa nyt deterministiset room-scoped `memory_events`-, `memory_episodes`- ja `audit_preview`-haut versionoidun public control-plane seamin kautta ilman semantic searchia tai write-surfacea
 - `public room-scoped blob metadata detail`
   `GET /v1/rooms/{room_id}/blobs/{blob_id}/meta` lukee nyt yhden deterministisen asset-backed `blob_id`-metadatarecordin versionoidun public control-plane seamin kautta ilman upload- tai mutation-surfacea
+- `audit preview query extension`
+  `audit_preview` reuseaa olemassa olevan `/api/audit`-previewn, säilyttää deterministisen limit/offset-käytöksen ja rajaa filttereiksi vain `event_type` ja `target_type`
 
 Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, joka näkyy käyttöliittymässä asti:
 
@@ -181,11 +184,12 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 - `GET /v1/rooms/{room_id}/blobs/{blob_id}/meta`
 - `POST /v1/rooms/{room_id}/objects/get`
 - `POST /v1/rooms/{room_id}/query`
+  tukee nyt `memory_events`, `memory_episodes` ja `audit_preview`
 - `POST /api/ingest/scan`
 
 ## Seuraavat järkevät rakennusvaiheet
 
-1. Seuraava post-A1-vaihe: älä widennä `/v1`-pintaa A1.7:n jälkeen ennen kuin seuraava vaihe on eksplisiittisesti hyväksytty kanonisissa docs-tiedostoissa.
+1. Seuraava post-A1-vaihe: älä widennä `/v1`-pintaa A1.8:n jälkeen ennen kuin seuraava vaihe on eksplisiittisesti hyväksytty kanonisissa docs-tiedostoissa.
 2. Memory Explorerin jatko A1.6:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
 3. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
 4. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.

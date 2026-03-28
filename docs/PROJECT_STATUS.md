@@ -3,7 +3,7 @@
 Last updated: 2026-03-28
 
 ## Current phase
-Phase A1.7 complete; no further approved post-A1 substep is defined yet
+Phase A1.8 complete; no further approved post-A1 substep is defined yet
 
 ## Phase state
 - Phase 2B.1 complete
@@ -25,6 +25,7 @@ Phase A1.7 complete; no further approved post-A1 substep is defined yet
 - Phase A1.5 complete
 - Phase A1.6 complete
 - Phase A1.7 complete
+- Phase A1.8 complete
 
 ## Completed in 2B.5
 - stress verification for replay/correction/provenance/room isolation
@@ -145,8 +146,20 @@ Phase A1.7 complete; no further approved post-A1 substep is defined yet
 - full unittest suite green
 - local HTTP smoke green for public room-scoped blob metadata detail and audit-chain writes
 
+## Completed in A1.8
+- public room-scoped query shell widened by one safe query kind only: audit_preview
+- POST /v1/rooms/{room_id}/query remains the only public query route
+- audit preview is backed by the existing deterministic room-scoped /api/audit surface
+- deterministic limit/offset pagination preserved for audit preview queries
+- bounded event_type and target_type filtering exposed for audit preview queries
+- audit preview uses summarize permission without widening room read access
+- query-shell contract and capability copy updated to reflect audit preview support
+- focused A1.8 tests green
+- full unittest suite green
+- compile pass green
+
 ## Next approved substep
 - no further approved post-A1 substep is enumerated in canonical repo evidence
-- require explicit roadmap extension or approval before widening the /v1 control plane beyond the completed A1.7 room-scoped blob metadata seam
-- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, or A1.7 public blob-meta seam work
+- require explicit roadmap extension or approval before widening the /v1 control plane beyond the completed A1.8 audit preview query extension
+- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, or A1.8 audit preview query work
 

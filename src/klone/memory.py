@@ -11,6 +11,7 @@ from .repository import KloneRepository, utc_now_iso
 from .rooms import room_registry
 from .schemas import (
     MemoryCorrectionResult,
+    MemoryLlmAnswerRecord,
     MemoryContextPackageRecord,
     MemoryLlmContextPayloadRecord,
     MemoryReplayRequestInternal,
@@ -30,6 +31,14 @@ ELIGIBLE_AUDIT_EVENT_TYPES = {
 
 SEED_VERSION = "phase_2b_2"
 SYSTEM_ACTOR_CANONICAL_KEY = "system_actor:system"
+SUPPORTED_LLM_ANSWER_QUESTIONS = {
+    "summarize this context",
+    "summarize this event",
+    "summarize this episode",
+    "what happened in this context",
+    "what happened in this event",
+    "what happened in this episode",
+}
 
 
 def _decode_metadata(raw_metadata: str | None) -> dict[str, Any] | None:
@@ -571,6 +580,58 @@ class MemoryService:
             }
         )
 
+    def generate_read_only_llm_answer(
+        self,
+        *,
+        room_id: str,
+        question: str,
+        event_id: int | None = None,
+        episode_id: str | None = None,
+        answerer: Any | None = None,
+        conn: sqlite3.Connection | None = None,
+    ) -> MemoryLlmAnswerRecord:
+        context_payload = self.prepare_llm_context_payload(
+            room_id=room_id,
+            event_id=event_id,
+            episode_id=episode_id,
+            conn=conn,
+        )
+        normalized_question = self._normalize_llm_question(question)
+        if normalized_question not in SUPPORTED_LLM_ANSWER_QUESTIONS:
+            return self._unsupported_llm_answer(
+                question=question,
+                context_payload=context_payload,
+                limitation="unsupported_question_for_bounded_read_only_answer_path",
+            )
+
+        if not context_payload.context_package.provenance_summary.source_refs:
+            return self._unsupported_llm_answer(
+                question=question,
+                context_payload=context_payload,
+                limitation="no_source_linked_provenance_available_for_answer",
+            )
+
+        prompt = self._build_read_only_llm_prompt(
+            question=question,
+            context_payload=context_payload,
+        )
+        if answerer is None:
+            answer_payload = self._default_read_only_answer_payload(
+                question=question,
+                context_payload=context_payload,
+            )
+            llm_call_performed = False
+        else:
+            answer_payload = answerer(prompt, context_payload)
+            llm_call_performed = True
+
+        return self._finalize_llm_answer(
+            question=question,
+            context_payload=context_payload,
+            answer_payload=answer_payload,
+            llm_call_performed=llm_call_performed,
+        )
+
     def _assemble_event_context_package(
         self,
         *,
@@ -884,6 +945,156 @@ class MemoryService:
         )
         return list(dict.fromkeys(warnings))
 
+    def _normalize_llm_question(self, question: str) -> str:
+        normalized = " ".join(question.strip().lower().split())
+        return normalized.rstrip("?.!")
+
+    def _build_read_only_llm_prompt(
+        self,
+        *,
+        question: str,
+        context_payload: MemoryLlmContextPayloadRecord,
+    ) -> str:
+        source_refs = ", ".join(context_payload.context_package.provenance_summary.source_refs)
+        included = ", ".join(
+            f"{item.memory_kind}:{item.memory_id}:{item.inclusion_reason}"
+            for item in context_payload.included_context
+        )
+        excluded = ", ".join(
+            f"{item.memory_kind}:{item.memory_id}:{item.exclusion_reason}"
+            for item in context_payload.excluded_context
+        ) or "none"
+        return "\n".join(
+            [
+                "Read-only bounded answer request.",
+                "Use only the provided room-scoped context.",
+                "Do not invent facts, provenance, or correction guidance.",
+                "Return source-backed content, derived explanation, and uncertainty separately.",
+                f"Question: {question}",
+                f"Scope: {context_payload.query_scope.scope_kind}",
+                f"Included context: {included}",
+                f"Excluded context: {excluded}",
+                f"Allowed source refs: {source_refs}",
+            ]
+        )
+
+    def _default_read_only_answer_payload(
+        self,
+        *,
+        question: str,
+        context_payload: MemoryLlmContextPayloadRecord,
+    ) -> dict[str, Any]:
+        context_package = context_payload.context_package
+        event_descriptions = [
+            f"event {event.id} ({event.event_type}, status={event.status})"
+            for event in context_package.included_events
+        ]
+        episode_descriptions = [
+            f"episode {episode.id} ({episode.episode_type}, status={episode.status})"
+            for episode in context_package.included_episodes
+        ]
+        source_backed_content: list[dict[str, Any]] = []
+        if event_descriptions:
+            source_backed_content.append(
+                {
+                    "content": "Included events: " + ", ".join(event_descriptions) + ".",
+                    "source_refs": list(context_package.provenance_summary.source_refs),
+                }
+            )
+        if episode_descriptions:
+            source_backed_content.append(
+                {
+                    "content": "Included episodes: " + ", ".join(episode_descriptions) + ".",
+                    "source_refs": list(context_package.provenance_summary.source_refs),
+                }
+            )
+        return {
+            "source_backed_content": source_backed_content,
+            "derived_explanation": (
+                "This answer is limited to the deterministic room-scoped context package selected for the request."
+            ),
+            "uncertainty": [
+                "Only stored source-linked memory reachable from the requested root was used.",
+                "No write-back, semantic retrieval, or inferred provenance was used.",
+            ],
+        }
+
+    def _finalize_llm_answer(
+        self,
+        *,
+        question: str,
+        context_payload: MemoryLlmContextPayloadRecord,
+        answer_payload: Mapping[str, Any],
+        llm_call_performed: bool,
+    ) -> MemoryLlmAnswerRecord:
+        allowed_source_refs = set(context_payload.context_package.provenance_summary.source_refs)
+        normalized_sources: list[dict[str, Any]] = []
+        for item in answer_payload.get("source_backed_content", []):
+            source_refs = [str(ref) for ref in item.get("source_refs", [])]
+            if not source_refs:
+                raise ValueError("Source-backed answer items must include at least one source_ref.")
+            if any(ref not in allowed_source_refs for ref in source_refs):
+                raise ValueError("LLM answer referenced provenance outside the bounded context package.")
+            normalized_sources.append(
+                {
+                    "content": str(item["content"]),
+                    "source_refs": sorted(dict.fromkeys(source_refs)),
+                }
+            )
+
+        limitations = list(context_payload.warnings)
+        limitations.append("bounded_by_read_only_source_linked_memory")
+        return MemoryLlmAnswerRecord.model_validate(
+            {
+                "room_id": context_payload.room_id,
+                "query_scope": context_payload.query_scope.model_dump(),
+                "question": question,
+                "supported": True,
+                "source_backed_content": normalized_sources,
+                "derived_explanation": answer_payload.get("derived_explanation"),
+                "uncertainty": [
+                    str(item) for item in answer_payload.get("uncertainty", [])
+                ],
+                "limitations": list(dict.fromkeys(limitations)),
+                "context_payload": context_payload.model_dump(),
+                "llm_call_performed": llm_call_performed,
+                "memory_write_enabled": False,
+            }
+        )
+
+    def _unsupported_llm_answer(
+        self,
+        *,
+        question: str,
+        context_payload: MemoryLlmContextPayloadRecord,
+        limitation: str,
+    ) -> MemoryLlmAnswerRecord:
+        limitations = list(context_payload.warnings)
+        limitations.extend(
+            [
+                limitation,
+                "bounded_by_read_only_source_linked_memory",
+                "no_write_back_or_memory_mutation_performed",
+            ]
+        )
+        return MemoryLlmAnswerRecord.model_validate(
+            {
+                "room_id": context_payload.room_id,
+                "query_scope": context_payload.query_scope.model_dump(),
+                "question": question,
+                "supported": False,
+                "source_backed_content": [],
+                "derived_explanation": None,
+                "uncertainty": [
+                    "The requested answer is not supported by this bounded read-only answer path.",
+                ],
+                "limitations": list(dict.fromkeys(limitations)),
+                "context_payload": context_payload.model_dump(),
+                "llm_call_performed": False,
+                "memory_write_enabled": False,
+            }
+        )
+
     def list_event_episode_memberships(
         self,
         *,
@@ -943,6 +1154,61 @@ class MemoryService:
             room_id=room_id,
             conn=conn,
         )
+
+    def get_event_provenance_detail(
+        self,
+        *,
+        room_id: str,
+        event_id: int,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any] | None:
+        event_row = self.repository.get_memory_event(event_id, room_id=room_id, conn=conn)
+        if event_row is None:
+            return None
+
+        provenance = self.repository.list_memory_provenance(
+            room_id=room_id,
+            owner_type="event",
+            owner_id=str(event_id),
+            conn=conn,
+        )
+        payload = {
+            "event": _decode_row_metadata(event_row),
+            "provenance": provenance,
+            "source_lineage": [row for row in provenance if row["provenance_type"] == "source_lineage"],
+            "seed_basis": [row for row in provenance if row["provenance_type"] == "seed_basis"],
+            "provenance_summary": self._build_provenance_summary(provenance),
+        }
+        return payload
+
+    def get_episode_provenance_detail(
+        self,
+        *,
+        room_id: str,
+        episode_id: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any] | None:
+        episode_row = self.repository.get_memory_episode(episode_id, room_id=room_id, conn=conn)
+        if episode_row is None:
+            return None
+
+        provenance = self.repository.list_memory_provenance(
+            room_id=room_id,
+            owner_type="episode",
+            owner_id=episode_id,
+            conn=conn,
+        )
+        payload = {
+            "episode": _decode_row_metadata(episode_row),
+            "provenance": provenance,
+            "source_lineage": [row for row in provenance if row["provenance_type"] == "source_lineage"],
+            "seed_basis": [row for row in provenance if row["provenance_type"] == "seed_basis"],
+            "membership_basis": [
+                row for row in provenance if row["provenance_type"] == "membership_basis"
+            ],
+            "provenance_summary": self._build_provenance_summary(provenance),
+        }
+        return payload
 
     def get_event_detail(
         self,

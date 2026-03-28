@@ -432,6 +432,23 @@ class MemoryEpisodeDetailRecord(MemoryEpisodeRecord):
     linked_events: list[MemoryEpisodeMemberRecord]
 
 
+class MemoryEventProvenanceDetailRecord(BaseModel):
+    event: MemoryEventRecord
+    provenance: list[MemoryProvenanceRecord]
+    source_lineage: list[MemoryProvenanceRecord]
+    seed_basis: list[MemoryProvenanceRecord]
+    provenance_summary: MemoryProvenanceSummaryRecord
+
+
+class MemoryEpisodeProvenanceDetailRecord(BaseModel):
+    episode: MemoryEpisodeRecord
+    provenance: list[MemoryProvenanceRecord]
+    source_lineage: list[MemoryProvenanceRecord]
+    seed_basis: list[MemoryProvenanceRecord]
+    membership_basis: list[MemoryProvenanceRecord]
+    provenance_summary: MemoryProvenanceSummaryRecord
+
+
 class MemoryContextQueryScopeRecord(BaseModel):
     scope_kind: str
     primary_event_id: int | None = None
@@ -491,3 +508,22 @@ class MemoryLlmContextPayloadRecord(BaseModel):
     llm_call_performed: bool = False
     memory_write_enabled: bool = False
     interface_mode: str = "read_only_context"
+
+
+class MemoryLlmAnswerSourceRecord(BaseModel):
+    content: str
+    source_refs: list[str]
+
+
+class MemoryLlmAnswerRecord(BaseModel):
+    room_id: str
+    query_scope: MemoryContextQueryScopeRecord
+    question: str
+    supported: bool
+    source_backed_content: list[MemoryLlmAnswerSourceRecord]
+    derived_explanation: str | None = None
+    uncertainty: list[str]
+    limitations: list[str]
+    context_payload: MemoryLlmContextPayloadRecord
+    llm_call_performed: bool = False
+    memory_write_enabled: bool = False

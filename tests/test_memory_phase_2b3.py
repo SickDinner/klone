@@ -412,10 +412,12 @@ class MemoryPhase2B3Tests(unittest.TestCase):
             {
                 "/api/memory/events": ["GET"],
                 "/api/memory/events/{event_id}": ["GET"],
+                "/api/memory/events/{event_id}/provenance": ["GET"],
                 "/api/memory/entities": ["GET"],
                 "/api/memory/entities/{entity_id}": ["GET"],
                 "/api/memory/episodes": ["GET"],
                 "/api/memory/episodes/{episode_id}": ["GET"],
+                "/api/memory/episodes/{episode_id}/provenance": ["GET"],
                 "/api/memory/episodes/{episode_id}/events": ["GET"],
             },
         )

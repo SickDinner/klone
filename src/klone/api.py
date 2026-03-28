@@ -25,10 +25,12 @@ from .schemas import (
     InternalRunRecord,
     MemoryEntityRecord,
     MemoryEpisodeDetailRecord,
+    MemoryEpisodeProvenanceDetailRecord,
     MemoryEventEpisodeMembershipRecord,
     MemoryEpisodeMemberRecord,
     MemoryEpisodeRecord,
     MemoryEventDetailRecord,
+    MemoryEventProvenanceDetailRecord,
     MemoryEventRecord,
     MemoryLinkedEntityRecord,
     MemoryProvenanceRecord,
@@ -257,6 +259,49 @@ def _memory_episode_detail_from_payload(payload: dict[str, Any]) -> MemoryEpisod
         _memory_episode_member_from_payload(item) for item in hydrated.get("linked_events", [])
     ]
     return MemoryEpisodeDetailRecord.model_validate(hydrated)
+
+
+def _memory_event_provenance_detail_from_payload(
+    payload: dict[str, Any],
+) -> MemoryEventProvenanceDetailRecord:
+    hydrated = dict(payload)
+    hydrated["event"] = _memory_event_from_row(hydrated["event"])
+    hydrated["provenance"] = [
+        _memory_provenance_from_row(item) for item in hydrated.get("provenance", [])
+    ]
+    hydrated["source_lineage"] = [
+        _memory_provenance_from_row(item) for item in hydrated.get("source_lineage", [])
+    ]
+    hydrated["seed_basis"] = [
+        _memory_provenance_from_row(item) for item in hydrated.get("seed_basis", [])
+    ]
+    hydrated["provenance_summary"] = _memory_provenance_summary_from_payload(
+        hydrated.get("provenance_summary", {})
+    )
+    return MemoryEventProvenanceDetailRecord.model_validate(hydrated)
+
+
+def _memory_episode_provenance_detail_from_payload(
+    payload: dict[str, Any],
+) -> MemoryEpisodeProvenanceDetailRecord:
+    hydrated = dict(payload)
+    hydrated["episode"] = _memory_episode_from_row(hydrated["episode"])
+    hydrated["provenance"] = [
+        _memory_provenance_from_row(item) for item in hydrated.get("provenance", [])
+    ]
+    hydrated["source_lineage"] = [
+        _memory_provenance_from_row(item) for item in hydrated.get("source_lineage", [])
+    ]
+    hydrated["seed_basis"] = [
+        _memory_provenance_from_row(item) for item in hydrated.get("seed_basis", [])
+    ]
+    hydrated["membership_basis"] = [
+        _memory_provenance_from_row(item) for item in hydrated.get("membership_basis", [])
+    ]
+    hydrated["provenance_summary"] = _memory_provenance_summary_from_payload(
+        hydrated.get("provenance_summary", {})
+    )
+    return MemoryEpisodeProvenanceDetailRecord.model_validate(hydrated)
 
 
 def _internal_run_from_row(row: dict[str, Any]) -> InternalRunRecord:
@@ -502,6 +547,19 @@ def memory_event_detail(
     return _memory_event_detail_from_payload(payload)
 
 
+@router.get("/memory/events/{event_id}/provenance", response_model=MemoryEventProvenanceDetailRecord)
+def memory_event_provenance_detail(
+    event_id: int,
+    room_id: str = Query(..., min_length=1),
+    repository: KloneRepository = Depends(get_repository),
+) -> MemoryEventProvenanceDetailRecord:
+    room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
+    payload = MemoryService(repository).get_event_provenance_detail(room_id=room.id, event_id=event_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail=f"Memory event {event_id} was not found.")
+    return _memory_event_provenance_detail_from_payload(payload)
+
+
 @router.get("/memory/entities", response_model=list[MemoryEntityRecord])
 def memory_entities(
     room_id: str = Query(..., min_length=1),
@@ -562,6 +620,25 @@ def memory_episode_detail(
     if payload is None:
         raise HTTPException(status_code=404, detail=f"Memory episode {episode_id} was not found.")
     return _memory_episode_detail_from_payload(payload)
+
+
+@router.get(
+    "/memory/episodes/{episode_id}/provenance",
+    response_model=MemoryEpisodeProvenanceDetailRecord,
+)
+def memory_episode_provenance_detail(
+    episode_id: str,
+    room_id: str = Query(..., min_length=1),
+    repository: KloneRepository = Depends(get_repository),
+) -> MemoryEpisodeProvenanceDetailRecord:
+    room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
+    payload = MemoryService(repository).get_episode_provenance_detail(
+        room_id=room.id,
+        episode_id=episode_id,
+    )
+    if payload is None:
+        raise HTTPException(status_code=404, detail=f"Memory episode {episode_id} was not found.")
+    return _memory_episode_provenance_detail_from_payload(payload)
 
 
 @router.get("/memory/episodes/{episode_id}/events", response_model=list[MemoryEpisodeMemberRecord])

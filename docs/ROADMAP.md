@@ -81,7 +81,7 @@ Public Control-Plane Skeleton:
 - versioned /v1 API shell inside the existing FastAPI app
 - request context with request_id / trace_id / principal placeholder
 - in-process service seams for MemoryFacade / PolicyService / AuditService / BlobService
-- initial sequence: A1.1 request-context + GET /v1/capabilities, then A1.2 append-only audit chain foundation, then A1.3 local blob metadata shell via existing asset routes, then A1.4 local object envelope shell via existing read routes, then A1.5 public room-scoped object get, then A1.6 public room-scoped query shell, then A1.7 public room-scoped blob metadata detail, then A1.8 public room-scoped audit preview query kind
+ - initial sequence: A1.1 request-context + GET /v1/capabilities, then A1.2 append-only audit chain foundation, then A1.3 local blob metadata shell via existing asset routes, then A1.4 local object envelope shell via existing read routes, then A1.5 public room-scoped object get, then A1.6 public room-scoped query shell, then A1.7 public room-scoped blob metadata detail, then A1.8 public room-scoped audit preview query kind, then A1.9 public room-scoped change preview seam
 - stable object/query/changes/blob contracts
 - append-only audit chain reuse/extension
 - local blob metadata shell
@@ -133,6 +133,16 @@ Public Room-Scoped Audit Preview Query Kind:
 - summarize permission only for audit_preview; do not widen room read behavior
 - append-only control-plane audit chaining reused for the query extension
 - no new /v1 route, no semantic search, no embeddings, no fuzzy matching, and no changes/write surface
+
+## Phase A1.9
+Public Room-Scoped Change Preview Seam:
+- GET /v1/rooms/{room_id}/changes only
+- read-only change preview only
+- backed by the existing deterministic room-scoped /api/audit preview surface
+- preserve deterministic limit/offset pagination and bounded event_type/target_type filtering
+- summarize permission only; do not widen room read behavior
+- append-only control-plane audit chaining reused for the new route
+- no write surface, no change detail route, no semantic search, no embeddings, and no fuzzy matching
 
 ## Not approved yet
 - semantic search

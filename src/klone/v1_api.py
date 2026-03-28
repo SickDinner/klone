@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request
 from .request_context import RequestContext
 from .schemas import PublicCapabilitiesResponse, RequestContextRecord
 from .services import ServiceContainer, module_registry_payload
+from .v1_contracts import contract_registry_payload
 
 
 router = APIRouter(prefix="/v1")
@@ -34,5 +35,5 @@ def capabilities(
         services=services.seam_descriptors(),
         module_registry=module_registry_payload(),
         capabilities=services.public_capabilities(),
+        contracts=contract_registry_payload(),
     )
-

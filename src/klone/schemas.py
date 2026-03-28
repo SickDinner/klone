@@ -219,12 +219,31 @@ class PublicCapabilityRecord(BaseModel):
     backed_by: list[str]
 
 
+class ContractFieldRecord(BaseModel):
+    name: str
+    field_type: str
+    required: bool
+    description: str
+
+
+class PublicContractRecord(BaseModel):
+    id: str
+    name: str
+    category: str
+    status: str
+    description: str
+    route_readiness: str
+    notes: list[str]
+    fields: list[ContractFieldRecord]
+
+
 class PublicCapabilitiesResponse(BaseModel):
     api_version: str
     request_context: RequestContextRecord
     services: list[ServiceSeamRecord]
     module_registry: list[ModuleCapabilityRecord]
     capabilities: list[PublicCapabilityRecord]
+    contracts: list[PublicContractRecord]
 
 
 class MissionControlStatus(BaseModel):

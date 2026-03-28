@@ -467,3 +467,27 @@ class MemoryContextPackageRecord(BaseModel):
     warnings: list[str]
     limitations: list[str]
     assembly_reasoning: list[str]
+
+
+class MemoryLlmContextInclusionRecord(BaseModel):
+    memory_kind: MemoryOwnerType
+    memory_id: str
+    inclusion_reason: str
+
+
+class MemoryLlmContextExclusionRecord(BaseModel):
+    memory_kind: MemoryOwnerType
+    memory_id: str | None = None
+    exclusion_reason: str
+
+
+class MemoryLlmContextPayloadRecord(BaseModel):
+    room_id: str
+    query_scope: MemoryContextQueryScopeRecord
+    context_package: MemoryContextPackageRecord
+    included_context: list[MemoryLlmContextInclusionRecord]
+    excluded_context: list[MemoryLlmContextExclusionRecord]
+    warnings: list[str]
+    llm_call_performed: bool = False
+    memory_write_enabled: bool = False
+    interface_mode: str = "read_only_context"

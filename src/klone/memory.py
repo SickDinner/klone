@@ -12,6 +12,7 @@ from .rooms import room_registry
 from .schemas import (
     MemoryCorrectionResult,
     MemoryContextPackageRecord,
+    MemoryLlmContextPayloadRecord,
     MemoryReplayRequestInternal,
     MemoryReplayResult,
     MemorySeedResult,
@@ -542,6 +543,34 @@ class MemoryService:
             conn=conn,
         )
 
+    def prepare_llm_context_payload(
+        self,
+        *,
+        room_id: str,
+        event_id: int | None = None,
+        episode_id: str | None = None,
+        conn: sqlite3.Connection | None = None,
+    ) -> MemoryLlmContextPayloadRecord:
+        context_package = self.assemble_context_package(
+            room_id=room_id,
+            event_id=event_id,
+            episode_id=episode_id,
+            conn=conn,
+        )
+        return MemoryLlmContextPayloadRecord.model_validate(
+            {
+                "room_id": room_id,
+                "query_scope": context_package.query_scope.model_dump(),
+                "context_package": context_package.model_dump(),
+                "included_context": self._build_llm_included_context(package=context_package),
+                "excluded_context": self._build_llm_excluded_context(package=context_package),
+                "warnings": self._build_llm_interface_warnings(package=context_package),
+                "llm_call_performed": False,
+                "memory_write_enabled": False,
+                "interface_mode": "read_only_context",
+            }
+        )
+
     def _assemble_event_context_package(
         self,
         *,
@@ -755,6 +784,105 @@ class MemoryService:
             "Package includes only stored records reachable from the requested root record.",
             "evidence_text is preserved exactly from stored memory rows.",
         ]
+
+    def _build_llm_included_context(
+        self,
+        *,
+        package: MemoryContextPackageRecord,
+    ) -> list[dict[str, Any]]:
+        included: list[dict[str, Any]] = []
+        if package.query_scope.scope_kind == "event_detail" and package.query_scope.primary_event_id is not None:
+            included.append(
+                {
+                    "memory_kind": "event",
+                    "memory_id": str(package.query_scope.primary_event_id),
+                    "inclusion_reason": "requested_root_event_detail",
+                }
+            )
+            included.extend(
+                {
+                    "memory_kind": "episode",
+                    "memory_id": episode.id,
+                    "inclusion_reason": "stored_event_episode_membership",
+                }
+                for episode in package.included_episodes
+            )
+            return included
+
+        if package.query_scope.scope_kind == "episode_detail" and package.query_scope.primary_episode_id is not None:
+            included.append(
+                {
+                    "memory_kind": "episode",
+                    "memory_id": package.query_scope.primary_episode_id,
+                    "inclusion_reason": "requested_root_episode_detail",
+                }
+            )
+            included.extend(
+                {
+                    "memory_kind": "event",
+                    "memory_id": str(event.id),
+                    "inclusion_reason": "stored_episode_event_membership",
+                }
+                for event in package.included_events
+            )
+        return included
+
+    def _build_llm_excluded_context(
+        self,
+        *,
+        package: MemoryContextPackageRecord,
+    ) -> list[dict[str, Any]]:
+        excluded: dict[tuple[str, str | None, str], dict[str, Any]] = {}
+        if package.query_scope.scope_kind == "event_detail":
+            primary_event_id = package.query_scope.primary_event_id
+            for episode in package.included_episodes:
+                for linked_event in episode.linked_events:
+                    linked_event_id = str(linked_event.event.id)
+                    if primary_event_id is not None and linked_event.event.id == primary_event_id:
+                        continue
+                    key = (
+                        "event",
+                        linked_event_id,
+                        "reachable_via_linked_episode_but_excluded_by_event_root_scope",
+                    )
+                    excluded[key] = {
+                        "memory_kind": "event",
+                        "memory_id": linked_event_id,
+                        "exclusion_reason": "reachable_via_linked_episode_but_excluded_by_event_root_scope",
+                    }
+        elif package.query_scope.scope_kind == "episode_detail":
+            primary_episode_id = package.query_scope.primary_episode_id
+            for event in package.included_events:
+                for membership in event.episode_memberships:
+                    membership_episode_id = membership.episode.id
+                    if primary_episode_id is not None and membership_episode_id == primary_episode_id:
+                        continue
+                    key = (
+                        "episode",
+                        membership_episode_id,
+                        "reachable_via_linked_event_but_excluded_by_episode_root_scope",
+                    )
+                    excluded[key] = {
+                        "memory_kind": "episode",
+                        "memory_id": membership_episode_id,
+                        "exclusion_reason": "reachable_via_linked_event_but_excluded_by_episode_root_scope",
+                    }
+        return [excluded[key] for key in sorted(excluded)]
+
+    def _build_llm_interface_warnings(
+        self,
+        *,
+        package: MemoryContextPackageRecord,
+    ) -> list[str]:
+        warnings = list(package.warnings)
+        warnings.extend(
+            [
+                "bounded_by_read_only_source_linked_memory",
+                "no_llm_call_performed",
+                "memory_write_path_disabled",
+            ]
+        )
+        return list(dict.fromkeys(warnings))
 
     def list_event_episode_memberships(
         self,

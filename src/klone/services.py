@@ -121,7 +121,7 @@ class MemoryFacade:
                 backed_by=["MemoryFacade"],
             ),
             PublicCapabilityRecord(
-                id="v1.query",
+                id="v1.query.read",
                 name="V1 Room Query",
                 category="query",
                 path="/v1/rooms/{room_id}/query",

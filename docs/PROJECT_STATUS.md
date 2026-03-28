@@ -3,7 +3,7 @@
 Last updated: 2026-03-28
 
 ## Current phase
-Phase A1.4 complete; next-step selection in progress
+Phase A1.5 approved; implementation pending
 
 ## Phase state
 - Phase 2B.1 complete
@@ -21,6 +21,8 @@ Phase A1.4 complete; next-step selection in progress
 - Phase A1.2 complete
 - Phase A1.3 complete
 - Phase A1.4 complete
+- Phase A1 complete
+- Phase A1.5 approved
 
 ## Completed in 2B.5
 - stress verification for replay/correction/provenance/room isolation
@@ -107,9 +109,18 @@ Phase A1.4 complete; next-step selection in progress
 - no ingest, replay, correction, or evidence_text behavior changes
 - focused A1.4 tests green
 - full unittest suite green
+- local HTTP smoke green for object-shell readiness and existing four service seams
+
+## Approved for A1.5
+- first public room-scoped read-only object lookup seam
+- POST /v1/rooms/{room_id}/objects/get only
+- support only existing object kinds already justified by repo reality: dataset, asset, memory_event, memory_episode
+- back the route with existing deterministic room-scoped reads and the completed A1.4 object-envelope shell
+- reuse request context and append-only control-plane audit chaining
+- no ingest, replay, correction, or evidence_text behavior changes
 
 ## Next approved substep
-- identify the next exact approved phase/substep after Phase A1.4 from verified repo evidence only
+- implement Phase A1.5 public room-scoped read-only object lookup at POST /v1/rooms/{room_id}/objects/get
 - do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, or A1.4 object envelope shell work
-- do not add /v1/objects/get, /v1/query, /v1/changes, or any write surface in A1.4
+- do not add /v1/query, /v1/changes, /v1/objects/set, /v1/blobs/upload, or /v1/blobs/{blob_id}/meta in A1.5
 

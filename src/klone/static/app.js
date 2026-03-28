@@ -12,6 +12,7 @@ const state = {
     episodes: [],
     selection: null,
     detail: null,
+    provenanceDetail: null,
     contextPayload: null,
     answer: null,
   },
@@ -480,6 +481,79 @@ function renderMemoryDetail(kind, detail) {
   `;
 }
 
+function renderProvenanceEntries(entries = []) {
+  if (!entries.length) {
+    return "<li>none</li>";
+  }
+  return entries
+    .map((item) => {
+      const fieldText = item.source_field ? ` field ${escapeHtml(item.source_field)}` : "";
+      const basisValue =
+        item.basis_value !== null && item.basis_value !== undefined && item.basis_value !== ""
+          ? `=${escapeHtml(item.basis_value)}`
+          : "";
+      return `
+        <li>
+          <span class="detail-line">
+            <strong>${escapeHtml(item.provenance_type)}</strong>
+            <span class="detail-token">${escapeHtml(item.source_table)}:${escapeHtml(item.source_record_id)}</span>
+            <span>${escapeHtml(item.basis_type)}${basisValue}</span>
+            ${fieldText ? `<span>${fieldText}</span>` : ""}
+          </span>
+        </li>
+      `;
+    })
+    .join("");
+}
+
+function renderMemoryProvenance(kind, provenanceDetail) {
+  const root = document.querySelector("#memory-provenance");
+  if (!provenanceDetail) {
+    root.className = "detail-card empty-state";
+    root.textContent = "No provenance detail loaded yet.";
+    return;
+  }
+
+  const owner = kind === "event" ? provenanceDetail.event : provenanceDetail.episode;
+  const summary = provenanceDetail.provenance_summary || {};
+  const sourceRefs = summary.source_refs || [];
+  const membershipBasis = provenanceDetail.membership_basis || [];
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>Provenance Lens</h3>
+    <p>Read-only provenance slices for ${escapeHtml(kind)} ${escapeHtml(owner.id)} inside room ${escapeHtml(owner.room_id)}.</p>
+    <div class="meta">${chips([
+      `total: ${summary.total_count || 0}`,
+      `source_lineage: ${summary.source_lineage_count || 0}`,
+      `seed_basis: ${summary.seed_basis_count || 0}`,
+      `membership_basis: ${summary.membership_basis_count || 0}`,
+      `source_refs: ${sourceRefs.length}`,
+    ])}</div>
+    <div class="provenance-grid">
+      <section class="provenance-column">
+        <h4>Source Lineage</h4>
+        <ul class="detail-list compact-list">${renderProvenanceEntries(provenanceDetail.source_lineage || [])}</ul>
+      </section>
+      <section class="provenance-column">
+        <h4>Seed Basis</h4>
+        <ul class="detail-list compact-list">${renderProvenanceEntries(provenanceDetail.seed_basis || [])}</ul>
+      </section>
+      <section class="provenance-column">
+        <h4>${kind === "episode" ? "Membership Basis" : "Full Provenance"}</h4>
+        <ul class="detail-list compact-list">${renderProvenanceEntries(
+          kind === "episode" ? membershipBasis : provenanceDetail.provenance || [],
+        )}</ul>
+      </section>
+    </div>
+    <ul class="detail-list">
+      <li><strong>source_refs</strong>: ${sourceRefs.map((item) => escapeHtml(item)).join(", ") || "none"}</li>
+      <li><strong>owner_status</strong>: ${escapeHtml(owner.status)}</li>
+      <li><strong>correction_reason</strong>: ${escapeHtml(owner.correction_reason || "none")}</li>
+    </ul>
+  `;
+}
+
 function renderMemoryContext(contextPayload) {
   const root = document.querySelector("#memory-context");
   if (!contextPayload) {
@@ -612,15 +686,22 @@ async function loadMemorySelection(kind, id, options = {}) {
     kind === "event"
       ? `/api/memory/events/${id}?room_id=${encodeURIComponent(roomId)}`
       : `/api/memory/episodes/${encodeURIComponent(id)}?room_id=${encodeURIComponent(roomId)}`;
+  const provenanceUrl =
+    kind === "event"
+      ? `/api/memory/events/${id}/provenance?room_id=${encodeURIComponent(roomId)}`
+      : `/api/memory/episodes/${encodeURIComponent(id)}/provenance?room_id=${encodeURIComponent(roomId)}`;
 
   try {
-    const [detail, contextPayload] = await Promise.all([
+    const [detail, provenanceDetail, contextPayload] = await Promise.all([
       fetchJson(detailUrl),
+      fetchJson(provenanceUrl),
       fetchJson(`/api/memory/context/payload?${scopeParams.toString()}`),
     ]);
     state.memory.detail = detail;
+    state.memory.provenanceDetail = provenanceDetail;
     state.memory.contextPayload = contextPayload;
     renderMemoryDetail(kind, detail);
+    renderMemoryProvenance(kind, provenanceDetail);
     renderMemoryContext(contextPayload);
     if (refreshAnswer) {
       await refreshMemoryAnswer();
@@ -628,6 +709,7 @@ async function loadMemorySelection(kind, id, options = {}) {
   } catch (error) {
     document.querySelector("#memory-detail").className = "detail-card empty-state";
     document.querySelector("#memory-detail").textContent = error.message;
+    renderMemoryProvenance(null, null);
   }
 }
 
@@ -699,6 +781,7 @@ async function refreshMemoryExplorer(event) {
     renderMemoryEvents([]);
     renderMemoryEpisodes([]);
     renderMemoryDetail(null, null);
+    renderMemoryProvenance(null, null);
     renderMemoryContext(null);
     renderMemoryAnswer(null);
     return;
@@ -757,15 +840,18 @@ async function refreshMemoryExplorer(event) {
     } else {
       state.memory.selection = null;
       state.memory.detail = null;
+      state.memory.provenanceDetail = null;
       state.memory.contextPayload = null;
       state.memory.answer = null;
       renderMemoryDetail(null, null);
+      renderMemoryProvenance(null, null);
       renderMemoryContext(null);
       renderMemoryAnswer(null);
     }
   } catch (error) {
     document.querySelector("#memory-detail").className = "detail-card empty-state";
     document.querySelector("#memory-detail").textContent = error.message;
+    renderMemoryProvenance(null, null);
   }
 }
 

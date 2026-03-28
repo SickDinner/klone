@@ -116,8 +116,12 @@ class MemoryPhase2C5Tests(unittest.TestCase):
 
     def test_memory_explorer_ui_text_is_present(self) -> None:
         html = (PROJECT_ROOT / "src" / "klone" / "static" / "index.html").read_text(encoding="utf-8")
+        js = (PROJECT_ROOT / "src" / "klone" / "static" / "app.js").read_text(encoding="utf-8")
         self.assertIn("Memory Explorer", html)
         self.assertIn("Context and Read-Only Answer", html)
+        self.assertIn("Provenance Lens", html)
+        self.assertIn("renderMemoryProvenance", js)
+        self.assertIn("/provenance?room_id=", js)
 
     def _ingest_dataset(
         self,

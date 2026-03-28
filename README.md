@@ -42,7 +42,7 @@ Uutta tässä versiossa:
 - `blob capability mapping`
   `/v1/capabilities` näyttää nyt, että nykyinen blob-shell nojaa olemassa oleviin `/api/assets`- ja `/api/assets/{asset_id}`-read-routeihin
 - `local object envelope shell`
-  `ObjectEnvelopeService` projisoi nyt olemassa olevat dataset-, asset-, memory event- ja memory episode -read-mallit deterministisiksi local object envelope -riveiksi ilman uutta `/v1/objects/get`-routea
+  sisäinen local object projector projisoi nyt olemassa olevat dataset-, asset-, memory event- ja memory episode -read-mallit deterministisiksi object envelope -riveiksi ilman uutta `/v1/objects/get`-routea tai uutta julkista service seamia
 - `object shell readiness`
   `/v1/capabilities` näyttää nyt object-shellin backing-routet ja olemassa olevien governed read-routejen kautta näkyvän readiness-tilan
 
@@ -61,7 +61,7 @@ Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, j
 - `mission control UI`
   dataset intake, dataset list, asset browser, room registry, governance guards, audit preview
 - `memory explorer UI`
-  room-scoped events, episodes, detail-paneeli, context payload ja bounded read-only answer preview
+  room-scoped events, episodes, detail-paneeli, provenance lens, context payload ja bounded read-only answer preview
 - `memory context APIs`
   read-only context package, LLM context payload ja source-linked answer route
 
@@ -173,8 +173,8 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ## Seuraavat järkevät rakennusvaiheet
 
-1. Seuraava A1-alivaihe A1.3:n jälkeen: valitse verified repo evidence -pohjalta seuraava pienin `/v1`-seam ilman write-surface wideningia.
-2. Memory Explorerin jatko A1.3:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
+1. Seuraava post-A1-vaihe: älä widennä `/v1`-pintaa ennen kuin seuraava vaihe on eksplisiittisesti hyväksytty kanonisissa docs-tiedostoissa.
+2. Memory Explorerin jatko A1.4:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
 3. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
 4. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
 5. Constitution Layer: hitaasti muuttuvat parametrit, provenance ja change logit.

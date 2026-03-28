@@ -3,7 +3,7 @@
 Last updated: 2026-03-28
 
 ## Current approved phase
-Post-A1.4 closeout / next-step selection
+Phase A1.5: Public Room-Scoped Object Get
 
 ## Baseline
 - 2B.1 through 2B.5 complete
@@ -13,15 +13,20 @@ Post-A1.4 closeout / next-step selection
 - A1.2 contract shells and append-only control-plane audit chain exist in repo reality
 - A1.3 local blob metadata shell exists in repo reality without adding a new /v1 blob route
 - A1.4 local object envelope shell exists in repo reality without adding a public /v1 object route
+- Phase A1 roadmap bullets are satisfied in current repo reality
+- A1.5 is approved but not implemented yet
 
 ## Immediate goal
-Phase A1.4 is complete. Identify the next exact approved phase/substep from verified repo evidence only.
+Implement the smallest approved A1.5 step only:
+`POST /v1/rooms/{room_id}/objects/get`.
 Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, or A1.4 object envelope shell work.
 
 ## Approved scope
-- canonical docs closeout after completed Phase A1.4
-- next-step selection from verified repo evidence only
-- duplicate-work prevention
+- one new read-only public route only: `POST /v1/rooms/{room_id}/objects/get`
+- room-scoped object lookup only
+- supported object kinds only: `dataset`, `asset`, `memory_event`, `memory_episode`
+- reuse existing deterministic room-scoped reads and the completed A1.4 object-envelope shell
+- reuse request context and append-only control-plane audit chaining
 - no unrelated runtime behavior
 - no unrelated API widening
 
@@ -40,13 +45,13 @@ Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memor
 - do not regress the contract shells or append-only audit-chain linkage on /v1/capabilities
 - do not regress the local blob metadata shell or its capability exposure via existing asset routes
 - do not regress the local object envelope shell or its capability/readiness visibility through /v1/capabilities
-- do not add public /v1/objects/get yet
-- do not add /v1 query, /v1 changes, /v1 objects/get, /v1 objects/set, /v1 blobs/upload, or /v1/blobs/{blob_id}/meta yet
+- do not add /v1 query, /v1 changes, /v1/objects/set, /v1/blobs/upload, or /v1/blobs/{blob_id}/meta in A1.5
+- do not widen supported object kinds beyond `dataset`, `asset`, `memory_event`, and `memory_episode`
 
 ## Required verification
 - compile pass
 - focused A1 tests
-- local verification if read behavior changes
+- local verification because a new public read route is approved
 
 
 

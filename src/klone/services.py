@@ -34,6 +34,14 @@ def module_registry_payload() -> list[ModuleCapabilityRecord]:
     ]
 
 
+def _decode_service_metadata_row(row: dict[str, object]) -> dict[str, object]:
+    payload = dict(row)
+    metadata_json = payload.pop("metadata_json", None)
+    if isinstance(metadata_json, str) and metadata_json:
+        payload["metadata"] = json.loads(metadata_json)
+    return payload
+
+
 class MemoryFacade:
     def __init__(self, repository: KloneRepository) -> None:
         self.memory_service = MemoryService(repository)
@@ -351,12 +359,11 @@ class _ObjectEnvelopeProjector:
     def list_dataset_envelopes(self, *, room_id: str) -> list[ObjectEnvelopeRecord]:
         rows = self.repository.list_datasets(room_id=room_id)
         return [
-            ObjectEnvelopeRecord(
+            self._build_object_envelope(
                 object_id=f"dataset:{row['id']}",
                 object_kind="dataset",
                 room_id=str(row["room_id"]),
                 classification_level=str(row["classification_level"]),
-                version=self.VERSION,
                 summary=str(row["label"]),
                 backing_routes=["/api/datasets"],
                 record=dict(row),
@@ -373,15 +380,14 @@ class _ObjectEnvelopeProjector:
     ) -> list[ObjectEnvelopeRecord]:
         rows = self.repository.list_assets(room_id=room_id, dataset_id=dataset_id, limit=limit)
         return [
-            ObjectEnvelopeRecord(
+            self._build_object_envelope(
                 object_id=f"asset:{row['id']}",
                 object_kind="asset",
                 room_id=str(row["room_id"]),
                 classification_level=str(row["classification_level"]),
-                version=self.VERSION,
                 summary=str(row["relative_path"]),
                 backing_routes=["/api/assets", "/api/assets/{asset_id}"],
-                record=dict(row),
+                record=_decode_service_metadata_row(dict(row)),
             )
             for row in rows
         ]
@@ -394,25 +400,29 @@ class _ObjectEnvelopeProjector:
         offset: int = 0,
         include_corrected: bool = True,
     ) -> list[ObjectEnvelopeRecord]:
-        rows = self.memory_service.query_events(
+        listing_rows = self.memory_service.query_events(
             room_id=room_id,
             limit=limit,
             offset=offset,
             include_corrected=include_corrected,
         )
-        return [
-            ObjectEnvelopeRecord(
-                object_id=f"memory_event:{row['id']}",
-                object_kind="memory_event",
-                room_id=str(row["room_id"]),
-                classification_level=str(row["classification_level"]),
-                version=self.VERSION,
-                summary=str(row["title"]),
-                backing_routes=["/api/memory/events", "/api/memory/events/{event_id}"],
-                record=dict(row),
+        envelopes: list[ObjectEnvelopeRecord] = []
+        for row in listing_rows:
+            detail_payload = self.memory_service.get_event_detail(room_id=room_id, event_id=int(row["id"]))
+            if detail_payload is None:
+                continue
+            envelopes.append(
+                self._build_object_envelope(
+                    object_id=f"memory_event:{row['id']}",
+                    object_kind="memory_event",
+                    room_id=str(row["room_id"]),
+                    classification_level=str(row["classification_level"]),
+                    summary=str(row["title"]),
+                    backing_routes=["/api/memory/events", "/api/memory/events/{event_id}"],
+                    record=dict(detail_payload),
+                )
             )
-            for row in rows
-        ]
+        return envelopes
 
     def list_memory_episode_envelopes(
         self,
@@ -422,25 +432,55 @@ class _ObjectEnvelopeProjector:
         offset: int = 0,
         include_corrected: bool = True,
     ) -> list[ObjectEnvelopeRecord]:
-        rows = self.memory_service.query_episodes(
+        listing_rows = self.memory_service.query_episodes(
             room_id=room_id,
             limit=limit,
             offset=offset,
             include_corrected=include_corrected,
         )
-        return [
-            ObjectEnvelopeRecord(
-                object_id=f"memory_episode:{row['id']}",
-                object_kind="memory_episode",
-                room_id=str(row["room_id"]),
-                classification_level=str(row["classification_level"]),
-                version=self.VERSION,
-                summary=str(row["title"]),
-                backing_routes=["/api/memory/episodes", "/api/memory/episodes/{episode_id}"],
-                record=dict(row),
+        envelopes: list[ObjectEnvelopeRecord] = []
+        for row in listing_rows:
+            detail_payload = self.memory_service.get_episode_detail(
+                room_id=room_id,
+                episode_id=str(row["id"]),
             )
-            for row in rows
-        ]
+            if detail_payload is None:
+                continue
+            envelopes.append(
+                self._build_object_envelope(
+                    object_id=f"memory_episode:{row['id']}",
+                    object_kind="memory_episode",
+                    room_id=str(row["room_id"]),
+                    classification_level=str(row["classification_level"]),
+                    summary=str(row["title"]),
+                    backing_routes=["/api/memory/episodes", "/api/memory/episodes/{episode_id}"],
+                    record=dict(detail_payload),
+                )
+            )
+        return envelopes
+
+    def _build_object_envelope(
+        self,
+        *,
+        object_id: str,
+        object_kind: str,
+        room_id: str,
+        classification_level: str,
+        summary: str | None,
+        backing_routes: list[str],
+        record: dict[str, object],
+    ) -> ObjectEnvelopeRecord:
+        return ObjectEnvelopeRecord(
+            object_id=object_id,
+            object_kind=object_kind,
+            room_id=room_id,
+            classification_level=classification_level,
+            version=self.VERSION,
+            summary=summary,
+            read_only=True,
+            backing_routes=backing_routes,
+            record=record,
+        )
 
 
 @dataclass(frozen=True)

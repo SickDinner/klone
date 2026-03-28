@@ -16,7 +16,6 @@ if str(SRC_ROOT) not in sys.path:
 from klone.config import Settings  # noqa: E402
 from klone.ingest import ingest_dataset  # noqa: E402
 from klone.main import create_app  # noqa: E402
-from klone.memory import MemoryService  # noqa: E402
 from klone.repository import KloneRepository  # noqa: E402
 from klone.schemas import DatasetIngestRequest  # noqa: E402
 from klone.services import ServiceContainer  # noqa: E402
@@ -34,60 +33,60 @@ class PhaseA17Tests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def test_v1_blob_get_returns_room_scoped_blob_metadata(self) -> None:
+    def test_v1_blob_meta_returns_room_scoped_asset_backed_metadata(self) -> None:
         ingest_result = self._ingest_dataset(
-            label="Blob Get Fixture",
+            label="Blob Meta Fixture",
             classification_level="personal",
-            folder_name="blob_get_fixture",
+            folder_name="blob_meta_fixture",
             files={"note.txt": "alpha"},
         )
         room_id = ingest_result["dataset"]["room_id"]
-        services = ServiceContainer.build(self.repository)
-        blob_record = services.blob.list_blob_metadata(room_id=room_id, limit=10)[0]
+        blob = ServiceContainer.build(self.repository).blob.list_blob_metadata(room_id=room_id, limit=10)[0]
 
         app = create_app(self._settings_for("phase_a1_7.sqlite"))
         observed = asyncio.run(
             self._perform_request(
                 app,
                 method="GET",
-                path=f"/v1/rooms/{room_id}/blobs/{blob_record.blob_id}/meta",
-                headers={"x-request-id": "req:a17-blob", "x-trace-id": "trace:a17-blob"},
+                path=f"/v1/rooms/{room_id}/blobs/{blob.blob_id}/meta",
+                headers={"x-request-id": "req:a17-meta", "x-trace-id": "trace:a17-meta"},
             )
         )
 
         self.assertEqual(observed["status_code"], 200)
-        self.assertEqual(observed["json"]["room_id"], room_id)
-        self.assertEqual(observed["json"]["blob"]["blob_id"], blob_record.blob_id)
-        self.assertEqual(observed["json"]["blob"]["linked_object_id"], blob_record.linked_object_id)
-        self.assertEqual(observed["json"]["blob"]["asset_id"], blob_record.asset_id)
-        self.assertEqual(observed["json"]["blob"]["relative_path"], "note.txt")
-        self.assertEqual(observed["json"]["blob"]["metadata"]["source"], "recursive_file_scan")
+        payload = observed["json"]
+        self.assertEqual(payload["room_id"], room_id)
+        self.assertEqual(payload["blob"]["blob_id"], blob.blob_id)
+        self.assertEqual(payload["blob"]["linked_object_id"], blob.linked_object_id)
+        self.assertEqual(payload["blob"]["asset_id"], blob.asset_id)
+        self.assertEqual(payload["blob"]["dataset_id"], ingest_result["dataset"]["id"])
+        self.assertEqual(payload["blob"]["relative_path"], "note.txt")
+        self.assertEqual(payload["blob"]["storage_kind"], "local_filesystem")
+        self.assertEqual(payload["blob"]["room_id"], room_id)
 
-    def test_v1_blob_get_blocks_wrong_room_and_invalid_blob_ids(self) -> None:
+    def test_v1_blob_meta_blocks_wrong_room_and_invalid_blob_id(self) -> None:
         restricted = self._ingest_dataset(
-            label="Restricted Blob Fixture",
+            label="Restricted Blob Meta",
             classification_level="personal",
-            folder_name="restricted_blob_fixture",
+            folder_name="restricted_blob_meta",
             files={"restricted.txt": "alpha"},
         )
         public = self._ingest_dataset(
-            label="Public Blob Fixture",
+            label="Public Blob Meta",
             classification_level="public",
-            folder_name="public_blob_fixture",
+            folder_name="public_blob_meta",
             files={"public.txt": "beta"},
         )
-        services = ServiceContainer.build(self.repository)
-        restricted_blob = services.blob.list_blob_metadata(
-            room_id=restricted["dataset"]["room_id"],
-            limit=10,
-        )[0]
+        restricted_room = restricted["dataset"]["room_id"]
+        public_room = public["dataset"]["room_id"]
+        blob = ServiceContainer.build(self.repository).blob.list_blob_metadata(room_id=restricted_room, limit=10)[0]
 
         app = create_app(self._settings_for("phase_a1_7.sqlite"))
         wrong_room = asyncio.run(
             self._perform_request(
                 app,
                 method="GET",
-                path=f"/v1/rooms/{public['dataset']['room_id']}/blobs/{restricted_blob.blob_id}/meta",
+                path=f"/v1/rooms/{public_room}/blobs/{blob.blob_id}/meta",
                 headers={"x-request-id": "req:a17-wrong-room"},
             )
         )
@@ -95,7 +94,7 @@ class PhaseA17Tests(unittest.TestCase):
             self._perform_request(
                 app,
                 method="GET",
-                path=f"/v1/rooms/{restricted['dataset']['room_id']}/blobs/blob:asset:not-a-number/meta",
+                path=f"/v1/rooms/{restricted_room}/blobs/not-a-blob-id/meta",
                 headers={"x-request-id": "req:a17-invalid"},
             )
         )
@@ -103,25 +102,24 @@ class PhaseA17Tests(unittest.TestCase):
         self.assertEqual(wrong_room["status_code"], 404)
         self.assertIn("was not found", wrong_room["json"]["detail"])
         self.assertEqual(invalid["status_code"], 400)
-        self.assertIn("Blob id must end with a numeric asset id.", invalid["json"]["detail"])
+        self.assertIn("blob:asset", invalid["json"]["detail"])
 
-    def test_v1_blob_get_writes_append_only_audit_chain_and_capabilities_expose_route(self) -> None:
+    def test_v1_blob_meta_writes_audit_chain_and_capabilities(self) -> None:
         ingest_result = self._ingest_dataset(
-            label="Audit Blob Fixture",
+            label="Blob Audit Fixture",
             classification_level="personal",
-            folder_name="audit_blob_fixture",
+            folder_name="blob_audit_fixture",
             files={"note.txt": "alpha"},
         )
         room_id = ingest_result["dataset"]["room_id"]
-        services = ServiceContainer.build(self.repository)
-        blob_record = services.blob.list_blob_metadata(room_id=room_id, limit=10)[0]
+        blob = ServiceContainer.build(self.repository).blob.list_blob_metadata(room_id=room_id, limit=10)[0]
         app = create_app(self._settings_for("phase_a1_7.sqlite"))
 
-        first = asyncio.run(
+        ok_response = asyncio.run(
             self._perform_request(
                 app,
                 method="GET",
-                path=f"/v1/rooms/{room_id}/blobs/{blob_record.blob_id}/meta",
+                path=f"/v1/rooms/{room_id}/blobs/{blob.blob_id}/meta",
                 headers={
                     "x-request-id": "req:a17-1",
                     "x-trace-id": "trace:a17-1",
@@ -130,11 +128,11 @@ class PhaseA17Tests(unittest.TestCase):
                 },
             )
         )
-        second = asyncio.run(
+        invalid_response = asyncio.run(
             self._perform_request(
                 app,
                 method="GET",
-                path=f"/v1/rooms/{room_id}/blobs/blob:asset:not-a-number/meta",
+                path=f"/v1/rooms/{room_id}/blobs/not-a-blob-id/meta",
                 headers={
                     "x-request-id": "req:a17-2",
                     "x-trace-id": "trace:a17-2",
@@ -145,8 +143,8 @@ class PhaseA17Tests(unittest.TestCase):
         )
         capabilities = asyncio.run(self._perform_request(app, method="GET", path="/v1/capabilities"))
 
-        self.assertEqual(first["status_code"], 200)
-        self.assertEqual(second["status_code"], 400)
+        self.assertEqual(ok_response["status_code"], 200)
+        self.assertEqual(invalid_response["status_code"], 400)
         self.assertEqual(capabilities["status_code"], 200)
 
         capability_map = {item["id"]: item for item in capabilities["json"]["capabilities"]}
@@ -160,9 +158,9 @@ class PhaseA17Tests(unittest.TestCase):
 
         contract_map = {item["id"]: item for item in capabilities["json"]["contracts"]}
         self.assertEqual(contract_map["blob-shell"]["route_readiness"], "public_read_only_meta_available")
-        self.assertIn(
-            "/v1/rooms/{room_id}/blobs/{blob_id}/meta",
+        self.assertEqual(
             contract_map["blob-shell"]["backing_routes"],
+            ["/v1/rooms/{room_id}/blobs/{blob_id}/meta", "/api/assets", "/api/assets/{asset_id}"],
         )
 
         chain_rows = self.repository.list_control_plane_audit_chain(limit=10)
@@ -170,21 +168,26 @@ class PhaseA17Tests(unittest.TestCase):
         self.assertGreaterEqual(len(blob_rows), 2)
         self.assertEqual(blob_rows[0]["request_id"], "req:a17-2")
         self.assertEqual(blob_rows[0]["status_code"], 400)
-        self.assertEqual(blob_rows[0]["route_path"], f"/v1/rooms/{room_id}/blobs/blob:asset:not-a-number/meta")
+        self.assertEqual(blob_rows[0]["route_path"], f"/v1/rooms/{room_id}/blobs/not-a-blob-id/meta")
         self.assertEqual(blob_rows[1]["request_id"], "req:a17-1")
         self.assertEqual(blob_rows[1]["status_code"], 200)
         self.assertEqual(blob_rows[0]["prev_event_hash"], blob_rows[1]["event_hash"])
 
-    def test_v1_surface_contains_blob_get_route(self) -> None:
+    def test_v1_surface_contains_blob_meta_object_get_and_query(self) -> None:
         v1_routes = {
             route.path: sorted(route.methods)
             for route in v1_router.routes
             if route.path.startswith("/v1")
         }
-        self.assertEqual(v1_routes["/v1/capabilities"], ["GET"])
-        self.assertEqual(v1_routes["/v1/rooms/{room_id}/blobs/{blob_id}/meta"], ["GET"])
-        self.assertEqual(v1_routes["/v1/rooms/{room_id}/objects/get"], ["POST"])
-        self.assertEqual(v1_routes["/v1/rooms/{room_id}/query"], ["POST"])
+        self.assertEqual(
+            v1_routes,
+            {
+                "/v1/capabilities": ["GET"],
+                "/v1/rooms/{room_id}/blobs/{blob_id}/meta": ["GET"],
+                "/v1/rooms/{room_id}/objects/get": ["POST"],
+                "/v1/rooms/{room_id}/query": ["POST"],
+            },
+        )
 
     async def _perform_request(
         self,
@@ -192,18 +195,13 @@ class PhaseA17Tests(unittest.TestCase):
         *,
         method: str,
         path: str,
-        body: dict[str, object] | None = None,
         headers: dict[str, str] | None = None,
     ) -> dict[str, object]:
         async with app.router.lifespan_context(app):
             events: list[dict] = []
-            body_bytes = json.dumps(body).encode("utf-8") if body is not None else b""
-            request_headers = dict(headers or {})
-            if body is not None:
-                request_headers.setdefault("content-type", "application/json")
             header_items = [
                 (key.lower().encode("utf-8"), value.encode("utf-8"))
-                for key, value in request_headers.items()
+                for key, value in (headers or {}).items()
             ]
             scope = {
                 "type": "http",
@@ -220,14 +218,8 @@ class PhaseA17Tests(unittest.TestCase):
                 "app": app,
             }
 
-            sent = False
-
             async def receive():
-                nonlocal sent
-                if sent:
-                    return {"type": "http.disconnect"}
-                sent = True
-                return {"type": "http.request", "body": body_bytes, "more_body": False}
+                return {"type": "http.request", "body": b"", "more_body": False}
 
             async def send(message):
                 events.append(message)
@@ -268,12 +260,6 @@ class PhaseA17Tests(unittest.TestCase):
             description=f"Fixture dataset {label}",
         )
         return ingest_dataset(self.repository, request)
-
-    def _seed_room(self, room_id: str) -> None:
-        MemoryService(self.repository).seed_from_audit_events(
-            room_id=room_id,
-            audit_event_ids=[row["id"] for row in self.repository.list_audit_events(room_id=room_id, limit=20)],
-        )
 
     def _settings_for(self, database_name: str) -> Settings:
         database_path = self.root / database_name

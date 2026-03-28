@@ -162,6 +162,43 @@ class PhaseG13Tests(unittest.TestCase):
         self.assertIn("/api/ingest/queue", js)
         self.assertIn("data-queue-action", js)
 
+    def test_startup_recovery_marks_running_job_interrupted_without_auto_execution(self) -> None:
+        folder = self.root / "g13_startup"
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "item.txt").write_text("alpha", encoding="utf-8")
+
+        request = DatasetIngestRequest(
+            label="G13 Startup",
+            root_path=str(folder),
+            collection="fixtures",
+            classification_level="personal",
+            description="Startup recovery boundary fixture.",
+        )
+
+        staged_job, _ = self.repository.enqueue_ingest_queue_job(
+            label=request.label,
+            normalized_root_path=str(folder),
+            room_id="restricted-room",
+            classification_level=request.classification_level,
+            collection=request.collection,
+            description=request.description,
+            request_payload=request.model_dump(mode="json"),
+        )
+        running_job = self.repository.start_ingest_queue_job(staged_job["id"], room_id="restricted-room")
+        self.assertEqual(running_job["status"], "running")
+
+        app = create_app(self._settings_for("phase_g1_3.sqlite"))
+        asyncio.run(self._enter_and_leave_lifespan(app))
+
+        observed_job = self.repository.get_ingest_queue_job(running_job["id"], room_id="restricted-room")
+        self.assertIsNotNone(observed_job)
+        self.assertEqual(observed_job["status"], "interrupted")
+        self.assertEqual(observed_job["last_error"], "interrupted_before_completion")
+        ingest_runs = self.repository.list_ingest_runs(room_id="restricted-room", limit=10)
+        self.assertEqual(ingest_runs, [])
+        audit_rows = self.repository.list_audit_events(room_id="restricted-room", limit=20)
+        self.assertIn("ingest_queue_interrupted", {row["event_type"] for row in audit_rows})
+
     async def _perform_request(
         self,
         app,
@@ -227,6 +264,10 @@ class PhaseG13Tests(unittest.TestCase):
             asset_preview_limit=12,
             audit_preview_limit=9,
         )
+
+    async def _enter_and_leave_lifespan(self, app) -> None:
+        async with app.router.lifespan_context(app):
+            return None
 
 
 if __name__ == "__main__":

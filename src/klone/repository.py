@@ -933,7 +933,7 @@ class KloneRepository:
                 """
                 SELECT *
                 FROM ingest_queue_jobs
-                WHERE room_id = ? AND normalized_root_path = ? AND status IN ('queued', 'running')
+                WHERE room_id = ? AND normalized_root_path = ? AND status IN ('queued', 'running', 'interrupted')
                 ORDER BY created_at DESC, id DESC
                 LIMIT 1
                 """,
@@ -1055,7 +1055,7 @@ class KloneRepository:
             current = self.get_ingest_queue_job(job_id, room_id=room_id, conn=active_conn)
             if current is None:
                 raise ValueError(f"Ingest queue job {job_id} was not found in room {room_id}.")
-            if current["status"] not in {"queued", "failed"}:
+            if current["status"] not in {"queued", "failed", "interrupted"}:
                 raise ValueError(
                     f"Ingest queue job {job_id} cannot start from status {current['status']}."
                 )
@@ -1082,6 +1082,48 @@ class KloneRepository:
                 (job_id, room_id),
             ).fetchone()
             return dict(row)
+
+    def recover_interrupted_ingest_queue_jobs(
+        self,
+        *,
+        conn: sqlite3.Connection | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._borrowed_connection(conn) as active_conn:
+            rows = active_conn.execute(
+                """
+                SELECT *
+                FROM ingest_queue_jobs
+                WHERE status = 'running'
+                ORDER BY updated_at DESC, id DESC
+                """
+            ).fetchall()
+            if not rows:
+                return []
+            recovered_at = utc_now_iso()
+            active_conn.execute(
+                """
+                UPDATE ingest_queue_jobs
+                SET status = 'interrupted',
+                    updated_at = ?,
+                    last_error = CASE
+                        WHEN last_error IS NULL OR last_error = '' THEN 'interrupted_before_completion'
+                        ELSE last_error
+                    END
+                WHERE status = 'running'
+                """,
+                (recovered_at,),
+            )
+            recovered_rows = active_conn.execute(
+                """
+                SELECT *
+                FROM ingest_queue_jobs
+                WHERE status = 'interrupted'
+                  AND updated_at = ?
+                ORDER BY id DESC
+                """,
+                (recovered_at,),
+            ).fetchall()
+            return [dict(row) for row in recovered_rows]
 
     def finish_ingest_queue_job(
         self,
@@ -1132,7 +1174,7 @@ class KloneRepository:
             current = self.get_ingest_queue_job(job_id, room_id=room_id, conn=active_conn)
             if current is None:
                 raise ValueError(f"Ingest queue job {job_id} was not found in room {room_id}.")
-            if current["status"] not in {"queued", "failed"}:
+            if current["status"] not in {"queued", "failed", "interrupted"}:
                 raise ValueError(
                     f"Ingest queue job {job_id} cannot be cancelled from status {current['status']}."
                 )

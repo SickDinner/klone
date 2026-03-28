@@ -371,7 +371,7 @@ function renderIngestQueueJobs(queueJobs) {
           ])}</div>
           <div class="meta">
             <button class="link-button" data-queue-action="inspect" data-queue-job-id="${job.id}" type="button">Inspect</button>
-            <button class="link-button" data-queue-action="execute" data-queue-job-id="${job.id}" type="button" ${job.can_execute ? "" : "disabled"}>Execute</button>
+            <button class="link-button" data-queue-action="execute" data-queue-job-id="${job.id}" type="button" ${job.can_execute ? "" : "disabled"}>${job.status === "interrupted" ? "Resume" : "Execute"}</button>
             <button class="link-button" data-queue-action="cancel" data-queue-job-id="${job.id}" type="button" ${job.can_cancel ? "" : "disabled"}>Cancel</button>
             <button class="link-button" data-queue-action="manifest" data-queue-job-id="${job.id}" type="button" ${job.last_run_id ? "" : "disabled"}>Inspect Run Manifest</button>
           </div>
@@ -392,7 +392,7 @@ function renderIngestQueueDetail(job) {
   root.className = "detail-card";
   root.innerHTML = `
     <h3>Queue Job ${job.id}</h3>
-    <p>${escapeHtml(job.label)} in ${escapeHtml(job.room_id)} persists the ingest request for manual execution and retry.</p>
+    <p>${escapeHtml(job.label)} in ${escapeHtml(job.room_id)} persists the ingest request for manual execution, retry, and interrupted-run recovery.</p>
     <div class="meta">${chips([
       `status: ${job.status}`,
       `classification: ${job.classification_level}`,

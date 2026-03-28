@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api import router as api_router
+from .audit import AuditService
 from .config import Settings, load_settings, settings
 from .contracts import APP_VERSION, BOOTSTRAP_TASK_ID
 from .request_context import build_request_context
@@ -26,6 +27,24 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
         run_started_at = utc_now_iso()
         repository = KloneRepository(resolved_settings.sqlite_path)
         bootstrap_report = repository.initialize()
+        recovered_queue_jobs = repository.recover_interrupted_ingest_queue_jobs()
+        if recovered_queue_jobs:
+            audit_service = AuditService(repository)
+            for job in recovered_queue_jobs:
+                audit_service.log_event(
+                    event_type="ingest_queue_interrupted",
+                    actor="hypervisor",
+                    target_type="ingest_queue_job",
+                    target_id=str(job["id"]),
+                    room_id=job["room_id"],
+                    classification_level=job["classification_level"],
+                    summary=f"Ingest queue job {job['id']} marked interrupted during startup recovery.",
+                    metadata={
+                        "queue_job_id": job["id"],
+                        "attempt_count": job["attempt_count"],
+                        "normalized_root_path": job["normalized_root_path"],
+                    },
+                )
         bootstrap_ids = repository.build_internal_run_identifiers(
             run_kind="bootstrap",
             started_at=run_started_at,
@@ -49,6 +68,7 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
                 "bootstrap_mode": bootstrap_report["bootstrap_mode"],
                 "missing_tables": bootstrap_report["missing_tables"],
                 "correction_schema_ready": bootstrap_report["correction_schema_ready"],
+                "recovered_ingest_queue_jobs": len(recovered_queue_jobs),
             },
         )
         app.state.settings = resolved_settings

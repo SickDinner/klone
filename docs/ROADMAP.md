@@ -184,8 +184,17 @@ Local Ingest Queue Shell:
 - Mission Control exposes queue depth plus recent queue job visibility
 - no resumable interruption state, no background workers, and no startup auto-resume in this phase
 
+## Phase G1.4
+Local Resumable Ingest Queue:
+- no new queue route; reuse the existing local queue shell
+- startup recovery marks orphaned local running jobs as interrupted
+- interrupted jobs remain room-scoped, visible, and manually resumable through POST /api/ingest/queue/{job_id}/execute
+- queue depth counts queued and interrupted jobs that still need operator attention
+- Mission Control exposes interrupted-run visibility and Resume copy without auto-executing scans
+- append-only audit records capture startup interruption recovery
+- no background workers, no automatic startup execution, and no distributed worker runtime in this phase
+
 ## Not approved yet
-- G1.4 resumable ingest queue
 - semantic search
 - embeddings
 - OCR/transcription

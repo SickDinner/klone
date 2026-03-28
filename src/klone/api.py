@@ -435,8 +435,8 @@ def _ingest_queue_job_from_row(row: dict[str, Any]) -> IngestQueueJobRecord:
         payload["description"] = "summary_only"
         if payload.get("last_error"):
             payload["last_error"] = "[summary-only]"
-    payload["can_execute"] = payload["status"] in {"queued", "failed"}
-    payload["can_cancel"] = payload["status"] in {"queued", "failed"}
+    payload["can_execute"] = payload["status"] in {"queued", "failed", "interrupted"}
+    payload["can_cancel"] = payload["status"] in {"queued", "failed", "interrupted"}
     return IngestQueueJobRecord.model_validate(payload)
 
 
@@ -639,7 +639,10 @@ def ingest_status(
     queue_depth = 0
     for room in _resolve_rooms(requested_room_id=room_id, permission="discover"):
         recent_runs.extend(repository.list_ingest_runs(room_id=room.id, limit=8))
-        queue_depth += repository.count_ingest_queue_jobs(room_id=room.id)
+        queue_depth += repository.count_ingest_queue_jobs(
+            room_id=room.id,
+            statuses=("queued", "interrupted"),
+        )
         recent_queue_jobs.extend(repository.list_ingest_queue_jobs(room_id=room.id, limit=8))
     recent_runs = sorted(recent_runs, key=lambda item: item["started_at"], reverse=True)[:8]
     recent_queue_jobs = sorted(recent_queue_jobs, key=lambda item: item["created_at"], reverse=True)[:8]

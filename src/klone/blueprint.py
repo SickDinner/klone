@@ -97,7 +97,7 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
             status="indexing_foundation",
             purpose="Index images, audio, video, documents, archives, and generic files into searchable evidence layers.",
             key_inputs=["dataset roots", "file scans", "metadata extraction"],
-            outputs=["indexed assets", "hashes", "type classification", "dedup groundwork", "preflight manifests", "local ingest queue", "run manifest history"],
+            outputs=["indexed assets", "hashes", "type classification", "dedup groundwork", "preflight manifests", "resumable ingest queue", "run manifest history"],
         ),
         ModuleCard(
             id="art-lab",
@@ -258,8 +258,8 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
         BuildPhase(
             id="phase-2a",
             title="Data Ingest Spine",
-            goal="Index local datasets with recursive scanning, preflight manifest visibility, local queue control, run manifest history, file classification, hashing, metadata extraction, and audit trails.",
-            deliverables=["dataset intake", "preflight manifests", "local ingest queue", "manifest history", "asset index", "ingest runs", "audit entries"],
+            goal="Index local datasets with recursive scanning, preflight manifest visibility, resumable local queue control, run manifest history, file classification, hashing, metadata extraction, and audit trails.",
+            deliverables=["dataset intake", "preflight manifests", "resumable ingest queue", "manifest history", "asset index", "ingest runs", "audit entries"],
         ),
         BuildPhase(
             id="phase-2b",

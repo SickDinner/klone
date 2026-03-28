@@ -1,9 +1,9 @@
 # PROJECT STATUS
 
-Last updated: 2026-03-28
+Last updated: 2026-03-29
 
 ## Current phase
-Phase A1.9 complete; no further approved A1 or G1 substep is defined yet
+Phase A1.9 and G1.4 complete; no further approved A1 or G1 substep is defined yet
 
 ## Phase state
 - Phase 2B.1 complete
@@ -31,6 +31,7 @@ Phase A1.9 complete; no further approved A1 or G1 substep is defined yet
 - Phase G1.1 complete
 - Phase G1.2 complete
 - Phase G1.3 complete
+- Phase G1.4 complete
 
 ## Completed in 2B.5
 - stress verification for replay/correction/provenance/room isolation
@@ -208,8 +209,21 @@ Phase A1.9 complete; no further approved A1 or G1 substep is defined yet
 - full unittest suite green
 - compile pass green
 
+## Completed in G1.4
+- local resumable queue recovery over the existing governed ingest spine
+- startup now marks orphaned local `running` queue jobs as `interrupted` rather than leaving them stuck invisibly
+- POST /api/ingest/queue/{job_id}/execute now safely resumes `interrupted` jobs through the existing deterministic ingest path
+- POST /api/ingest/queue/{job_id}/cancel now also handles `interrupted` jobs without widening into async worker cancellation semantics
+- POST /api/ingest/queue now reuses an interrupted job for the same room/root path instead of staging a duplicate
+- GET /api/ingest/queue and GET /api/ingest/status now surface `interrupted` jobs as pending operator work and preserve bounded queue visibility
+- startup writes append-only `ingest_queue_interrupted` audit rows for recovered jobs
+- Mission Control now shows Resume copy and interrupted-run recovery context without auto-executing scans
+- focused G1.4 tests green
+- full unittest suite green
+- compile pass green
+
 ## Next approved substep
 - no further approved A1 or G1 substep is enumerated in canonical repo evidence
-- require explicit roadmap extension or approval before widening the public control-plane seam beyond the completed A1.9 change preview route or the ingest spine beyond the completed G1.3 local queue shell
-- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, G1.1 preflight manifest work, G1.2 manifest history work, or G1.3 local queue shell work
+- require explicit roadmap extension or approval before widening the public control-plane seam beyond the completed A1.9 change preview route or the ingest spine beyond the completed G1.4 local resumable queue shell
+- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, or G1.4 local resumable queue work
 

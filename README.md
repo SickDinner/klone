@@ -32,6 +32,7 @@ Nykyinen kanoninen tila on:
 - `G1.1 read-only ingest preflight manifest complete`
 - `G1.2 bounded ingest run manifest history complete`
 - `G1.3 local ingest queue shell complete`
+- `G1.4 local resumable ingest queue complete`
 
 Uutta tässä versiossa:
 
@@ -72,9 +73,11 @@ Uutta tässä versiossa:
 - `mission control inspect flow`
   Ingest Runs -paneeli tukee nyt `Inspect Manifest` -näkymää ja avaa onnistuneen scanin jälkeen juuri syntyneen manifestin automaattisesti
 - `local ingest queue shell`
-  `POST /api/ingest/queue` stageaa tai reuseaa local-first ingest-jobin, `POST /api/ingest/queue/{job_id}/execute` ajaa sen eksplisiittisesti, ja `POST /api/ingest/queue/{job_id}/cancel` peruuttaa queued/failed-jobin ilman background worker -oopperaa
+  `POST /api/ingest/queue` stageaa tai reuseaa local-first ingest-jobin, `POST /api/ingest/queue/{job_id}/execute` ajaa sen eksplisiittisesti, ja `POST /api/ingest/queue/{job_id}/cancel` peruuttaa queued/failed/interrupted-jobin ilman background worker -oopperaa
+- `local resumable ingest queue`
+  startup merkitsee orvoiksi jääneet local `running` queue-jobit tilaan `interrupted`, UI näyttää ne edelleen operatorin työjonona, ja sama `POST /api/ingest/queue/{job_id}/execute` toimii nyt myös hallittuna resume-polkuina ilman automaattista startup-ajamista
 - `mission control queue flow`
-  Dataset Intake tukee nyt `Queue Dataset` -askelta, ja Mission Control näyttää queue depthin sekä inspect/execute/cancel -kontrollit ennen kuin ingest-run muuttuu manifestoituneeksi historialle
+  Dataset Intake tukee nyt `Queue Dataset` -askelta, ja Mission Control näyttää queue depthin sekä inspect/execute/resume/cancel -kontrollit ennen kuin ingest-run muuttuu manifestoituneeksi historialle
 
 Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, joka näkyy käyttöliittymässä asti:
 
@@ -219,4 +222,4 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 3. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
 4. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
 5. Constitution Layer: hitaasti muuttuvat parametrit, provenance ja change logit.
-6. Syvempi ingest: OCR, transkriptio, extraction pipeline -tilat ja parempi dedup, mutta ei ennen erillistä G1.4-hyväksyntää.
+6. Syvempi ingest: OCR, transkriptio, extraction pipeline -tilat ja parempi dedup, mutta ei ennen seuraavan ingest-vaiheen erillistä hyväksyntää.

@@ -65,6 +65,20 @@ def _sanitize_object_envelope(envelope: ObjectEnvelopeRecord) -> ObjectEnvelopeR
     return envelope.model_copy(update={"record": sanitized_record})
 
 
+def _normalize_public_query_filters(payload: PublicQueryRequest) -> dict[str, object]:
+    filters: dict[str, object] = {"include_corrected": payload.include_corrected}
+    if payload.status is not None:
+        filters["status"] = payload.status
+    if payload.ingest_run_id is not None:
+        filters["ingest_run_id"] = payload.ingest_run_id
+    if payload.query_kind == "memory_events":
+        if payload.event_type is not None:
+            filters["event_type"] = payload.event_type
+    elif payload.episode_type is not None:
+        filters["episode_type"] = payload.episode_type
+    return filters
+
+
 @router.get("/capabilities", response_model=PublicCapabilitiesResponse)
 def capabilities(
     services: ServiceContainer = Depends(get_service_container),
@@ -195,6 +209,16 @@ def query(
     route_path = f"/v1/rooms/{room_id}/query"
     try:
         _require_room_read(room_id=room_id, actor_role=request_context.actor_role)
+        if payload.query_kind == "memory_events" and payload.episode_type is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="episode_type is only supported for memory_episodes queries.",
+            )
+        if payload.query_kind == "memory_episodes" and payload.event_type is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="event_type is only supported for memory_events queries.",
+            )
         if payload.query_kind == "memory_events":
             rows = services.memory.memory_service.query_events(
                 room_id=room_id,
@@ -205,12 +229,6 @@ def query(
                 ingest_run_id=payload.ingest_run_id,
                 include_corrected=payload.include_corrected,
             )
-            filters = {
-                "status": payload.status,
-                "event_type": payload.event_type,
-                "ingest_run_id": payload.ingest_run_id,
-                "include_corrected": payload.include_corrected,
-            }
             backing_routes = ["/api/memory/events"]
             sanitized_results = [
                 _memory_event_from_row(dict(row)).model_dump(mode="json")
@@ -226,12 +244,6 @@ def query(
                 ingest_run_id=payload.ingest_run_id,
                 include_corrected=payload.include_corrected,
             )
-            filters = {
-                "status": payload.status,
-                "episode_type": payload.episode_type,
-                "ingest_run_id": payload.ingest_run_id,
-                "include_corrected": payload.include_corrected,
-            }
             backing_routes = ["/api/memory/episodes"]
             sanitized_results = [
                 _memory_episode_from_row(dict(row)).model_dump(mode="json")
@@ -243,11 +255,6 @@ def query(
                 detail="Unsupported query_kind. Supported kinds are memory_events and memory_episodes.",
             )
 
-        applied_filters = {
-            key: value
-            for key, value in filters.items()
-            if value is not None
-        }
         response = PublicQueryResponse(
             api_version="v1",
             request_context=RequestContextRecord(
@@ -263,12 +270,12 @@ def query(
             limit=payload.limit,
             offset=payload.offset,
             result_count=len(sanitized_results),
-            filters=applied_filters,
+            filters=_normalize_public_query_filters(payload),
             backing_routes=backing_routes,
             results=sanitized_results,
         )
         services.audit.log_control_plane_event(
-            event_type="v1_query_read",
+            event_type="v1_query",
             route_path=route_path,
             request_context=request_context,
             status_code=200,
@@ -279,12 +286,13 @@ def query(
                 "result_count": len(sanitized_results),
                 "limit": payload.limit,
                 "offset": payload.offset,
+                "filters": response.filters,
             },
         )
         return response
     except HTTPException as error:
         services.audit.log_control_plane_event(
-            event_type="v1_query_read",
+            event_type="v1_query",
             route_path=route_path,
             request_context=request_context,
             status_code=error.status_code,
@@ -301,7 +309,7 @@ def query(
         raise
     except ValueError as error:
         services.audit.log_control_plane_event(
-            event_type="v1_query_read",
+            event_type="v1_query",
             route_path=route_path,
             request_context=request_context,
             status_code=400,

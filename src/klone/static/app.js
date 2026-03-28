@@ -6,6 +6,7 @@ const state = {
   datasets: [],
   audit: [],
   ingestStatus: null,
+  ingestPreview: null,
   memory: {
     roomId: "",
     events: [],
@@ -131,6 +132,81 @@ function renderDatasets(datasets) {
       `,
     )
     .join("");
+}
+
+function renderIngestPreview(preflight) {
+  const root = document.querySelector("#ingest-preview");
+  if (!preflight) {
+    root.className = "detail-card empty-state";
+    root.textContent = "Run a preflight preview to inspect the manifest before indexing.";
+    return;
+  }
+
+  const warningMarkup = preflight.warnings?.length
+    ? `<ul class="manifest-list warning-list">${preflight.warnings
+        .map((warning) => `<li>${escapeHtml(warning)}</li>`)
+        .join("")}</ul>`
+    : '<div class="empty-state">No preview warnings.</div>';
+
+  const breakdownMarkup = preflight.asset_kind_breakdown?.length
+    ? `<ul class="manifest-list">${preflight.asset_kind_breakdown
+        .map(
+          (item) =>
+            `<li><strong>${escapeHtml(item.asset_kind)}</strong>: ${item.count} files, ${formatBytes(item.total_size_bytes)}</li>`,
+        )
+        .join("")}</ul>`
+    : '<div class="empty-state">No files discovered in this preview.</div>';
+
+  const sampleMarkup = preflight.sample_assets?.length
+    ? `<ul class="manifest-list">${preflight.sample_assets
+        .map((item) => {
+          const canonical =
+            item.canonical_dataset_label && item.canonical_relative_path
+              ? `duplicate of ${item.canonical_dataset_label}/${item.canonical_relative_path}`
+              : item.dedup_status === "duplicate"
+                ? `duplicate of asset ${item.canonical_asset_id}`
+                : "unique";
+          return `<li><strong>${escapeHtml(item.relative_path)}</strong>: ${escapeHtml(item.planned_action)}, ${escapeHtml(item.asset_kind)}, ${formatBytes(item.size_bytes)} (${escapeHtml(canonical)})</li>`;
+        })
+        .join("")}</ul>`
+    : '<div class="empty-state">No sample assets available.</div>';
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>Preflight Manifest</h3>
+    <p>${escapeHtml(preflight.request.label)} resolves to ${escapeHtml(preflight.room_label)} without writing a dataset or asset row.</p>
+    <div class="meta">${chips([
+      `room: ${preflight.room_id}`,
+      `can_start_ingest: ${preflight.can_start_ingest}`,
+      `files: ${preflight.files_discovered}`,
+      `size: ${formatBytes(preflight.total_size_bytes)}`,
+      `new: ${preflight.planned_new_assets}`,
+      `updated: ${preflight.planned_updated_assets}`,
+      `unchanged: ${preflight.planned_unchanged_assets}`,
+      `duplicates: ${preflight.duplicates_detected}`,
+      `existing_dataset: ${preflight.existing_dataset_slug || "new_dataset"}`,
+      `access: ${preflight.access_guard.decision}`,
+    ])}</div>
+    <ul class="detail-list">
+      <li><strong>normalized_root_path</strong>: ${escapeHtml(preflight.normalized_root_path)}</li>
+      <li><strong>classification_guard</strong>: ${escapeHtml(preflight.classification_guard.reason)}</li>
+      <li><strong>access_guard</strong>: ${escapeHtml(preflight.access_guard.reason)}</li>
+    </ul>
+    <div class="preview-grid">
+      <section class="preview-block">
+        <h4>Kind Breakdown</h4>
+        ${breakdownMarkup}
+      </section>
+      <section class="preview-block">
+        <h4>Sample Assets</h4>
+        ${sampleMarkup}
+      </section>
+    </div>
+    <section class="preview-block warning-list">
+      <h4>Warnings</h4>
+      ${warningMarkup}
+    </section>
+  `;
 }
 
 function renderRooms(rooms) {
@@ -884,6 +960,7 @@ async function refreshMissionControl() {
   renderAgents(blueprint.agents);
   renderPhases(blueprint.build_phases);
   renderIngestRuns(ingestStatus);
+  renderIngestPreview(state.ingestPreview);
   populateRoomFilter(rooms);
   populateDatasetFilter(datasets);
   populateMemoryRoomFilter(rooms);
@@ -891,12 +968,45 @@ async function refreshMissionControl() {
   await refreshMemoryExplorer();
 }
 
+function collectIngestPayload(form) {
+  return Object.fromEntries(new FormData(form).entries());
+}
+
+async function previewIngestForm() {
+  const form = document.querySelector("#ingest-form");
+  const previewButton = document.querySelector("#ingest-preview-button");
+  const feedback = document.querySelector("#ingest-feedback");
+  const payload = collectIngestPayload(form);
+
+  previewButton.disabled = true;
+  feedback.textContent = "Building ingest manifest...";
+
+  try {
+    const result = await fetchJson("/api/ingest/preflight?sample_limit=8", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    state.ingestPreview = result;
+    renderIngestPreview(result);
+    feedback.textContent = result.can_start_ingest
+      ? `Preview ready: ${result.files_discovered} files across ${result.asset_kind_breakdown.length} asset kinds.`
+      : `Preview ready with guard warning: ${result.access_guard.reason}`;
+  } catch (error) {
+    state.ingestPreview = null;
+    renderIngestPreview(null);
+    feedback.textContent = error.message;
+  } finally {
+    previewButton.disabled = false;
+  }
+}
+
 async function submitIngestForm(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const submitButton = form.querySelector("button[type='submit']");
   const feedback = document.querySelector("#ingest-feedback");
-  const payload = Object.fromEntries(new FormData(form).entries());
+  const payload = collectIngestPayload(form);
 
   submitButton.disabled = true;
   feedback.textContent = "Scanning dataset...";
@@ -918,6 +1028,7 @@ async function submitIngestForm(event) {
 
 function bindEvents() {
   document.querySelector("#ingest-form").addEventListener("submit", submitIngestForm);
+  document.querySelector("#ingest-preview-button").addEventListener("click", previewIngestForm);
   document.querySelector("#asset-refresh").addEventListener("click", refreshAssetBrowser);
   document.querySelector("#asset-room-filter").addEventListener("change", refreshAssetBrowser);
   document.querySelector("#asset-dataset-filter").addEventListener("change", refreshAssetBrowser);

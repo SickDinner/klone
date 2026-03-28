@@ -33,6 +33,7 @@ VIDEO_EXTENSIONS = {".avi", ".m4v", ".mkv", ".mov", ".mp4", ".webm"}
 TEXT_EXTENSIONS = {".csv", ".html", ".htm", ".json", ".md", ".rtf", ".tsv", ".txt", ".xml", ".yaml", ".yml"}
 DOCUMENT_EXTENSIONS = {".doc", ".docx", ".epub", ".odt", ".pdf", ".ppt", ".pptx", ".xls", ".xlsx"}
 ARCHIVE_EXTENSIONS = {".7z", ".bz2", ".gz", ".rar", ".tar", ".tgz", ".xz", ".zip"}
+ASSET_KIND_ORDER: tuple[AssetKind, ...] = ("image", "audio", "video", "text", "document", "archive", "generic")
 
 def iso_from_timestamp(timestamp: float) -> str:
     return datetime.fromtimestamp(timestamp, tz=UTC).isoformat()
@@ -123,6 +124,141 @@ def build_asset_payload(
             "root_path": str(root_path),
             "sanitized_summary": f"{asset_kind} asset {file_path.name}",
         },
+    }
+
+
+def preview_ingest_manifest(
+    repository: KloneRepository,
+    request: DatasetIngestRequest,
+    *,
+    sample_limit: int = 12,
+) -> dict[str, Any]:
+    root_path = normalize_root_path(request.root_path)
+    files, walk_errors = iter_files(root_path)
+    room = room_registry.default_room_for_classification(request.classification_level)
+    room_id = room.id
+    classification_decision = classification_guard.evaluate(
+        classification_level=request.classification_level,
+        room_id=room_id,
+    )
+    access_decision = access_guard.evaluate(
+        room_id=room_id,
+        actor_role="owner",
+        requested_permission="write",
+    )
+
+    sorted_files = sorted(files, key=lambda item: str(item.relative_to(root_path)).lower())
+    existing_dataset: dict[str, Any] | None = None
+    total_size_bytes = 0
+    planned_new_assets = 0
+    planned_updated_assets = 0
+    planned_unchanged_assets = 0
+    duplicates_detected = 0
+    kind_breakdown: dict[AssetKind, dict[str, int]] = {
+        asset_kind: {"count": 0, "total_size_bytes": 0}
+        for asset_kind in ASSET_KIND_ORDER
+    }
+    sample_assets: list[dict[str, Any]] = []
+
+    with repository.connection() as conn:
+        existing_dataset = repository.get_dataset_by_root_path(str(root_path), conn=conn)
+        existing_dataset_id = existing_dataset["id"] if existing_dataset is not None else None
+        for file_path in sorted_files:
+            asset_payload = build_asset_payload(
+                file_path,
+                root_path=root_path,
+                collection=request.collection,
+                classification_level=request.classification_level,
+            )
+            total_size_bytes += int(asset_payload["size_bytes"])
+            asset_kind = asset_payload["asset_kind"]
+            kind_breakdown[asset_kind]["count"] += 1
+            kind_breakdown[asset_kind]["total_size_bytes"] += int(asset_payload["size_bytes"])
+
+            existing_asset = (
+                repository.get_asset_by_dataset_path(
+                    existing_dataset_id,
+                    path=str(asset_payload["path"]),
+                    conn=conn,
+                )
+                if existing_dataset_id is not None
+                else None
+            )
+            canonical = repository.find_duplicate_asset_candidate(
+                sha256=str(asset_payload["sha256"]),
+                dataset_id=existing_dataset_id,
+                path=str(asset_payload["path"]),
+                conn=conn,
+            )
+            dedup_status = "duplicate" if canonical is not None else "unique"
+            planned_action = "new"
+            if existing_asset is not None:
+                planned_action = "updated" if existing_asset["sha256"] != asset_payload["sha256"] else "unchanged"
+
+            if planned_action == "new":
+                planned_new_assets += 1
+            elif planned_action == "updated":
+                planned_updated_assets += 1
+            else:
+                planned_unchanged_assets += 1
+            if dedup_status == "duplicate":
+                duplicates_detected += 1
+
+            if len(sample_assets) < sample_limit:
+                sample_assets.append(
+                    {
+                        "relative_path": asset_payload["relative_path"],
+                        "file_name": asset_payload["file_name"],
+                        "asset_kind": asset_kind,
+                        "mime_type": asset_payload["mime_type"],
+                        "size_bytes": asset_payload["size_bytes"],
+                        "planned_action": planned_action,
+                        "dedup_status": dedup_status,
+                        "canonical_asset_id": canonical["id"] if canonical is not None else None,
+                        "canonical_dataset_label": canonical["dataset_label"] if canonical is not None else None,
+                        "canonical_relative_path": canonical["relative_path"] if canonical is not None else None,
+                    }
+                )
+
+    warnings = list(walk_errors)
+    if classification_decision.decision != "allowed":
+        warnings.append(classification_decision.reason)
+    if access_decision.decision != "allowed":
+        warnings.append(access_decision.reason)
+
+    asset_kind_breakdown = [
+        {
+            "asset_kind": asset_kind,
+            "count": summary["count"],
+            "total_size_bytes": summary["total_size_bytes"],
+        }
+        for asset_kind, summary in kind_breakdown.items()
+        if summary["count"] > 0
+    ]
+
+    return {
+        "request": request.model_dump(mode="json"),
+        "normalized_root_path": str(root_path),
+        "room_id": room.id,
+        "room_label": room.label,
+        "existing_dataset_id": existing_dataset["id"] if existing_dataset is not None else None,
+        "existing_dataset_slug": existing_dataset["slug"] if existing_dataset is not None else None,
+        "classification_guard": classification_decision.model_dump(mode="json"),
+        "access_guard": access_decision.model_dump(mode="json"),
+        "can_start_ingest": (
+            classification_decision.decision == "allowed"
+            and access_decision.decision == "allowed"
+        ),
+        "files_discovered": len(sorted_files),
+        "total_size_bytes": total_size_bytes,
+        "planned_new_assets": planned_new_assets,
+        "planned_updated_assets": planned_updated_assets,
+        "planned_unchanged_assets": planned_unchanged_assets,
+        "duplicates_detected": duplicates_detected,
+        "asset_kind_breakdown": asset_kind_breakdown,
+        "sample_limit": sample_limit,
+        "sample_assets": sample_assets,
+        "warnings": warnings,
     }
 
 

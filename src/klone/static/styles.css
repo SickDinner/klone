@@ -379,6 +379,34 @@ td {
   margin-top: 14px;
 }
 
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.preview-block {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.manifest-list {
+  padding-left: 18px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.manifest-list li + li {
+  margin-top: 6px;
+}
+
+.warning-list {
+  margin-top: 14px;
+}
+
 .provenance-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

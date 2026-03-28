@@ -746,6 +746,28 @@ class KloneRepository:
             ).fetchone()
             return dict(row), True
 
+    def get_dataset_by_root_path(
+        self,
+        root_path: str,
+        *,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any] | None:
+        with self._borrowed_connection(conn) as active_conn:
+            row = active_conn.execute(
+                """
+                SELECT d.*,
+                       COUNT(a.id) AS asset_count,
+                       COALESCE(SUM(CASE WHEN a.dedup_status = 'duplicate' THEN 1 ELSE 0 END), 0)
+                         AS duplicate_count
+                FROM datasets d
+                LEFT JOIN assets a ON a.dataset_id = d.id
+                WHERE d.root_path = ?
+                GROUP BY d.id
+                """,
+                (root_path,),
+            ).fetchone()
+            return dict(row) if row is not None else None
+
     def mark_dataset_scan_state(
         self,
         dataset_id: int,
@@ -985,25 +1007,17 @@ class KloneRepository:
         conn: sqlite3.Connection | None = None,
     ) -> dict[str, Any]:
         with self._borrowed_connection(conn) as active_conn:
-            existing = active_conn.execute(
-                """
-                SELECT *
-                FROM assets
-                WHERE dataset_id = ? AND path = ?
-                """,
-                (dataset_id, asset["path"]),
-            ).fetchone()
-            canonical = active_conn.execute(
-                """
-                SELECT id
-                FROM assets
-                WHERE sha256 = ?
-                  AND NOT (dataset_id = ? AND path = ?)
-                ORDER BY id
-                LIMIT 1
-                """,
-                (asset["sha256"], dataset_id, asset["path"]),
-            ).fetchone()
+            existing = self.get_asset_by_dataset_path(
+                dataset_id,
+                path=str(asset["path"]),
+                conn=active_conn,
+            )
+            canonical = self.find_duplicate_asset_candidate(
+                sha256=str(asset["sha256"]),
+                dataset_id=dataset_id,
+                path=str(asset["path"]),
+                conn=active_conn,
+            )
             dedup_status = "duplicate" if canonical is not None else "unique"
             canonical_asset_id = canonical["id"] if canonical is not None else None
             metadata_json = json.dumps(asset["metadata"], sort_keys=True)
@@ -1112,6 +1126,53 @@ class KloneRepository:
                 "action": action,
                 "is_duplicate": dedup_status == "duplicate",
             }
+
+    def get_asset_by_dataset_path(
+        self,
+        dataset_id: int,
+        *,
+        path: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any] | None:
+        with self._borrowed_connection(conn) as active_conn:
+            row = active_conn.execute(
+                """
+                SELECT *
+                FROM assets
+                WHERE dataset_id = ? AND path = ?
+                """,
+                (dataset_id, path),
+            ).fetchone()
+            return dict(row) if row is not None else None
+
+    def find_duplicate_asset_candidate(
+        self,
+        *,
+        sha256: str,
+        dataset_id: int | None = None,
+        path: str | None = None,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any] | None:
+        with self._borrowed_connection(conn) as active_conn:
+            query = """
+                SELECT a.id,
+                       a.dataset_id,
+                       a.path,
+                       a.relative_path,
+                       a.room_id,
+                       a.dedup_status,
+                       d.label AS dataset_label
+                FROM assets a
+                JOIN datasets d ON d.id = a.dataset_id
+                WHERE a.sha256 = ?
+            """
+            params: list[Any] = [sha256]
+            if dataset_id is not None and path is not None:
+                query += " AND NOT (a.dataset_id = ? AND a.path = ?)"
+                params.extend([dataset_id, path])
+            query += " ORDER BY a.id ASC LIMIT 1"
+            row = active_conn.execute(query, params).fetchone()
+            return dict(row) if row is not None else None
 
     def list_datasets(self, *, room_id: str) -> list[dict[str, Any]]:
         with self.connection() as conn:

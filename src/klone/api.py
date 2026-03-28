@@ -10,7 +10,7 @@ from .blueprint import SYSTEM_BLUEPRINT
 from .config import Settings, settings
 from .contracts import APP_VERSION, MODULE_REGISTRY_VERSION, MemoryEpisodeType, MemoryStatus
 from .guards import access_guard, governance_guard_catalog, output_guard
-from .ingest import ingest_dataset
+from .ingest import ingest_dataset, preview_ingest_manifest
 from .memory import MemoryService
 from .repository import KloneRepository
 from .rooms import PERMISSION_LEVELS, room_registry
@@ -21,6 +21,7 @@ from .schemas import (
     DatasetRecord,
     GovernanceGuardRecord,
     IngestExecutionResponse,
+    IngestPreflightResponse,
     IngestStatusResponse,
     InternalRunRecord,
     MemoryEntityRecord,
@@ -589,6 +590,23 @@ def ingest_status(
         latest_run=recent_runs[0] if recent_runs else None,
         recent_runs=recent_runs,
     )
+
+
+@router.post("/ingest/preflight", response_model=IngestPreflightResponse)
+def ingest_preflight(
+    request: DatasetIngestRequest,
+    sample_limit: int = Query(default=12, ge=1, le=24),
+    repository: KloneRepository = Depends(get_repository),
+) -> IngestPreflightResponse:
+    try:
+        result = preview_ingest_manifest(repository, request, sample_limit=sample_limit)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except NotADirectoryError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except OSError as error:
+        raise HTTPException(status_code=500, detail=f"Ingest preflight failed: {error}") from error
+    return IngestPreflightResponse.model_validate(result)
 
 
 @router.get("/audit", response_model=list[AuditEventRecord])

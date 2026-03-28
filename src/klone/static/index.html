@@ -70,10 +70,12 @@
               <textarea name="description" rows="3" placeholder="What this dataset is and why it belongs here"></textarea>
             </label>
             <div class="form-actions">
+              <button class="button button-secondary" id="ingest-preview-button" type="button">Preview Manifest</button>
               <button class="button" type="submit">Scan Dataset</button>
               <span class="feedback" id="ingest-feedback">No ingest run started yet.</span>
             </div>
           </form>
+          <div id="ingest-preview" class="detail-card empty-state">Run a preflight preview to inspect the manifest before indexing.</div>
         </article>
 
         <article class="panel">

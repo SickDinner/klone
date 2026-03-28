@@ -125,6 +125,25 @@ class IngestRunRecord(BaseModel):
     summary: str | None = None
 
 
+class IngestManifestKindRecord(BaseModel):
+    asset_kind: AssetKind
+    count: int
+    total_size_bytes: int
+
+
+class IngestManifestSampleRecord(BaseModel):
+    relative_path: str
+    file_name: str
+    asset_kind: AssetKind
+    mime_type: str | None = None
+    size_bytes: int
+    planned_action: Literal["new", "updated", "unchanged"]
+    dedup_status: DedupStatus
+    canonical_asset_id: int | None = None
+    canonical_dataset_label: str | None = None
+    canonical_relative_path: str | None = None
+
+
 class AuditEventRecord(BaseModel):
     id: int
     event_type: str
@@ -377,6 +396,28 @@ class IngestExecutionResponse(BaseModel):
     dataset: DatasetRecord
     run: IngestRunRecord
     errors: list[str]
+
+
+class IngestPreflightResponse(BaseModel):
+    request: DatasetIngestRequest
+    normalized_root_path: str
+    room_id: str
+    room_label: str
+    existing_dataset_id: int | None = None
+    existing_dataset_slug: str | None = None
+    classification_guard: GuardResultRecord
+    access_guard: GuardResultRecord
+    can_start_ingest: bool
+    files_discovered: int
+    total_size_bytes: int
+    planned_new_assets: int
+    planned_updated_assets: int
+    planned_unchanged_assets: int
+    duplicates_detected: int
+    asset_kind_breakdown: list[IngestManifestKindRecord]
+    sample_limit: int
+    sample_assets: list[IngestManifestSampleRecord]
+    warnings: list[str]
 
 
 class MemoryEventRecord(BaseModel):

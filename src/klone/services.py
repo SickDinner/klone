@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 
 from .audit import AuditService
 from .blueprint import SYSTEM_BLUEPRINT
@@ -8,7 +9,7 @@ from .guards import governance_guard_catalog
 from .memory import MemoryService
 from .repository import KloneRepository
 from .rooms import room_registry
-from .schemas import ModuleCapabilityRecord, PublicCapabilityRecord, ServiceSeamRecord
+from .schemas import BlobMetadataRecord, ModuleCapabilityRecord, PublicCapabilityRecord, ServiceSeamRecord
 
 
 def module_registry_payload() -> list[ModuleCapabilityRecord]:
@@ -165,17 +166,121 @@ class PolicyService:
 
 
 class BlobService:
+    BLOB_ID_PREFIX = "blob:asset:"
+    STORAGE_KIND = "local_filesystem"
+
+    def __init__(self, repository: KloneRepository) -> None:
+        self.repository = repository
+
     def seam_descriptor(self) -> ServiceSeamRecord:
         return ServiceSeamRecord(
             id="blob-service",
             name="BlobService",
-            implementation="in_process_placeholder",
-            status="placeholder",
+            implementation="in_process_local_shell",
+            status="local_metadata_shell",
             notes=[
-                "No public blob route is exposed in A1.1.",
-                "This seam exists only to keep the future object/blob contract boundary explicit.",
+                "Projects the existing governed assets table into a local-first blob metadata shell.",
+                "Reuses existing /api/assets and /api/assets/{asset_id} read routes without adding a new /v1 blob route.",
+                "No public /v1 blobs upload or /v1/blobs/{blob_id}/meta route exists yet.",
             ],
         )
+
+    def public_capabilities(self) -> list[PublicCapabilityRecord]:
+        return [
+            PublicCapabilityRecord(
+                id="blob.metadata.list",
+                name="Blob Metadata List",
+                category="blob",
+                path="/api/assets",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=True,
+                status="available_via_asset_routes",
+                description="List local blob metadata through the existing governed asset index.",
+                backed_by=["BlobService", "PolicyService"],
+            ),
+            PublicCapabilityRecord(
+                id="blob.metadata.detail",
+                name="Blob Metadata Detail",
+                category="blob",
+                path="/api/assets/{asset_id}",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=True,
+                status="available_via_asset_routes",
+                description="Read a single local blob metadata record through the existing governed asset detail route.",
+                backed_by=["BlobService", "PolicyService"],
+            ),
+        ]
+
+    @classmethod
+    def blob_id_for_asset(cls, asset_id: int) -> str:
+        return f"{cls.BLOB_ID_PREFIX}{asset_id}"
+
+    @staticmethod
+    def linked_object_id_for_asset(asset_id: int) -> str:
+        return f"asset:{asset_id}"
+
+    @classmethod
+    def asset_id_from_blob_id(cls, blob_id: str) -> int:
+        if not blob_id.startswith(cls.BLOB_ID_PREFIX):
+            raise ValueError("Blob id must use the blob:asset:<id> format.")
+        asset_id_text = blob_id.removeprefix(cls.BLOB_ID_PREFIX)
+        if not asset_id_text.isdigit():
+            raise ValueError("Blob id must end with a numeric asset id.")
+        return int(asset_id_text)
+
+    def _record_from_asset_row(self, row: dict[str, object]) -> BlobMetadataRecord:
+        metadata_json = row.get("metadata_json")
+        metadata = json.loads(metadata_json) if isinstance(metadata_json, str) and metadata_json else None
+        canonical_asset_id = row.get("canonical_asset_id")
+        canonical_blob_id = (
+            self.blob_id_for_asset(int(canonical_asset_id))
+            if isinstance(canonical_asset_id, int)
+            else None
+        )
+        return BlobMetadataRecord(
+            blob_id=self.blob_id_for_asset(int(row["id"])),
+            asset_id=int(row["id"]),
+            linked_object_id=self.linked_object_id_for_asset(int(row["id"])),
+            dataset_id=int(row["dataset_id"]),
+            dataset_label=str(row["dataset_label"]),
+            room_id=str(row["room_id"]),
+            classification_level=str(row["classification_level"]),
+            asset_kind=str(row["asset_kind"]),
+            media_type=str(row["mime_type"] or "application/octet-stream"),
+            storage_kind=self.STORAGE_KIND,
+            size_bytes=int(row["size_bytes"]),
+            sha256=str(row["sha256"]),
+            dedup_status=str(row["dedup_status"]),
+            canonical_blob_id=canonical_blob_id,
+            file_name=str(row["file_name"]),
+            relative_path=str(row["relative_path"]),
+            indexed_at=str(row["indexed_at"]),
+            metadata=metadata,
+        )
+
+    def list_blob_metadata(
+        self,
+        *,
+        room_id: str,
+        dataset_id: int | None = None,
+        limit: int = 40,
+    ) -> list[BlobMetadataRecord]:
+        rows = self.repository.list_assets(room_id=room_id, dataset_id=dataset_id, limit=limit)
+        return [self._record_from_asset_row(row) for row in rows]
+
+    def get_blob_metadata(
+        self,
+        *,
+        blob_id: str,
+        room_id: str,
+    ) -> BlobMetadataRecord | None:
+        asset_id = self.asset_id_from_blob_id(blob_id)
+        row = self.repository.get_asset(asset_id, room_id=room_id)
+        if row is None:
+            return None
+        return self._record_from_asset_row(row)
 
 
 @dataclass(frozen=True)
@@ -191,7 +296,7 @@ class ServiceContainer:
             memory=MemoryFacade(repository),
             policy=PolicyService(),
             audit=AuditService(repository),
-            blob=BlobService(),
+            blob=BlobService(repository),
         )
 
     def seam_descriptors(self) -> list[ServiceSeamRecord]:
@@ -227,6 +332,7 @@ class ServiceContainer:
             ),
             *self.policy.public_capabilities(),
             *self.memory.public_capabilities(),
+            *self.blob.public_capabilities(),
             PublicCapabilityRecord(
                 id="audit.preview.read",
                 name="Audit Preview",
@@ -240,4 +346,3 @@ class ServiceContainer:
                 backed_by=["AuditService", "PolicyService"],
             ),
         ]
-

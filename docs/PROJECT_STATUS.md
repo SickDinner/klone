@@ -3,7 +3,7 @@
 Last updated: 2026-03-28
 
 ## Current phase
-Phase A1.2 complete; next-step selection in progress
+Phase A1.3 complete; next-step selection in progress
 
 ## Phase state
 - Phase 2B.1 complete
@@ -19,6 +19,7 @@ Phase A1.2 complete; next-step selection in progress
 - Phase A1 approved
 - Phase A1.1 complete
 - Phase A1.2 complete
+- Phase A1.3 complete
 
 ## Completed in 2B.5
 - stress verification for replay/correction/provenance/room isolation
@@ -88,8 +89,17 @@ Phase A1.2 complete; next-step selection in progress
 - full unittest suite green
 - local HTTP smoke green for audit-chain linkage
 
+## Completed in A1.3
+- local blob metadata shell projects governed asset rows into a stable read-only blob metadata record
+- BlobService exposes deterministic blob_id and linked_object_id mapping over existing asset rows
+- GET /v1/capabilities exposes blob metadata list/detail capability visibility via existing /api/assets routes
+- no new /v1 blob route added
+- focused A1.3 tests green
+- full unittest suite green
+- local HTTP smoke green for blob-service seam visibility
+
 ## Next approved substep
-- identify the next exact approved phase/substep after Phase A1.2 from verified repo evidence only
-- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, or A1.2 audit/contract-shell work
+- identify the next exact approved phase/substep after Phase A1.3 from verified repo evidence only
+- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, or A1.3 blob metadata shell work
 - do not add /v1 query/object/changes/blob mutation endpoints yet
 

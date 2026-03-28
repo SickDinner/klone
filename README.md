@@ -22,6 +22,7 @@ Nykyinen kanoninen tila on:
 - `Phase A1 approved`
 - `A1.1 public control-plane seam kickoff complete`
 - `A1.2 append-only audit chain foundation complete`
+- `A1.3 local blob metadata shell complete`
 
 Uutta tässä versiossa:
 
@@ -35,6 +36,10 @@ Uutta tässä versiossa:
   stable `object`, `query`, `change` ja `blob` contract shellit näkyvät nyt `/v1/capabilities`-vastauksessa
 - `append-only control-plane audit chain`
   `/v1/capabilities` kirjoittaa nyt deterministisen audit-ketjun `request_id`, `trace_id`, `principal` ja hash-linkityksen kanssa
+- `local blob metadata shell`
+  `BlobService` projisoi nyt olemassa olevat `assets`-rivit deterministisiksi `blob:asset:<id>` metadata-recordeiksi ilman uusia `/v1` blob-routeja
+- `blob capability mapping`
+  `/v1/capabilities` näyttää nyt, että nykyinen blob-shell nojaa olemassa oleviin `/api/assets`- ja `/api/assets/{asset_id}`-read-routeihin
 
 Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, joka näkyy käyttöliittymässä asti:
 
@@ -163,8 +168,8 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ## Seuraavat järkevät rakennusvaiheet
 
-1. Seuraava A1-alivaihe: valitse verified repo evidence -pohjalta seuraava pienin `/v1`-seam ilman write-surface wideningia.
-2. Memory Explorerin jatko A1.2:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
+1. Seuraava A1-alivaihe A1.3:n jälkeen: valitse verified repo evidence -pohjalta seuraava pienin `/v1`-seam ilman write-surface wideningia.
+2. Memory Explorerin jatko A1.3:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
 3. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
 4. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
 5. Constitution Layer: hitaasti muuttuvat parametrit, provenance ja change logit.

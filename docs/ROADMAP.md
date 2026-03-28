@@ -81,7 +81,7 @@ Public Control-Plane Skeleton:
 - versioned /v1 API shell inside the existing FastAPI app
 - request context with request_id / trace_id / principal placeholder
 - in-process service seams for MemoryFacade / PolicyService / AuditService / BlobService
-- initial sequence: A1.1 request-context + GET /v1/capabilities, then A1.2 append-only audit chain foundation
+- initial sequence: A1.1 request-context + GET /v1/capabilities, then A1.2 append-only audit chain foundation, then A1.3 local blob metadata shell via existing asset routes
 - stable object/query/changes/blob contracts
 - append-only audit chain reuse/extension
 - local blob metadata shell

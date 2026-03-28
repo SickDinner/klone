@@ -73,6 +73,27 @@ class AssetRecord(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
+class BlobMetadataRecord(BaseModel):
+    blob_id: str
+    asset_id: int
+    linked_object_id: str | None = None
+    dataset_id: int
+    dataset_label: str
+    room_id: str
+    classification_level: ClassificationLevel
+    asset_kind: AssetKind
+    media_type: str
+    storage_kind: str
+    size_bytes: int
+    sha256: str
+    dedup_status: DedupStatus
+    canonical_blob_id: str | None = None
+    file_name: str
+    relative_path: str
+    indexed_at: str
+    metadata: dict[str, Any] | None = None
+
+
 class IngestRunRecord(BaseModel):
     id: int
     dataset_id: int

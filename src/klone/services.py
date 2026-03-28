@@ -120,6 +120,18 @@ class MemoryFacade:
                 description="Generate a bounded source-linked answer without enabling memory mutation.",
                 backed_by=["MemoryFacade"],
             ),
+            PublicCapabilityRecord(
+                id="v1.query",
+                name="V1 Room Query",
+                category="query",
+                path="/v1/rooms/{room_id}/query",
+                methods=["POST"],
+                read_only=True,
+                room_scoped=True,
+                status="available",
+                description="Run deterministic room-scoped memory event or episode queries through the versioned public control-plane seam.",
+                backed_by=["MemoryFacade", "PolicyService", "AuditService"],
+            ),
         ]
 
 

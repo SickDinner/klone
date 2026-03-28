@@ -16,6 +16,8 @@ from .schemas import (
     PublicCapabilitiesResponse,
     PublicObjectGetRequest,
     PublicObjectGetResponse,
+    PublicQueryRequest,
+    PublicQueryResponse,
     RequestContextRecord,
 )
 from .services import ServiceContainer, module_registry_payload
@@ -59,6 +61,14 @@ def _sanitize_object_envelope(envelope: ObjectEnvelopeRecord) -> ObjectEnvelopeR
     else:
         raise HTTPException(status_code=400, detail="Unsupported object kind for public object get.")
     return envelope.model_copy(update={"record": sanitized_record})
+
+
+def _require_matching_request_id(*, payload_request_id: str, request_context: RequestContext) -> None:
+    if payload_request_id != request_context.request_id:
+        raise HTTPException(
+            status_code=400,
+            detail="payload.request_id must match the active request context request_id.",
+        )
 
 
 @router.get("/capabilities", response_model=PublicCapabilitiesResponse)
@@ -175,6 +185,107 @@ def object_get(
                 "room_id": room_id,
                 "object_id": payload.object_id,
                 "result": "invalid_object_id",
+                "detail": str(error),
+            },
+        )
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post("/rooms/{room_id}/query", response_model=PublicQueryResponse)
+def query(
+    room_id: str,
+    payload: PublicQueryRequest,
+    services: ServiceContainer = Depends(get_service_container),
+    request_context: RequestContext = Depends(get_request_context),
+) -> PublicQueryResponse:
+    route_path = f"/v1/rooms/{room_id}/query"
+    try:
+        _require_room_read(room_id=room_id, actor_role=request_context.actor_role)
+        _require_matching_request_id(
+            payload_request_id=payload.request_id,
+            request_context=request_context,
+        )
+        if payload.query_kind != "object.envelopes.list":
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported query_kind. The public query seam currently supports only 'object.envelopes.list'.",
+            )
+        object_kind = str(payload.filters.get("object_kind", "")).strip()
+        if not object_kind:
+            raise HTTPException(
+                status_code=400,
+                detail="filters.object_kind is required for the public query seam.",
+            )
+        items, next_cursor = services.object_envelope.query_object_envelopes(
+            room_id=room_id,
+            object_kind=object_kind,
+            limit=payload.limit,
+            cursor=payload.cursor,
+        )
+        sanitized_items = [_sanitize_object_envelope(item) for item in items]
+        response = PublicQueryResponse(
+            api_version="v1",
+            request_context=RequestContextRecord(
+                request_id=request_context.request_id,
+                trace_id=request_context.trace_id,
+                principal=request_context.principal,
+                actor_role=request_context.actor_role,
+            ),
+            room_id=room_id,
+            query_id=payload.query_id,
+            query_kind=payload.query_kind,
+            applied_filters={"object_kind": object_kind},
+            cursor=payload.cursor,
+            next_cursor=next_cursor,
+            items=sanitized_items,
+        )
+        services.audit.log_control_plane_event(
+            event_type="v1_query_read",
+            route_path=route_path,
+            request_context=request_context,
+            status_code=200,
+            summary="Read a room-scoped public query page.",
+            metadata={
+                "room_id": room_id,
+                "query_id": payload.query_id,
+                "query_kind": payload.query_kind,
+                "object_kind": object_kind,
+                "result_count": len(sanitized_items),
+                "cursor": payload.cursor,
+                "next_cursor": next_cursor,
+            },
+        )
+        return response
+    except HTTPException as error:
+        services.audit.log_control_plane_event(
+            event_type="v1_query_read",
+            route_path=route_path,
+            request_context=request_context,
+            status_code=error.status_code,
+            summary="Blocked or invalid public room-scoped query.",
+            metadata={
+                "room_id": room_id,
+                "query_id": payload.query_id,
+                "query_kind": payload.query_kind,
+                "cursor": payload.cursor,
+                "result": "error",
+                "detail": error.detail,
+            },
+        )
+        raise
+    except ValueError as error:
+        services.audit.log_control_plane_event(
+            event_type="v1_query_read",
+            route_path=route_path,
+            request_context=request_context,
+            status_code=400,
+            summary="Rejected invalid public room-scoped query.",
+            metadata={
+                "room_id": room_id,
+                "query_id": payload.query_id,
+                "query_kind": payload.query_kind,
+                "cursor": payload.cursor,
+                "result": "invalid_query",
                 "detail": str(error),
             },
         )

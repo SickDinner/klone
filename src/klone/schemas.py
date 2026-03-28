@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -257,6 +257,32 @@ class PublicObjectGetResponse(BaseModel):
     request_context: RequestContextRecord
     room_id: str
     object: ObjectEnvelopeRecord
+
+
+class PublicQueryRequest(BaseModel):
+    query_kind: Literal["memory_events", "memory_episodes"]
+    limit: int = Field(default=50, ge=1, le=200)
+    offset: int = Field(default=0, ge=0)
+    status: MemoryStatus | None = None
+    event_type: str | None = Field(default=None, min_length=1)
+    episode_type: MemoryEpisodeType | None = None
+    ingest_run_id: int | None = Field(default=None, ge=1)
+    include_corrected: bool = True
+
+
+class PublicQueryResponse(BaseModel):
+    api_version: str
+    request_context: RequestContextRecord
+    room_id: str
+    query_id: str
+    query_kind: Literal["memory_events", "memory_episodes"]
+    read_only: bool = True
+    limit: int
+    offset: int
+    result_count: int
+    filters: dict[str, Any]
+    backing_routes: list[str]
+    results: list[dict[str, Any]]
 
 
 class PublicQueryRequest(BaseModel):

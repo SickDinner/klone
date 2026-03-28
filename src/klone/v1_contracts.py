@@ -88,7 +88,7 @@ def contract_registry_payload() -> list[PublicContractRecord]:
             category="query",
             status="contract_shell",
             route_readiness="public_read_only_query_available",
-            description="Stable query envelope for future public read flows without committing to search semantics.",
+            description="Stable read-only query envelope for deterministic public room-scoped list flows without committing to search semantics.",
             notes=[
                 "Does not imply semantic search, embeddings, or fuzzy matching.",
                 "The shell exists to keep query inputs deterministic and auditable.",
@@ -96,8 +96,6 @@ def contract_registry_payload() -> list[PublicContractRecord]:
             ],
             backing_routes=[
                 "/v1/rooms/{room_id}/query",
-                "/api/datasets",
-                "/api/assets",
                 "/api/memory/events",
                 "/api/memory/episodes",
             ],
@@ -130,7 +128,7 @@ def contract_registry_payload() -> list[PublicContractRecord]:
                     name="cursor",
                     field_type="string",
                     required=False,
-                    description="Pagination or traversal continuation token.",
+                    description="Reserved continuation token field; the current public query route uses deterministic limit/offset pagination.",
                 ),
                 ContractFieldRecord(
                     name="limit",

@@ -114,7 +114,7 @@ def contract_registry_payload() -> list[PublicContractRecord]:
             description="Append-only change envelope intended to align future public change surfaces with audit reuse.",
             notes=[
                 "This shell is append-only by design and should reuse audit lineage rather than overwrite history.",
-                "No public /v1 changes route exists in A1.2.",
+                "No public /v1 changes route exists yet.",
             ],
             fields=[
                 ContractFieldRecord(

@@ -101,6 +101,9 @@ class ObjectEnvelopeRecord(BaseModel):
     classification_level: ClassificationLevel
     version: int
     summary: str | None = None
+    read_only: bool = True
+    backing_routes: list[str]
+    record: dict[str, Any]
 
 
 class IngestRunRecord(BaseModel):

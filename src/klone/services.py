@@ -289,74 +289,62 @@ class BlobService:
         return self._record_from_asset_row(row)
 
 
-class ObjectEnvelopeService:
+class _ObjectEnvelopeProjector:
     VERSION = 1
 
     def __init__(self, repository: KloneRepository) -> None:
         self.repository = repository
         self.memory_service = MemoryService(repository)
 
-    def seam_descriptor(self) -> ServiceSeamRecord:
-        return ServiceSeamRecord(
-            id="object-envelope-service",
-            name="ObjectEnvelopeService",
-            implementation="in_process_local_shell",
-            status="local_envelope_shell",
-            notes=[
-                "Projects existing governed dataset, asset, memory event, and memory episode reads into a deterministic local object envelope shell.",
-                "Reuses existing read routes and does not add a public /v1 object route.",
-            ],
-        )
-
     def public_capabilities(self) -> list[PublicCapabilityRecord]:
         return [
             PublicCapabilityRecord(
                 id="object.envelope.dataset",
                 name="Dataset Object Envelope",
-                category="object_shell",
+                category="object",
                 path="/api/datasets",
                 methods=["GET"],
                 read_only=True,
                 room_scoped=True,
                 status="available_via_existing_read_routes",
                 description="Project governed dataset rows into the local object envelope shell.",
-                backed_by=["ObjectEnvelopeService", "PolicyService"],
+                backed_by=["PolicyService"],
             ),
             PublicCapabilityRecord(
                 id="object.envelope.asset",
                 name="Asset Object Envelope",
-                category="object_shell",
+                category="object",
                 path="/api/assets",
                 methods=["GET"],
                 read_only=True,
                 room_scoped=True,
                 status="available_via_existing_read_routes",
                 description="Project governed asset rows into the local object envelope shell.",
-                backed_by=["ObjectEnvelopeService", "PolicyService"],
+                backed_by=["BlobService", "PolicyService"],
             ),
             PublicCapabilityRecord(
                 id="object.envelope.memory_event",
                 name="Memory Event Object Envelope",
-                category="object_shell",
+                category="object",
                 path="/api/memory/events",
                 methods=["GET"],
                 read_only=True,
                 room_scoped=True,
                 status="available_via_existing_read_routes",
                 description="Project governed memory event rows into the local object envelope shell.",
-                backed_by=["ObjectEnvelopeService", "MemoryFacade"],
+                backed_by=["MemoryFacade"],
             ),
             PublicCapabilityRecord(
                 id="object.envelope.memory_episode",
                 name="Memory Episode Object Envelope",
-                category="object_shell",
+                category="object",
                 path="/api/memory/episodes",
                 methods=["GET"],
                 read_only=True,
                 room_scoped=True,
                 status="available_via_existing_read_routes",
                 description="Project governed memory episode rows into the local object envelope shell.",
-                backed_by=["ObjectEnvelopeService", "MemoryFacade"],
+                backed_by=["MemoryFacade"],
             ),
         ]
 
@@ -370,6 +358,8 @@ class ObjectEnvelopeService:
                 classification_level=str(row["classification_level"]),
                 version=self.VERSION,
                 summary=str(row["label"]),
+                backing_routes=["/api/datasets"],
+                record=dict(row),
             )
             for row in rows
         ]
@@ -390,6 +380,8 @@ class ObjectEnvelopeService:
                 classification_level=str(row["classification_level"]),
                 version=self.VERSION,
                 summary=str(row["relative_path"]),
+                backing_routes=["/api/assets", "/api/assets/{asset_id}"],
+                record=dict(row),
             )
             for row in rows
         ]
@@ -416,6 +408,8 @@ class ObjectEnvelopeService:
                 classification_level=str(row["classification_level"]),
                 version=self.VERSION,
                 summary=str(row["title"]),
+                backing_routes=["/api/memory/events", "/api/memory/events/{event_id}"],
+                record=dict(row),
             )
             for row in rows
         ]
@@ -442,6 +436,8 @@ class ObjectEnvelopeService:
                 classification_level=str(row["classification_level"]),
                 version=self.VERSION,
                 summary=str(row["title"]),
+                backing_routes=["/api/memory/episodes", "/api/memory/episodes/{episode_id}"],
+                record=dict(row),
             )
             for row in rows
         ]
@@ -453,7 +449,7 @@ class ServiceContainer:
     policy: PolicyService
     audit: AuditService
     blob: BlobService
-    object_envelope: ObjectEnvelopeService
+    object_envelope: _ObjectEnvelopeProjector
 
     @classmethod
     def build(cls, repository: KloneRepository) -> "ServiceContainer":
@@ -462,7 +458,7 @@ class ServiceContainer:
             policy=PolicyService(),
             audit=AuditService(repository),
             blob=BlobService(repository),
-            object_envelope=ObjectEnvelopeService(repository),
+            object_envelope=_ObjectEnvelopeProjector(repository),
         )
 
     def seam_descriptors(self) -> list[ServiceSeamRecord]:
@@ -480,7 +476,6 @@ class ServiceContainer:
                 ],
             ),
             self.blob.seam_descriptor(),
-            self.object_envelope.seam_descriptor(),
         ]
 
     def public_capabilities(self) -> list[PublicCapabilityRecord]:

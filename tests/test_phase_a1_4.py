@@ -74,12 +74,27 @@ class PhaseA14Tests(unittest.TestCase):
 
         self.assertEqual(dataset_envelopes[0].object_kind, "dataset")
         self.assertTrue(dataset_envelopes[0].object_id.startswith("dataset:"))
+        self.assertTrue(dataset_envelopes[0].read_only)
+        self.assertEqual(dataset_envelopes[0].backing_routes, ["/api/datasets"])
+        self.assertEqual(dataset_envelopes[0].record["label"], "Object Shell Fixture")
         self.assertEqual(asset_envelopes[0].object_kind, "asset")
         self.assertTrue(asset_envelopes[0].object_id.startswith("asset:"))
+        self.assertEqual(asset_envelopes[0].backing_routes, ["/api/assets", "/api/assets/{asset_id}"])
+        self.assertEqual(asset_envelopes[0].record["relative_path"], "note.txt")
         self.assertEqual(event_envelopes[0].object_kind, "memory_event")
         self.assertTrue(event_envelopes[0].object_id.startswith("memory_event:"))
+        self.assertEqual(
+            event_envelopes[0].backing_routes,
+            ["/api/memory/events", "/api/memory/events/{event_id}"],
+        )
+        self.assertIn("title", event_envelopes[0].record)
         self.assertEqual(episode_envelopes[0].object_kind, "memory_episode")
         self.assertTrue(episode_envelopes[0].object_id.startswith("memory_episode:"))
+        self.assertEqual(
+            episode_envelopes[0].backing_routes,
+            ["/api/memory/episodes", "/api/memory/episodes/{episode_id}"],
+        )
+        self.assertIn("title", episode_envelopes[0].record)
 
     def test_v1_capabilities_exposes_object_shell_readiness_without_new_v1_route(self) -> None:
         app = create_app(self._settings_for("phase_a1_4_app.sqlite"))

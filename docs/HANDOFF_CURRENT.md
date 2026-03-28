@@ -3,7 +3,7 @@
 Last updated: 2026-03-28
 
 ## Current approved phase
-Post-A1.3 closeout / next-step selection
+Phase A1 closeout complete / awaiting next approved phase
 
 ## Baseline
 - 2B.1 through 2B.5 complete
@@ -14,12 +14,12 @@ Post-A1.3 closeout / next-step selection
 - A1.3 local blob metadata shell exists in repo reality without adding a new /v1 blob route
 
 ## Immediate goal
-Phase A1.3 is complete. Identify the next exact approved phase/substep from verified repo evidence only.
-Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, or A1.3 blob metadata shell work.
+Phase A1 is fully closed. No further approved post-A1 substep is enumerated in repo evidence.
+Await explicit roadmap extension or approval before widening the control plane. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, or A1.3 blob metadata shell work.
 
 ## Approved scope
-- canonical docs closeout after completed Phase A1.3
-- next-step selection from verified repo evidence only
+- canonical docs closeout after completed Phase A1
+- verified confirmation that no further post-A1 approved substep is currently defined
 - duplicate-work prevention
 - no unrelated runtime behavior
 - no unrelated API widening

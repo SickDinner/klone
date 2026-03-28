@@ -183,6 +183,7 @@ class PhaseA17Tests(unittest.TestCase):
             v1_routes,
             {
                 "/v1/capabilities": ["GET"],
+                "/v1/rooms/{room_id}/changes": ["GET"],
                 "/v1/rooms/{room_id}/blobs/{blob_id}/meta": ["GET"],
                 "/v1/rooms/{room_id}/objects/get": ["POST"],
                 "/v1/rooms/{room_id}/query": ["POST"],

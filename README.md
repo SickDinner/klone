@@ -28,6 +28,7 @@ Nykyinen kanoninen tila on:
 - `A1.6 public room-scoped query shell complete`
 - `A1.7 public room-scoped blob metadata detail complete`
 - `A1.8 public room-scoped audit preview query kind complete`
+- `A1.9 public room-scoped change preview seam complete`
 - `G1.1 read-only ingest preflight manifest complete`
 - `G1.2 bounded ingest run manifest history complete`
 - `G1.3 local ingest queue shell complete`
@@ -60,6 +61,8 @@ Uutta tässä versiossa:
   `GET /v1/rooms/{room_id}/blobs/{blob_id}/meta` lukee nyt yhden deterministisen asset-backed `blob_id`-metadatarecordin versionoidun public control-plane seamin kautta ilman upload- tai mutation-surfacea
 - `audit preview query extension`
   `audit_preview` reuseaa olemassa olevan `/api/audit`-previewn, säilyttää deterministisen limit/offset-käytöksen ja rajaa filttereiksi vain `event_type` ja `target_type`
+- `public room-scoped change preview`
+  `GET /v1/rooms/{room_id}/changes` projisoi nyt deterministiset read-only change-preview-rivit olemassa olevan room-scoped `/api/audit`-previewn päälle ilman write-surfacea tai change-detail-routea
 - `ingest preflight manifest`
   `POST /api/ingest/preflight` näyttää nyt ennen varsinaista scania normalisoidun root-polun, room/guard-päätökset, asset-kind-jakauman, planned new/updated/unchanged -laskurit, duplicate-ehdokkaat ja sample-assetit ilman write-sivuvaikutuksia
 - `mission control preview flow`
@@ -202,6 +205,7 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 - `GET /api/memory/context/payload`
 - `GET /api/memory/context/answer`
 - `GET /v1/capabilities`
+- `GET /v1/rooms/{room_id}/changes`
 - `GET /v1/rooms/{room_id}/blobs/{blob_id}/meta`
 - `POST /v1/rooms/{room_id}/objects/get`
 - `POST /v1/rooms/{room_id}/query`
@@ -210,9 +214,9 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ## Seuraavat järkevät rakennusvaiheet
 
-1. Seuraava G1-vaihe: resumable ingest queue vasta kun se hyväksytään erikseen kanonisissa docs-tiedostoissa.
-2. Memory Explorerin jatko A1.8:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
+1. Seuraava post-A1/G1-vaihe vasta erillisellä hyväksynnällä kanonisissa docs-tiedostoissa.
+2. Memory Explorerin jatko A1.9:n jälkeen: provenance-UX, change-preview-linkitys, kontekstin parempi visualisointi ja selaintason smoke-testit.
 3. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
 4. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
 5. Constitution Layer: hitaasti muuttuvat parametrit, provenance ja change logit.
-6. Syvempi ingest: OCR, transkriptio, extraction pipeline -tilat ja parempi dedup.
+6. Syvempi ingest: OCR, transkriptio, extraction pipeline -tilat ja parempi dedup, mutta ei ennen erillistä G1.4-hyväksyntää.

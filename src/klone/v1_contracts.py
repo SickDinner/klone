@@ -150,11 +150,16 @@ def contract_registry_payload() -> list[PublicContractRecord]:
             name="Change Shell",
             category="changes",
             status="contract_shell",
-            route_readiness="no_public_route_yet",
-            description="Append-only change envelope intended to align future public change surfaces with audit reuse.",
+            route_readiness="public_read_only_changes_available",
+            description="Append-only change preview envelope projected from existing room-scoped audit rows without introducing a write surface.",
             notes=[
                 "This shell is append-only by design and should reuse audit lineage rather than overwrite history.",
-                "No public /v1 changes route exists yet.",
+                "GET /v1/rooms/{room_id}/changes is the first public read-only change preview route.",
+                "Current change rows are deterministic preview projections over the existing room-scoped audit preview surface.",
+            ],
+            backing_routes=[
+                "/v1/rooms/{room_id}/changes",
+                "/api/audit",
             ],
             fields=[
                 ContractFieldRecord(
@@ -179,7 +184,7 @@ def contract_registry_payload() -> list[PublicContractRecord]:
                     name="trace_id",
                     field_type="string",
                     required=True,
-                    description="Trace identifier linking the change to request context and audit.",
+                    description="Deterministic preview trace identifier derived from the backing audit row.",
                 ),
                 ContractFieldRecord(
                     name="recorded_at",
@@ -192,6 +197,12 @@ def contract_registry_payload() -> list[PublicContractRecord]:
                     field_type="string",
                     required=True,
                     description="Actor or principal placeholder associated with the change.",
+                ),
+                ContractFieldRecord(
+                    name="summary",
+                    field_type="string",
+                    required=True,
+                    description="Bounded preview-safe summary for the projected change row.",
                 ),
             ],
         ),

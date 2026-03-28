@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .api import (
     _audit_event_from_row,
@@ -17,6 +17,8 @@ from .rooms import room_registry
 from .schemas import (
     ObjectEnvelopeRecord,
     PublicBlobGetResponse,
+    PublicChangePreviewRecord,
+    PublicChangePreviewResponse,
     PublicCapabilitiesResponse,
     PublicObjectGetRequest,
     PublicObjectGetResponse,
@@ -86,6 +88,24 @@ def _normalize_public_query_filters(payload: PublicQueryRequest) -> dict[str, ob
         if payload.target_type is not None:
             filters["target_type"] = payload.target_type
     return filters
+
+
+def _change_preview_from_audit_row(row: dict[str, object]) -> PublicChangePreviewRecord:
+    audit_event = _audit_event_from_row(row)
+    object_id = (
+        f"{audit_event.target_type}:{audit_event.target_id}"
+        if audit_event.target_id is not None
+        else f"{audit_event.target_type}:unknown"
+    )
+    return PublicChangePreviewRecord(
+        change_id=f"change:audit:{audit_event.id}",
+        object_id=object_id,
+        change_kind=audit_event.event_type,
+        trace_id=f"trace:audit:{audit_event.id}",
+        recorded_at=audit_event.created_at,
+        actor=audit_event.actor,
+        summary=audit_event.summary,
+    )
 
 
 @router.get("/capabilities", response_model=PublicCapabilitiesResponse)
@@ -201,6 +221,92 @@ def blob_meta(
             },
         )
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.get("/rooms/{room_id}/changes", response_model=PublicChangePreviewResponse)
+def changes(
+    room_id: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    event_type: str | None = Query(default=None, min_length=1),
+    target_type: str | None = Query(default=None, min_length=1),
+    services: ServiceContainer = Depends(get_service_container),
+    request_context: RequestContext = Depends(get_request_context),
+) -> PublicChangePreviewResponse:
+    route_path = f"/v1/rooms/{room_id}/changes"
+    filters = {
+        key: value
+        for key, value in {
+            "event_type": event_type,
+            "target_type": target_type,
+        }.items()
+        if value is not None
+    }
+    try:
+        _require_room_permission(
+            room_id=room_id,
+            actor_role=request_context.actor_role,
+            permission="summarize",
+        )
+        rows = services.audit.repository.list_audit_events(
+            room_id=room_id,
+            limit=limit,
+            offset=offset,
+            event_type=event_type,
+            target_type=target_type,
+        )
+        changes_payload = [
+            _change_preview_from_audit_row(dict(row))
+            for row in rows
+        ]
+        response = PublicChangePreviewResponse(
+            api_version="v1",
+            request_context=RequestContextRecord(
+                request_id=request_context.request_id,
+                trace_id=request_context.trace_id,
+                principal=request_context.principal,
+                actor_role=request_context.actor_role,
+            ),
+            room_id=room_id,
+            limit=limit,
+            offset=offset,
+            result_count=len(changes_payload),
+            filters=filters,
+            backing_routes=["/api/audit"],
+            changes=changes_payload,
+        )
+        services.audit.log_control_plane_event(
+            event_type="v1_changes_read",
+            route_path=route_path,
+            request_context=request_context,
+            status_code=200,
+            summary="Read room-scoped public change preview rows.",
+            metadata={
+                "room_id": room_id,
+                "result_count": len(changes_payload),
+                "limit": limit,
+                "offset": offset,
+                "filters": filters,
+            },
+        )
+        return response
+    except HTTPException as error:
+        services.audit.log_control_plane_event(
+            event_type="v1_changes_read",
+            route_path=route_path,
+            request_context=request_context,
+            status_code=error.status_code,
+            summary="Blocked or invalid public room-scoped change preview read.",
+            metadata={
+                "room_id": room_id,
+                "limit": limit,
+                "offset": offset,
+                "filters": filters,
+                "result": "error",
+                "detail": error.detail,
+            },
+        )
+        raise
 
 
 @router.post("/rooms/{room_id}/objects/get", response_model=PublicObjectGetResponse)

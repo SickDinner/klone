@@ -134,6 +134,16 @@ Public Room-Scoped Audit Preview Query Kind:
 - append-only control-plane audit chaining reused for the query extension
 - no new /v1 route, no semantic search, no embeddings, no fuzzy matching, and no changes/write surface
 
+## Phase A1.9
+Public Room-Scoped Change Preview Seam:
+- GET /v1/rooms/{room_id}/changes only
+- read-only change preview only
+- backed by the existing deterministic room-scoped /api/audit preview surface
+- preserve deterministic limit/offset pagination and bounded event_type/target_type filtering
+- summarize permission only; do not widen room read behavior
+- append-only control-plane audit chaining reused for the new route
+- no write surface, no change detail route, no semantic search, no embeddings, and no fuzzy matching
+
 ## Phase G1
 Governed Ingest Spine:
 - make ingest visible before writes rather than treating scan as a blind submit
@@ -175,7 +185,6 @@ Local Ingest Queue Shell:
 - no resumable interruption state, no background workers, and no startup auto-resume in this phase
 
 ## Not approved yet
-- A1.9 public room-scoped change preview seam
 - G1.4 resumable ingest queue
 - semantic search
 - embeddings

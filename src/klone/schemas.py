@@ -336,6 +336,29 @@ class PublicQueryResponse(BaseModel):
     results: list[dict[str, Any]]
 
 
+class PublicChangePreviewRecord(BaseModel):
+    change_id: str
+    object_id: str
+    change_kind: str
+    trace_id: str
+    recorded_at: str
+    actor: str
+    summary: str
+
+
+class PublicChangePreviewResponse(BaseModel):
+    api_version: str
+    request_context: RequestContextRecord
+    room_id: str
+    read_only: bool = True
+    limit: int
+    offset: int
+    result_count: int
+    filters: dict[str, Any]
+    backing_routes: list[str]
+    changes: list[PublicChangePreviewRecord]
+
+
 class ServiceSeamRecord(BaseModel):
     id: str
     name: str

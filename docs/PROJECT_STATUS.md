@@ -3,7 +3,7 @@
 Last updated: 2026-03-28
 
 ## Current phase
-Phase G1.3 complete; no further approved G1 substep is defined yet
+Phase A1.9 complete; no further approved A1 or G1 substep is defined yet
 
 ## Phase state
 - Phase 2B.1 complete
@@ -26,6 +26,7 @@ Phase G1.3 complete; no further approved G1 substep is defined yet
 - Phase A1.6 complete
 - Phase A1.7 complete
 - Phase A1.8 complete
+- Phase A1.9 complete
 - Phase G1 approved
 - Phase G1.1 complete
 - Phase G1.2 complete
@@ -162,6 +163,18 @@ Phase G1.3 complete; no further approved G1 substep is defined yet
 - full unittest suite green
 - compile pass green
 
+## Completed in A1.9
+- first public room-scoped change preview seam
+- GET /v1/rooms/{room_id}/changes only
+- change preview is backed by the existing deterministic room-scoped /api/audit preview surface
+- deterministic limit/offset pagination preserved for change preview reads
+- bounded event_type and target_type filtering exposed for change preview reads
+- summarize permission only; no room-read widening for change preview
+- change-shell contract and capability copy updated to reflect public read-only change preview availability
+- focused A1.9 tests green
+- full unittest suite green
+- compile pass green
+
 ## Completed in G1.1
 - first governed ingest preflight manifest surface
 - POST /api/ingest/preflight reuses the existing DatasetIngestRequest shape
@@ -196,7 +209,7 @@ Phase G1.3 complete; no further approved G1 substep is defined yet
 - compile pass green
 
 ## Next approved substep
-- no further approved G1 substep is enumerated in canonical repo evidence
-- require explicit roadmap extension or approval before widening the ingest spine beyond the completed G1.3 local queue shell
+- no further approved A1 or G1 substep is enumerated in canonical repo evidence
+- require explicit roadmap extension or approval before widening the public control-plane seam beyond the completed A1.9 change preview route or the ingest spine beyond the completed G1.3 local queue shell
 - do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, G1.1 preflight manifest work, G1.2 manifest history work, or G1.3 local queue shell work
 

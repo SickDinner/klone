@@ -739,4 +739,16 @@ class ServiceContainer:
                 description="Read bounded audit preview rows through the existing governed API.",
                 backed_by=["AuditService", "PolicyService"],
             ),
+            PublicCapabilityRecord(
+                id="v1.changes.read",
+                name="V1 Room Change Preview",
+                category="changes",
+                path="/v1/rooms/{room_id}/changes",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=True,
+                status="available",
+                description="Read deterministic room-scoped change preview rows through the versioned public control-plane seam.",
+                backed_by=["AuditService", "PolicyService"],
+            ),
         ]

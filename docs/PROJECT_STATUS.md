@@ -3,7 +3,7 @@
 Last updated: 2026-03-29
 
 ## Current phase
-Phase A1.9 and G1.4 complete; no further approved A1 or G1 substep is defined yet
+Phase G1.5 approved; implementation pending
 
 ## Phase state
 - Phase 2B.1 complete
@@ -32,6 +32,7 @@ Phase A1.9 and G1.4 complete; no further approved A1 or G1 substep is defined ye
 - Phase G1.2 complete
 - Phase G1.3 complete
 - Phase G1.4 complete
+- Phase G1.5 approved
 
 ## Completed in 2B.5
 - stress verification for replay/correction/provenance/room isolation
@@ -222,8 +223,17 @@ Phase A1.9 and G1.4 complete; no further approved A1 or G1 substep is defined ye
 - full unittest suite green
 - compile pass green
 
+## Approved for G1.5
+- one bounded room-scoped ingest queue history/detail read surface
+- reuse existing `ingest_queue_jobs`, append-only `audit_events`, and linked ingest run / manifest references only
+- expose interrupted, reused, completed, failed, and cancelled lifecycle visibility when present
+- keep queue execution semantics unchanged
+- no new queue states, no worker daemon, no automatic resume, and no startup auto-execution
+
 ## Next approved substep
-- no further approved A1 or G1 substep is enumerated in canonical repo evidence
-- require explicit roadmap extension or approval before widening the public control-plane seam beyond the completed A1.9 change preview route or the ingest spine beyond the completed G1.4 local resumable queue shell
-- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, or G1.4 local resumable queue work
+- Phase G1.5 approved: bounded ingest queue history seam
+- add one bounded room-scoped queue job history/detail read surface at `GET /api/ingest/queue/{job_id}/history`
+- reuse existing `ingest_queue_jobs`, append-only `audit_events`, and linked ingest run / manifest references only
+- keep queue execution semantics unchanged; no new workers, no automatic resume, no startup auto-execute, and no `/v1` widening
+- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, or G1.4 local resumable queue work
 

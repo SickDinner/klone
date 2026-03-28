@@ -33,6 +33,7 @@ Nykyinen kanoninen tila on:
 - `G1.2 bounded ingest run manifest history complete`
 - `G1.3 local ingest queue shell complete`
 - `G1.4 local resumable ingest queue complete`
+- `G1.5 bounded ingest queue history seam approved`
 
 Uutta tässä versiossa:
 
@@ -217,7 +218,7 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ## Seuraavat järkevät rakennusvaiheet
 
-1. Seuraava post-A1/G1-vaihe vasta erillisellä hyväksynnällä kanonisissa docs-tiedostoissa.
+1. Toteuta `G1.5 bounded ingest queue history seam` kanonisten docsien rajojen sisällä ennen uusia ingest-laajennuksia.
 2. Memory Explorerin jatko A1.9:n jälkeen: provenance-UX, change-preview-linkitys, kontekstin parempi visualisointi ja selaintason smoke-testit.
 3. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
 4. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.

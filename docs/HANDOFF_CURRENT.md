@@ -3,7 +3,7 @@
 Last updated: 2026-03-29
 
 ## Current approved phase
-Phase A1.9 and G1.4 closeout complete / awaiting next approved phase
+Phase G1.5: Bounded Ingest Queue History Seam
 
 ## Baseline
 - 2B.1 through 2B.5 complete
@@ -25,12 +25,12 @@ Phase A1.9 and G1.4 closeout complete / awaiting next approved phase
 - G1.4 local resumable ingest queue exists in repo reality
 
 ## Immediate goal
-Phase A1.9 and G1.4 are complete. No further approved A1 or G1 substep is enumerated in canonical repo evidence.
-Await explicit roadmap extension or approval before widening the public control-plane seam or the ingest spine. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local ingest queue shell work, or G1.4 local resumable queue work.
+Phase G1.5 is the next approved ingest step. Implement one bounded room-scoped queue job history/detail read surface at `GET /api/ingest/queue/{job_id}/history`, backed only by existing `ingest_queue_jobs`, append-only `audit_events`, and linked ingest run / manifest references.
+Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local ingest queue shell work, or G1.4 local resumable queue work.
 
 ## Approved scope
-- canonical docs closeout after completed Phase G1.4
-- verified confirmation that no further post-A1.9 or post-G1.4 approved substep is currently defined
+- one bounded room-scoped queue history/detail read surface at `GET /api/ingest/queue/{job_id}/history`
+- reuse existing `ingest_queue_jobs`, append-only `audit_events`, and linked ingest run / manifest references only
 - duplicate-work prevention
 - no unrelated runtime behavior
 - no unrelated API widening
@@ -42,9 +42,13 @@ Await explicit roadmap extension or approval before widening the public control-
 - do not regress the completed local ingest queue shell at `/api/ingest/queue`
 - do not regress the completed explicit queue execution shell at `/api/ingest/queue/{job_id}/execute`
 - do not regress the completed explicit queue cancellation shell at `/api/ingest/queue/{job_id}/cancel`
+- do not regress the completed room-scoped change preview seam at `/v1/rooms/{room_id}/changes`
 - do not regress startup recovery that marks orphaned queue jobs as `interrupted`
 - do not regress interrupted job reuse on POST `/api/ingest/queue` for the same room/root path
 - do not regress manual resume behavior for `interrupted` queue jobs through the existing execute route
+- do not add new queue states
+- do not add background workers, scheduler behavior, or distributed queue orchestration
+- do not add automatic retry, automatic resume, or startup auto-execute behavior
 - do not modify evidence_text
 - do not add public write endpoints
 - do not add semantic search
@@ -63,9 +67,7 @@ Await explicit roadmap extension or approval before widening the public control-
 - do not regress the public room-scoped read-only query seam at `/v1/rooms/{room_id}/query`
 - do not regress the completed `audit_preview` query kind on `/v1/rooms/{room_id}/query`
 - do not regress the public room-scoped read-only change preview seam at `/v1/rooms/{room_id}/changes`
-- do not add async queue workers or distributed queue orchestration without a new approved phase
-- do not widen manifest history into full file-by-file archival or background processing without a new approved phase
-- do not widen startup recovery into automatic queue execution without a new approved phase
+- do not widen queue history into full file-by-file archival or background processing without a new approved phase
 - do not add semantic search, fuzzy matching, embeddings, or query-time synthesis
 - do not add /v1/changes/{change_id}, /v1/objects/set, /v1/blobs/upload, or any new blob list/query route beyond the completed A1.7 blob metadata seam
 - do not widen supported query kinds beyond `memory_events`, `memory_episodes`, and `audit_preview` without a new approved phase
@@ -80,6 +82,7 @@ Await explicit roadmap extension or approval before widening the public control-
 - focused A1.9 tests green
 - regression slice for A1.2, A1.6, and A1.8 green
 - focused G1.3 and G1.4 tests green
+- focused G1.5 tests green
 - regression slice for G1.1 green
 - full unittest suite green
 - local verification if read behavior changes

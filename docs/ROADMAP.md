@@ -194,6 +194,15 @@ Local Resumable Ingest Queue:
 - append-only audit records capture startup interruption recovery
 - no background workers, no automatic startup execution, and no distributed worker runtime in this phase
 
+## Phase G1.5
+Bounded Ingest Queue History Seam:
+- GET /api/ingest/queue/{job_id}/history
+- read-only queue history/detail only
+- reuse existing `ingest_queue_jobs`, append-only `audit_events`, and linked ingest run / manifest references only
+- preserve room scope, deterministic ordering, and bounded history visibility
+- make interrupted, resumed, completed, failed, and cancelled lifecycle transitions inspectable when already present in stored evidence
+- no new queue states, no automatic resume/execute, no background workers, and no `/v1` widening in this phase
+
 ## Not approved yet
 - semantic search
 - embeddings

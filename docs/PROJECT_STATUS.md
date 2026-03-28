@@ -3,7 +3,7 @@
 Last updated: 2026-03-27
 
 ## Current phase
-Phase 2C.1 in progress
+Phase 2C.1 complete
 
 ## Phase state
 - Phase 2B.1 complete
@@ -11,7 +11,7 @@ Phase 2C.1 in progress
 - Phase 2B.3 complete
 - Phase 2B.4 complete
 - Phase 2B.5 complete
-- Phase 2C.1 in progress
+- Phase 2C.1 complete
 
 ## Completed in 2B.5
 - stress verification for replay/correction/provenance/room isolation
@@ -32,10 +32,12 @@ Phase 2C.1 in progress
 - episode-side deterministic filtering
 - episode/event traversal refinement
 - query/list provenance summary exposure
+- query/list provenance summary exposure
 
 ## Next approved substep
-- identify the next exact unfinished 2C.1 read-only retrieval substep from verified repo evidence only
-- do not reimplement event query, episode query, traversal, detail provenance, or query/list provenance summary
+- identify the next exact approved phase/substep after Phase 2C.1 from verified repo evidence only
+- do not reopen completed 2C.1 retrieval work
+
 
 
 

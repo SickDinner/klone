@@ -70,7 +70,8 @@ class PhaseA13Tests(unittest.TestCase):
         blob_service = services["blob-service"]
         self.assertEqual(blob_service["status"], "local_metadata_shell")
         self.assertEqual(blob_service["implementation"], "in_process_local_shell")
-        self.assertIn("No public /v1 blobs upload or /v1/blobs/{blob_id}/meta route exists yet.", blob_service["notes"])
+        self.assertIn("Reuses existing /api/assets and /api/assets/{asset_id} read routes and backs GET /v1/rooms/{room_id}/blobs/{blob_id}/meta.", blob_service["notes"])
+        self.assertIn("No public /v1 blobs upload route exists yet.", blob_service["notes"])
 
         capabilities = {item["id"]: item for item in payload["capabilities"]}
         self.assertEqual(capabilities["blob.metadata.list"]["path"], "/api/assets")
@@ -85,7 +86,7 @@ class PhaseA13Tests(unittest.TestCase):
             if route.path.startswith("/v1")
         }
         self.assertEqual(v1_routes["/v1/capabilities"], ["GET"])
-        self.assertEqual(v1_routes["/v1/rooms/{room_id}/blobs/get"], ["POST"])
+        self.assertEqual(v1_routes["/v1/rooms/{room_id}/blobs/{blob_id}/meta"], ["GET"])
         self.assertEqual(v1_routes["/v1/rooms/{room_id}/objects/get"], ["POST"])
         self.assertEqual(v1_routes["/v1/rooms/{room_id}/query"], ["POST"])
 

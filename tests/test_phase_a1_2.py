@@ -45,7 +45,7 @@ class PhaseA12Tests(unittest.TestCase):
             self.assertIn("route_readiness", contract)
 
         blob_contract = next(item for item in contracts if item["id"] == "blob-shell")
-        self.assertEqual(blob_contract["route_readiness"], "metadata_only_no_public_upload")
+        self.assertEqual(blob_contract["route_readiness"], "public_read_only_meta_available")
         self.assertIn("No /v1 blobs upload route exists yet.", blob_contract["notes"])
 
     def test_v1_capabilities_writes_append_only_control_plane_audit_chain(self) -> None:
@@ -104,7 +104,7 @@ class PhaseA12Tests(unittest.TestCase):
             if route.path.startswith("/v1")
         }
         self.assertEqual(v1_routes["/v1/capabilities"], ["GET"])
-        self.assertEqual(v1_routes["/v1/rooms/{room_id}/blobs/get"], ["POST"])
+        self.assertEqual(v1_routes["/v1/rooms/{room_id}/blobs/{blob_id}/meta"], ["GET"])
         self.assertEqual(v1_routes["/v1/rooms/{room_id}/objects/get"], ["POST"])
         self.assertEqual(v1_routes["/v1/rooms/{room_id}/query"], ["POST"])
 

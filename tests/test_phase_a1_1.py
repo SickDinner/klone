@@ -90,6 +90,7 @@ class PhaseA11Tests(unittest.TestCase):
             v1_routes,
             {
                 "/v1/capabilities": ["GET"],
+                "/v1/rooms/{room_id}/objects/get": ["POST"],
             },
         )
 

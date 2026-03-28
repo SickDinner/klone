@@ -1,9 +1,23 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
+from .api import (
+    _asset_record_from_row,
+    _dataset_record_from_row,
+    _memory_episode_detail_from_payload,
+    _memory_event_detail_from_payload,
+)
+from .guards import access_guard
 from .request_context import RequestContext
-from .schemas import PublicCapabilitiesResponse, RequestContextRecord
+from .rooms import room_registry
+from .schemas import (
+    ObjectEnvelopeRecord,
+    PublicCapabilitiesResponse,
+    PublicObjectGetRequest,
+    PublicObjectGetResponse,
+    RequestContextRecord,
+)
 from .services import ServiceContainer, module_registry_payload
 from .v1_contracts import contract_registry_payload
 
@@ -17,6 +31,34 @@ def get_service_container(request: Request) -> ServiceContainer:
 
 def get_request_context(request: Request) -> RequestContext:
     return request.state.request_context
+
+
+def _require_room_read(*, room_id: str, actor_role: str) -> None:
+    room = room_registry.get_room(room_id)
+    if room is None:
+        raise HTTPException(status_code=404, detail=f"Room {room_id} was not found.")
+    decision = access_guard.evaluate(
+        room_id=room_id,
+        actor_role=actor_role,
+        requested_permission="read",
+    )
+    if decision.decision != "allowed":
+        raise HTTPException(status_code=403, detail=decision.reason)
+
+
+def _sanitize_object_envelope(envelope: ObjectEnvelopeRecord) -> ObjectEnvelopeRecord:
+    record_payload = dict(envelope.record)
+    if envelope.object_kind == "dataset":
+        sanitized_record = _dataset_record_from_row(record_payload).model_dump(mode="json")
+    elif envelope.object_kind == "asset":
+        sanitized_record = _asset_record_from_row(record_payload).model_dump(mode="json")
+    elif envelope.object_kind == "memory_event":
+        sanitized_record = _memory_event_detail_from_payload(record_payload).model_dump(mode="json")
+    elif envelope.object_kind == "memory_episode":
+        sanitized_record = _memory_episode_detail_from_payload(record_payload).model_dump(mode="json")
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported object kind for public object get.")
+    return envelope.model_copy(update={"record": sanitized_record})
 
 
 @router.get("/capabilities", response_model=PublicCapabilitiesResponse)
@@ -52,3 +94,88 @@ def capabilities(
         },
     )
     return response
+
+
+@router.post("/rooms/{room_id}/objects/get", response_model=PublicObjectGetResponse)
+def object_get(
+    room_id: str,
+    payload: PublicObjectGetRequest,
+    services: ServiceContainer = Depends(get_service_container),
+    request_context: RequestContext = Depends(get_request_context),
+) -> PublicObjectGetResponse:
+    route_path = f"/v1/rooms/{room_id}/objects/get"
+    try:
+        _require_room_read(room_id=room_id, actor_role=request_context.actor_role)
+        envelope = services.object_envelope.get_object_envelope(
+            room_id=room_id,
+            object_id=payload.object_id,
+        )
+        if envelope is None:
+            services.audit.log_control_plane_event(
+                event_type="v1_object_get",
+                route_path=route_path,
+                request_context=request_context,
+                status_code=404,
+                summary="Attempted to read a public room-scoped object envelope that was not found.",
+                metadata={"room_id": room_id, "object_id": payload.object_id, "result": "not_found"},
+            )
+            raise HTTPException(status_code=404, detail=f"Object {payload.object_id} was not found.")
+
+        sanitized_envelope = _sanitize_object_envelope(envelope)
+        response = PublicObjectGetResponse(
+            api_version="v1",
+            request_context=RequestContextRecord(
+                request_id=request_context.request_id,
+                trace_id=request_context.trace_id,
+                principal=request_context.principal,
+                actor_role=request_context.actor_role,
+            ),
+            room_id=room_id,
+            object=sanitized_envelope,
+        )
+        services.audit.log_control_plane_event(
+            event_type="v1_object_get",
+            route_path=route_path,
+            request_context=request_context,
+            status_code=200,
+            summary="Read a public room-scoped object envelope.",
+            metadata={
+                "room_id": room_id,
+                "object_id": payload.object_id,
+                "object_kind": sanitized_envelope.object_kind,
+                "backing_route_count": len(sanitized_envelope.backing_routes),
+                "result": "ok",
+            },
+        )
+        return response
+    except HTTPException as error:
+        if error.status_code in {400, 403}:
+            services.audit.log_control_plane_event(
+                event_type="v1_object_get",
+                route_path=route_path,
+                request_context=request_context,
+                status_code=error.status_code,
+                summary="Blocked or invalid public room-scoped object envelope read.",
+                metadata={
+                    "room_id": room_id,
+                    "object_id": payload.object_id,
+                    "result": "error",
+                    "detail": error.detail,
+                },
+            )
+        raise
+    except ValueError as error:
+        services.audit.log_control_plane_event(
+            event_type="v1_object_get",
+            route_path=route_path,
+            request_context=request_context,
+            status_code=400,
+            summary="Rejected invalid public room-scoped object envelope read.",
+            metadata={
+                "room_id": room_id,
+                "object_id": payload.object_id,
+                "result": "invalid_object_id",
+                "detail": str(error),
+            },
+        )
+        raise HTTPException(status_code=400, detail=str(error)) from error

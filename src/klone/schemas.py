@@ -248,6 +248,17 @@ class RequestContextRecord(BaseModel):
     actor_role: str
 
 
+class PublicObjectGetRequest(BaseModel):
+    object_id: str = Field(..., min_length=1)
+
+
+class PublicObjectGetResponse(BaseModel):
+    api_version: str
+    request_context: RequestContextRecord
+    room_id: str
+    object: ObjectEnvelopeRecord
+
+
 class ServiceSeamRecord(BaseModel):
     id: str
     name: str

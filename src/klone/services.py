@@ -304,8 +304,32 @@ class _ObjectEnvelopeProjector:
         self.repository = repository
         self.memory_service = MemoryService(repository)
 
+    def seam_descriptor(self) -> ServiceSeamRecord:
+        return ServiceSeamRecord(
+            id="object-envelope-service",
+            name="ObjectEnvelopeService",
+            implementation="in_process_local_shell",
+            status="local_envelope_shell",
+            notes=[
+                "Projects existing governed dataset, asset, memory event, and memory episode reads into a deterministic local object envelope shell.",
+                "Reuses existing read routes and the public read-only object-get seam without adding write authority.",
+            ],
+        )
+
     def public_capabilities(self) -> list[PublicCapabilityRecord]:
         return [
+            PublicCapabilityRecord(
+                id="v1.objects.get",
+                name="V1 Room Object Get",
+                category="object",
+                path="/v1/rooms/{room_id}/objects/get",
+                methods=["POST"],
+                read_only=True,
+                room_scoped=True,
+                status="available",
+                description="Read one room-scoped object envelope through the versioned public control-plane seam.",
+                backed_by=["ObjectEnvelopeService", "PolicyService", "AuditService"],
+            ),
             PublicCapabilityRecord(
                 id="object.envelope.dataset",
                 name="Dataset Object Envelope",
@@ -459,6 +483,82 @@ class _ObjectEnvelopeProjector:
             )
         return envelopes
 
+    def get_object_envelope(
+        self,
+        *,
+        room_id: str,
+        object_id: str,
+    ) -> ObjectEnvelopeRecord | None:
+        object_kind, separator, local_id = object_id.partition(":")
+        if not separator or not local_id:
+            raise ValueError("object_id must use the '<kind>:<id>' format.")
+
+        if object_kind == "dataset":
+            if not local_id.isdigit():
+                raise ValueError("dataset object ids must end with a numeric id.")
+            row = self.repository.get_dataset(int(local_id), room_id=room_id)
+            if row is None:
+                return None
+            return self._build_object_envelope(
+                object_id=object_id,
+                object_kind="dataset",
+                room_id=str(row["room_id"]),
+                classification_level=str(row["classification_level"]),
+                summary=str(row["label"]),
+                backing_routes=["/api/datasets"],
+                record=dict(row),
+            )
+
+        if object_kind == "asset":
+            if not local_id.isdigit():
+                raise ValueError("asset object ids must end with a numeric id.")
+            row = self.repository.get_asset(int(local_id), room_id=room_id)
+            if row is None:
+                return None
+            return self._build_object_envelope(
+                object_id=object_id,
+                object_kind="asset",
+                room_id=str(row["room_id"]),
+                classification_level=str(row["classification_level"]),
+                summary=str(row["relative_path"]),
+                backing_routes=["/api/assets", "/api/assets/{asset_id}"],
+                record=_decode_service_metadata_row(dict(row)),
+            )
+
+        if object_kind == "memory_event":
+            if not local_id.isdigit():
+                raise ValueError("memory_event object ids must end with a numeric id.")
+            payload = self.memory_service.get_event_detail(room_id=room_id, event_id=int(local_id))
+            if payload is None:
+                return None
+            return self._build_object_envelope(
+                object_id=object_id,
+                object_kind="memory_event",
+                room_id=str(payload["room_id"]),
+                classification_level=str(payload["classification_level"]),
+                summary=str(payload["title"]),
+                backing_routes=["/api/memory/events", "/api/memory/events/{event_id}"],
+                record=dict(payload),
+            )
+
+        if object_kind == "memory_episode":
+            payload = self.memory_service.get_episode_detail(room_id=room_id, episode_id=local_id)
+            if payload is None:
+                return None
+            return self._build_object_envelope(
+                object_id=object_id,
+                object_kind="memory_episode",
+                room_id=str(payload["room_id"]),
+                classification_level=str(payload["classification_level"]),
+                summary=str(payload["title"]),
+                backing_routes=["/api/memory/episodes", "/api/memory/episodes/{episode_id}"],
+                record=dict(payload),
+            )
+
+        raise ValueError(
+            "Unsupported object kind. Supported kinds are dataset, asset, memory_event, and memory_episode."
+        )
+
     def _build_object_envelope(
         self,
         *,
@@ -516,6 +616,7 @@ class ServiceContainer:
                 ],
             ),
             self.blob.seam_descriptor(),
+            self.object_envelope.seam_descriptor(),
         ]
 
     def public_capabilities(self) -> list[PublicCapabilityRecord]:

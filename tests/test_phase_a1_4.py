@@ -215,19 +215,25 @@ class PhaseA14Tests(unittest.TestCase):
         contracts = {item["id"]: item for item in payload["contracts"]}
         object_shell = contracts["object-shell"]
 
-        self.assertEqual(object_shell["route_readiness"], "available_via_existing_read_routes")
+        self.assertEqual(object_shell["route_readiness"], "public_read_only_get_available")
         self.assertEqual(
             object_shell["backing_routes"],
             [
+                "/v1/rooms/{room_id}/objects/get",
                 "/api/datasets",
                 "/api/assets",
                 "/api/memory/events",
                 "/api/memory/episodes",
             ],
         )
-        self.assertIn("No public /v1 object route exists yet.", object_shell["notes"])
+        self.assertIn(
+            "POST /v1/rooms/{room_id}/objects/get is the first public read-only object route.",
+            object_shell["notes"],
+        )
 
         capabilities = {item["id"]: item for item in payload["capabilities"]}
+        self.assertEqual(capabilities["v1.objects.get"]["path"], "/v1/rooms/{room_id}/objects/get")
+        self.assertEqual(capabilities["v1.objects.get"]["methods"], ["POST"])
         self.assertEqual(capabilities["object.envelope.dataset"]["path"], "/api/datasets")
         self.assertEqual(capabilities["object.envelope.asset"]["path"], "/api/assets")
         self.assertEqual(capabilities["object.envelope.memory_event"]["path"], "/api/memory/events")
@@ -239,7 +245,13 @@ class PhaseA14Tests(unittest.TestCase):
             for route in v1_router.routes
             if route.path.startswith("/v1")
         }
-        self.assertEqual(v1_routes, {"/v1/capabilities": ["GET"]})
+        self.assertEqual(
+            v1_routes,
+            {
+                "/v1/capabilities": ["GET"],
+                "/v1/rooms/{room_id}/objects/get": ["POST"],
+            },
+        )
 
     async def _perform_request(
         self,

@@ -84,7 +84,13 @@ class PhaseA13Tests(unittest.TestCase):
             for route in v1_router.routes
             if route.path.startswith("/v1")
         }
-        self.assertEqual(v1_routes, {"/v1/capabilities": ["GET"]})
+        self.assertEqual(
+            v1_routes,
+            {
+                "/v1/capabilities": ["GET"],
+                "/v1/rooms/{room_id}/objects/get": ["POST"],
+            },
+        )
 
     async def _perform_request(
         self,

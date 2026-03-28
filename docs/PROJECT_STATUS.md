@@ -136,7 +136,7 @@ Phase A1.7 complete; no further approved post-A1 substep is defined yet
 
 ## Completed in A1.7
 - first public room-scoped blob metadata detail seam
-- POST /v1/rooms/{room_id}/blobs/get only
+- GET /v1/rooms/{room_id}/blobs/{blob_id}/meta only
 - support only the existing deterministic asset-backed blob metadata shell already justified by repo reality
 - preserve deterministic blob_id and linked_object_id mapping over governed asset rows
 - reuse request context and append-only control-plane audit chaining
@@ -148,5 +148,5 @@ Phase A1.7 complete; no further approved post-A1 substep is defined yet
 ## Next approved substep
 - no further approved post-A1 substep is enumerated in canonical repo evidence
 - require explicit roadmap extension or approval before widening the /v1 control plane beyond the completed A1.7 room-scoped blob metadata seam
-- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, or A1.7 public blob-get seam work
+- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, or A1.7 public blob-meta seam work
 

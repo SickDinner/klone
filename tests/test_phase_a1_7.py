@@ -49,9 +49,8 @@ class PhaseA17Tests(unittest.TestCase):
         observed = asyncio.run(
             self._perform_request(
                 app,
-                method="POST",
-                path=f"/v1/rooms/{room_id}/blobs/get",
-                body={"blob_id": blob_record.blob_id},
+                method="GET",
+                path=f"/v1/rooms/{room_id}/blobs/{blob_record.blob_id}/meta",
                 headers={"x-request-id": "req:a17-blob", "x-trace-id": "trace:a17-blob"},
             )
         )
@@ -87,18 +86,16 @@ class PhaseA17Tests(unittest.TestCase):
         wrong_room = asyncio.run(
             self._perform_request(
                 app,
-                method="POST",
-                path=f"/v1/rooms/{public['dataset']['room_id']}/blobs/get",
-                body={"blob_id": restricted_blob.blob_id},
+                method="GET",
+                path=f"/v1/rooms/{public['dataset']['room_id']}/blobs/{restricted_blob.blob_id}/meta",
                 headers={"x-request-id": "req:a17-wrong-room"},
             )
         )
         invalid = asyncio.run(
             self._perform_request(
                 app,
-                method="POST",
-                path=f"/v1/rooms/{restricted['dataset']['room_id']}/blobs/get",
-                body={"blob_id": "blob:asset:not-a-number"},
+                method="GET",
+                path=f"/v1/rooms/{restricted['dataset']['room_id']}/blobs/blob:asset:not-a-number/meta",
                 headers={"x-request-id": "req:a17-invalid"},
             )
         )
@@ -123,9 +120,8 @@ class PhaseA17Tests(unittest.TestCase):
         first = asyncio.run(
             self._perform_request(
                 app,
-                method="POST",
-                path=f"/v1/rooms/{room_id}/blobs/get",
-                body={"blob_id": blob_record.blob_id},
+                method="GET",
+                path=f"/v1/rooms/{room_id}/blobs/{blob_record.blob_id}/meta",
                 headers={
                     "x-request-id": "req:a17-1",
                     "x-trace-id": "trace:a17-1",
@@ -137,9 +133,8 @@ class PhaseA17Tests(unittest.TestCase):
         second = asyncio.run(
             self._perform_request(
                 app,
-                method="POST",
-                path=f"/v1/rooms/{room_id}/blobs/get",
-                body={"blob_id": "blob:asset:not-a-number"},
+                method="GET",
+                path=f"/v1/rooms/{room_id}/blobs/blob:asset:not-a-number/meta",
                 headers={
                     "x-request-id": "req:a17-2",
                     "x-trace-id": "trace:a17-2",
@@ -155,21 +150,27 @@ class PhaseA17Tests(unittest.TestCase):
         self.assertEqual(capabilities["status_code"], 200)
 
         capability_map = {item["id"]: item for item in capabilities["json"]["capabilities"]}
-        self.assertEqual(capability_map["v1.blobs.get"]["path"], "/v1/rooms/{room_id}/blobs/get")
-        self.assertEqual(capability_map["v1.blobs.get"]["methods"], ["POST"])
-        self.assertTrue(capability_map["v1.blobs.get"]["read_only"])
-        self.assertTrue(capability_map["v1.blobs.get"]["room_scoped"])
+        self.assertEqual(
+            capability_map["v1.blobs.meta.read"]["path"],
+            "/v1/rooms/{room_id}/blobs/{blob_id}/meta",
+        )
+        self.assertEqual(capability_map["v1.blobs.meta.read"]["methods"], ["GET"])
+        self.assertTrue(capability_map["v1.blobs.meta.read"]["read_only"])
+        self.assertTrue(capability_map["v1.blobs.meta.read"]["room_scoped"])
 
         contract_map = {item["id"]: item for item in capabilities["json"]["contracts"]}
-        self.assertEqual(contract_map["blob-shell"]["route_readiness"], "metadata_only_no_public_upload")
-        self.assertIn("/v1/rooms/{room_id}/blobs/get", contract_map["blob-shell"]["backing_routes"])
+        self.assertEqual(contract_map["blob-shell"]["route_readiness"], "public_read_only_meta_available")
+        self.assertIn(
+            "/v1/rooms/{room_id}/blobs/{blob_id}/meta",
+            contract_map["blob-shell"]["backing_routes"],
+        )
 
         chain_rows = self.repository.list_control_plane_audit_chain(limit=10)
-        blob_rows = [row for row in chain_rows if row["event_type"] == "v1_blob_get"]
+        blob_rows = [row for row in chain_rows if row["event_type"] == "v1_blob_meta_read"]
         self.assertGreaterEqual(len(blob_rows), 2)
         self.assertEqual(blob_rows[0]["request_id"], "req:a17-2")
         self.assertEqual(blob_rows[0]["status_code"], 400)
-        self.assertEqual(blob_rows[0]["route_path"], f"/v1/rooms/{room_id}/blobs/get")
+        self.assertEqual(blob_rows[0]["route_path"], f"/v1/rooms/{room_id}/blobs/blob:asset:not-a-number/meta")
         self.assertEqual(blob_rows[1]["request_id"], "req:a17-1")
         self.assertEqual(blob_rows[1]["status_code"], 200)
         self.assertEqual(blob_rows[0]["prev_event_hash"], blob_rows[1]["event_hash"])
@@ -181,7 +182,7 @@ class PhaseA17Tests(unittest.TestCase):
             if route.path.startswith("/v1")
         }
         self.assertEqual(v1_routes["/v1/capabilities"], ["GET"])
-        self.assertEqual(v1_routes["/v1/rooms/{room_id}/blobs/get"], ["POST"])
+        self.assertEqual(v1_routes["/v1/rooms/{room_id}/blobs/{blob_id}/meta"], ["GET"])
         self.assertEqual(v1_routes["/v1/rooms/{room_id}/objects/get"], ["POST"])
         self.assertEqual(v1_routes["/v1/rooms/{room_id}/query"], ["POST"])
 

@@ -16,11 +16,11 @@ Phase A1.7 closeout complete / awaiting next approved phase
 - Phase A1 roadmap bullets are satisfied in current repo reality
 - A1.5 public room-scoped object get exists in repo reality
 - A1.6 public room-scoped query shell exists in repo reality
-- A1.7 public room-scoped blob metadata get exists in repo reality
+- A1.7 public room-scoped blob metadata detail exists in repo reality
 
 ## Immediate goal
 Phase A1.7 is complete. No further approved post-A1 substep is enumerated in canonical repo evidence.
-Await explicit roadmap extension or approval before widening the control plane. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, or A1.7 public blob-get seam work.
+Await explicit roadmap extension or approval before widening the control plane. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, or A1.7 public blob-meta seam work.
 
 ## Approved scope
 - canonical docs closeout after completed Phase A1.7
@@ -44,7 +44,7 @@ Await explicit roadmap extension or approval before widening the control plane. 
 - do not regress the contract shells or append-only audit-chain linkage on /v1/capabilities
 - do not regress the local blob metadata shell or its capability exposure via existing asset routes
 - do not regress the local object envelope shell or its capability/readiness visibility through /v1/capabilities
-- do not regress the public room-scoped read-only blob-get seam at `/v1/rooms/{room_id}/blobs/get`
+- do not regress the public room-scoped read-only blob-meta seam at `/v1/rooms/{room_id}/blobs/{blob_id}/meta`
 - do not regress the public room-scoped read-only object-get seam at `/v1/rooms/{room_id}/objects/get`
 - do not regress the public room-scoped read-only query seam at `/v1/rooms/{room_id}/query`
 - do not add semantic search, fuzzy matching, embeddings, or query-time synthesis

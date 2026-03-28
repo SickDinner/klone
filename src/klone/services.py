@@ -206,19 +206,19 @@ class BlobService:
             status="local_metadata_shell",
             notes=[
                 "Projects the existing governed assets table into a local-first blob metadata shell.",
-                "Reuses existing /api/assets and /api/assets/{asset_id} read routes and backs POST /v1/rooms/{room_id}/blobs/get.",
-                "No public /v1 blobs upload or /v1/blobs/{blob_id}/meta route exists yet.",
+                "Reuses existing /api/assets and /api/assets/{asset_id} read routes and backs GET /v1/rooms/{room_id}/blobs/{blob_id}/meta.",
+                "No public /v1 blobs upload route exists yet.",
             ],
         )
 
     def public_capabilities(self) -> list[PublicCapabilityRecord]:
         return [
             PublicCapabilityRecord(
-                id="v1.blobs.get",
-                name="V1 Room Blob Get",
+                id="v1.blobs.meta.read",
+                name="V1 Room Blob Metadata",
                 category="blob",
-                path="/v1/rooms/{room_id}/blobs/get",
-                methods=["POST"],
+                path="/v1/rooms/{room_id}/blobs/{blob_id}/meta",
+                methods=["GET"],
                 read_only=True,
                 room_scoped=True,
                 status="available",

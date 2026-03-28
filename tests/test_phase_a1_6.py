@@ -358,7 +358,7 @@ class PhaseA16Tests(unittest.TestCase):
             if route.path.startswith("/v1")
         }
         self.assertEqual(v1_routes["/v1/capabilities"], ["GET"])
-        self.assertEqual(v1_routes["/v1/rooms/{room_id}/blobs/get"], ["POST"])
+        self.assertEqual(v1_routes["/v1/rooms/{room_id}/blobs/{blob_id}/meta"], ["GET"])
         self.assertEqual(v1_routes["/v1/rooms/{room_id}/objects/get"], ["POST"])
         self.assertEqual(v1_routes["/v1/rooms/{room_id}/query"], ["POST"])
 

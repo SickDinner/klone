@@ -96,6 +96,7 @@ def contract_registry_payload() -> list[PublicContractRecord]:
             ],
             backing_routes=[
                 "/v1/rooms/{room_id}/query",
+                "/api/audit",
                 "/api/memory/events",
                 "/api/memory/episodes",
             ],

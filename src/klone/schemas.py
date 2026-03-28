@@ -267,12 +267,13 @@ class PublicObjectGetResponse(BaseModel):
 
 
 class PublicQueryRequest(BaseModel):
-    query_kind: Literal["memory_events", "memory_episodes"]
+    query_kind: Literal["memory_events", "memory_episodes", "audit_preview"]
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
     status: MemoryStatus | None = None
     event_type: str | None = Field(default=None, min_length=1)
     episode_type: MemoryEpisodeType | None = None
+    target_type: str | None = Field(default=None, min_length=1)
     ingest_run_id: int | None = Field(default=None, ge=1)
     include_corrected: bool = True
 
@@ -282,7 +283,7 @@ class PublicQueryResponse(BaseModel):
     request_context: RequestContextRecord
     room_id: str
     query_id: str
-    query_kind: Literal["memory_events", "memory_episodes"]
+    query_kind: Literal["memory_events", "memory_episodes", "audit_preview"]
     read_only: bool = True
     limit: int
     offset: int

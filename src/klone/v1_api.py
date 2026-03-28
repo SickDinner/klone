@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .api import (
+    _audit_event_from_row,
     _asset_record_from_row,
     _dataset_record_from_row,
     _memory_episode_from_row,
@@ -38,14 +39,14 @@ def get_request_context(request: Request) -> RequestContext:
     return request.state.request_context
 
 
-def _require_room_read(*, room_id: str, actor_role: str) -> None:
+def _require_room_permission(*, room_id: str, actor_role: str, permission: str) -> None:
     room = room_registry.get_room(room_id)
     if room is None:
         raise HTTPException(status_code=404, detail=f"Room {room_id} was not found.")
     decision = access_guard.evaluate(
         room_id=room_id,
         actor_role=actor_role,
-        requested_permission="read",
+        requested_permission=permission,
     )
     if decision.decision != "allowed":
         raise HTTPException(status_code=403, detail=decision.reason)
@@ -67,7 +68,9 @@ def _sanitize_object_envelope(envelope: ObjectEnvelopeRecord) -> ObjectEnvelopeR
 
 
 def _normalize_public_query_filters(payload: PublicQueryRequest) -> dict[str, object]:
-    filters: dict[str, object] = {"include_corrected": payload.include_corrected}
+    filters: dict[str, object] = {}
+    if payload.query_kind in {"memory_events", "memory_episodes"}:
+        filters["include_corrected"] = payload.include_corrected
     if payload.status is not None:
         filters["status"] = payload.status
     if payload.ingest_run_id is not None:
@@ -75,8 +78,13 @@ def _normalize_public_query_filters(payload: PublicQueryRequest) -> dict[str, ob
     if payload.query_kind == "memory_events":
         if payload.event_type is not None:
             filters["event_type"] = payload.event_type
-    elif payload.episode_type is not None:
+    elif payload.query_kind == "memory_episodes" and payload.episode_type is not None:
         filters["episode_type"] = payload.episode_type
+    elif payload.query_kind == "audit_preview":
+        if payload.event_type is not None:
+            filters["event_type"] = payload.event_type
+        if payload.target_type is not None:
+            filters["target_type"] = payload.target_type
     return filters
 
 
@@ -124,7 +132,7 @@ def blob_meta(
 ) -> PublicBlobGetResponse:
     route_path = f"/v1/rooms/{room_id}/blobs/{blob_id}/meta"
     try:
-        _require_room_read(room_id=room_id, actor_role=request_context.actor_role)
+        _require_room_permission(room_id=room_id, actor_role=request_context.actor_role, permission="read")
         blob = services.blob.get_blob_metadata(blob_id=blob_id, room_id=room_id)
         if blob is None:
             services.audit.log_control_plane_event(
@@ -204,7 +212,7 @@ def object_get(
 ) -> PublicObjectGetResponse:
     route_path = f"/v1/rooms/{room_id}/objects/get"
     try:
-        _require_room_read(room_id=room_id, actor_role=request_context.actor_role)
+        _require_room_permission(room_id=room_id, actor_role=request_context.actor_role, permission="read")
         envelope = services.object_envelope.get_object_envelope(
             room_id=room_id,
             object_id=payload.object_id,
@@ -289,11 +297,21 @@ def query(
 ) -> PublicQueryResponse:
     route_path = f"/v1/rooms/{room_id}/query"
     try:
-        _require_room_read(room_id=room_id, actor_role=request_context.actor_role)
+        permission = "summarize" if payload.query_kind == "audit_preview" else "read"
+        _require_room_permission(
+            room_id=room_id,
+            actor_role=request_context.actor_role,
+            permission=permission,
+        )
         if payload.query_kind == "memory_events" and payload.episode_type is not None:
             raise HTTPException(
                 status_code=400,
                 detail="episode_type is only supported for memory_episodes queries.",
+            )
+        if payload.query_kind in {"memory_events", "memory_episodes"} and payload.target_type is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="target_type is only supported for audit_preview queries.",
             )
         if payload.query_kind == "memory_episodes" and payload.event_type is not None:
             raise HTTPException(
@@ -330,10 +348,38 @@ def query(
                 _memory_episode_from_row(dict(row)).model_dump(mode="json")
                 for row in rows
             ]
+        elif payload.query_kind == "audit_preview":
+            if payload.status is not None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="status is only supported for memory_events and memory_episodes queries.",
+                )
+            if payload.episode_type is not None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="episode_type is only supported for memory_episodes queries.",
+                )
+            if payload.ingest_run_id is not None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="ingest_run_id is only supported for memory_events and memory_episodes queries.",
+                )
+            rows = services.audit.repository.list_audit_events(
+                room_id=room_id,
+                limit=payload.limit,
+                offset=payload.offset,
+                event_type=payload.event_type,
+                target_type=payload.target_type,
+            )
+            backing_routes = ["/api/audit"]
+            sanitized_results = [
+                _audit_event_from_row(dict(row)).model_dump(mode="json")
+                for row in rows
+            ]
         else:
             raise HTTPException(
                 status_code=400,
-                detail="Unsupported query_kind. Supported kinds are memory_events and memory_episodes.",
+                detail="Unsupported query_kind. Supported kinds are memory_events, memory_episodes, and audit_preview.",
             )
 
         response = PublicQueryResponse(

@@ -1245,17 +1245,33 @@ class KloneRepository:
             return dict(row) if row is not None else None
 
     # Audit queries
-    def list_audit_events(self, *, room_id: str, limit: int = 25) -> list[dict[str, Any]]:
+    def list_audit_events(
+        self,
+        *,
+        room_id: str,
+        limit: int = 25,
+        offset: int = 0,
+        event_type: str | None = None,
+        target_type: str | None = None,
+    ) -> list[dict[str, Any]]:
         with self.connection() as conn:
+            clauses = ["room_id = ?"]
+            params: list[Any] = [room_id]
+            if event_type is not None:
+                clauses.append("event_type = ?")
+                params.append(event_type)
+            if target_type is not None:
+                clauses.append("target_type = ?")
+                params.append(target_type)
             rows = conn.execute(
-                """
+                f"""
                 SELECT *
                 FROM audit_events
-                WHERE room_id = ?
-                ORDER BY created_at DESC
-                LIMIT ?
+                WHERE {' AND '.join(clauses)}
+                ORDER BY created_at DESC, id DESC
+                LIMIT ? OFFSET ?
                 """,
-                (room_id, limit),
+                (*params, limit, offset),
             ).fetchall()
             return [dict(row) for row in rows]
 

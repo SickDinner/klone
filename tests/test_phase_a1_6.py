@@ -338,7 +338,7 @@ class PhaseA16Tests(unittest.TestCase):
         self.assertEqual(contract_map["query-shell"]["route_readiness"], "public_read_only_query_available")
         self.assertEqual(
             contract_map["query-shell"]["backing_routes"],
-            ["/v1/rooms/{room_id}/query", "/api/memory/events", "/api/memory/episodes"],
+            ["/v1/rooms/{room_id}/query", "/api/audit", "/api/memory/events", "/api/memory/episodes"],
         )
 
         chain_rows = self.repository.list_control_plane_audit_chain(limit=10)

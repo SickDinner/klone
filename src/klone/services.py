@@ -129,7 +129,7 @@ class MemoryFacade:
                 read_only=True,
                 room_scoped=True,
                 status="available",
-                description="Run deterministic room-scoped memory event or episode queries through the versioned public control-plane seam.",
+                description="Run deterministic room-scoped memory event, episode, or audit preview queries through the versioned public control-plane seam.",
                 backed_by=["MemoryFacade", "PolicyService", "AuditService"],
             ),
         ]

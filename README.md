@@ -191,7 +191,7 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 ## Seuraavat järkevät rakennusvaiheet
 
 1. Seuraava post-A1-vaihe: toteuta vain hyväksytty `A1.9` eli `GET /v1/rooms/{room_id}/changes` read-only change preview -seamina nykyisen audit-preview-backingin päälle.
-2. Memory Explorerin jatko A1.6:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
+2. Memory Explorerin jatko A1.8:n jälkeen: provenance-UX, kontekstin parempi visualisointi ja selaintason smoke-testit.
 3. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
 4. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
 5. Constitution Layer: hitaasti muuttuvat parametrit, provenance ja change logit.

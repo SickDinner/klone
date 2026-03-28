@@ -163,9 +163,20 @@ Bounded Ingest Run Manifest History:
 - Mission Control ingest-run history can inspect stored manifest snapshots
 - no resumable queue, no background worker orchestration, and no preview persistence in this phase
 
+## Phase G1.3
+Local Ingest Queue Shell:
+- POST /api/ingest/queue
+- POST /api/ingest/queue/{job_id}/execute
+- POST /api/ingest/queue/{job_id}/cancel
+- local queue shell only
+- reuse the existing deterministic ingest execution path rather than introducing a new worker runtime
+- allow explicit operator staging, execute, retry-after-failure, and cancel-before-run control
+- Mission Control exposes queue depth plus recent queue job visibility
+- no resumable interruption state, no background workers, and no startup auto-resume in this phase
+
 ## Not approved yet
 - A1.9 public room-scoped change preview seam
-- G1.3 resumable ingest queue
+- G1.4 resumable ingest queue
 - semantic search
 - embeddings
 - OCR/transcription

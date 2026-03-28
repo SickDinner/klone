@@ -30,6 +30,7 @@ Nykyinen kanoninen tila on:
 - `A1.8 public room-scoped audit preview query kind complete`
 - `G1.1 read-only ingest preflight manifest complete`
 - `G1.2 bounded ingest run manifest history complete`
+- `G1.3 local ingest queue shell complete`
 
 Uutta tässä versiossa:
 
@@ -67,6 +68,10 @@ Uutta tässä versiossa:
   `GET /api/ingest/runs/{run_id}/manifest` näyttää nyt bounded snapshotin toteutuneesta ingest-ajosta, mukaan lukien total size, kind breakdown, sample-assetit ja warnings-listan
 - `mission control inspect flow`
   Ingest Runs -paneeli tukee nyt `Inspect Manifest` -näkymää ja avaa onnistuneen scanin jälkeen juuri syntyneen manifestin automaattisesti
+- `local ingest queue shell`
+  `POST /api/ingest/queue` stageaa tai reuseaa local-first ingest-jobin, `POST /api/ingest/queue/{job_id}/execute` ajaa sen eksplisiittisesti, ja `POST /api/ingest/queue/{job_id}/cancel` peruuttaa queued/failed-jobin ilman background worker -oopperaa
+- `mission control queue flow`
+  Dataset Intake tukee nyt `Queue Dataset` -askelta, ja Mission Control näyttää queue depthin sekä inspect/execute/cancel -kontrollit ennen kuin ingest-run muuttuu manifestoituneeksi historialle
 
 Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, joka näkyy käyttöliittymässä asti:
 
@@ -177,6 +182,10 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 - `GET /api/assets`
 - `GET /api/assets/{asset_id}`
 - `POST /api/ingest/preflight`
+- `GET /api/ingest/queue`
+- `POST /api/ingest/queue`
+- `POST /api/ingest/queue/{job_id}/execute`
+- `POST /api/ingest/queue/{job_id}/cancel`
 - `GET /api/ingest/runs/{run_id}/manifest`
 - `GET /api/ingest/status`
 - `GET /api/audit`

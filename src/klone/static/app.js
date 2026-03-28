@@ -6,6 +6,8 @@ const state = {
   datasets: [],
   audit: [],
   ingestStatus: null,
+  ingestQueue: [],
+  ingestQueueSelectionId: null,
   ingestPreview: null,
   ingestManifest: null,
   memory: {
@@ -86,7 +88,7 @@ function renderStatusCards(status) {
     <article class="panel stat-card">
       <h3>System</h3>
       <p>${escapeHtml(status.app_name)} in ${escapeHtml(status.environment)}</p>
-      <div class="meta">${chips([`owner_debug_mode: ${status.owner_debug_mode}`, `guards: ${status.guard_count}`])}</div>
+      <div class="meta">${chips([`owner_debug_mode: ${status.owner_debug_mode}`, `guards: ${status.guard_count}`, `queue_depth: ${state.ingestStatus?.queue_depth ?? 0}`])}</div>
     </article>
     <article class="panel stat-card">
       <h3>Datasets</h3>
@@ -347,6 +349,68 @@ function renderIngestRuns(ingestStatus) {
     .join("");
 }
 
+function renderIngestQueueJobs(queueJobs) {
+  const root = document.querySelector("#ingest-queue-jobs");
+  if (!queueJobs?.length) {
+    root.innerHTML = '<div class="empty-state">No queued ingest jobs available.</div>';
+    return;
+  }
+  root.innerHTML = queueJobs
+    .map((job) => {
+      const selected = String(state.ingestQueueSelectionId || "") === String(job.id);
+      return `
+        <article class="stack-item ${selected ? "memory-selected" : ""}">
+          <small>${escapeHtml(job.room_id)}</small>
+          <h3>${escapeHtml(job.label)}</h3>
+          <p>${escapeHtml(job.description || job.normalized_root_path)}</p>
+          <div class="meta">${chips([
+            `status: ${job.status}`,
+            `collection: ${job.collection}`,
+            `attempts: ${job.attempt_count}`,
+            `last_run_id: ${job.last_run_id || "none"}`,
+          ])}</div>
+          <div class="meta">
+            <button class="link-button" data-queue-action="inspect" data-queue-job-id="${job.id}" type="button">Inspect</button>
+            <button class="link-button" data-queue-action="execute" data-queue-job-id="${job.id}" type="button" ${job.can_execute ? "" : "disabled"}>Execute</button>
+            <button class="link-button" data-queue-action="cancel" data-queue-job-id="${job.id}" type="button" ${job.can_cancel ? "" : "disabled"}>Cancel</button>
+            <button class="link-button" data-queue-action="manifest" data-queue-job-id="${job.id}" type="button" ${job.last_run_id ? "" : "disabled"}>Inspect Run Manifest</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderIngestQueueDetail(job) {
+  const root = document.querySelector("#ingest-queue-detail");
+  if (!job) {
+    root.className = "detail-card empty-state";
+    root.textContent = "Select a queued ingest job.";
+    return;
+  }
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>Queue Job ${job.id}</h3>
+    <p>${escapeHtml(job.label)} in ${escapeHtml(job.room_id)} persists the ingest request for manual execution and retry.</p>
+    <div class="meta">${chips([
+      `status: ${job.status}`,
+      `classification: ${job.classification_level}`,
+      `collection: ${job.collection}`,
+      `attempt_count: ${job.attempt_count}`,
+      `last_run_id: ${job.last_run_id || "none"}`,
+    ])}</div>
+    <ul class="detail-list">
+      <li><strong>normalized_root_path</strong>: ${escapeHtml(job.normalized_root_path)}</li>
+      <li><strong>created_at</strong>: ${escapeHtml(formatTime(job.created_at))}</li>
+      <li><strong>updated_at</strong>: ${escapeHtml(formatTime(job.updated_at))}</li>
+      <li><strong>started_at</strong>: ${escapeHtml(formatTime(job.started_at))}</li>
+      <li><strong>completed_at</strong>: ${escapeHtml(formatTime(job.completed_at))}</li>
+      <li><strong>last_error</strong>: ${escapeHtml(job.last_error || "none")}</li>
+    </ul>
+  `;
+}
+
 function renderIngestRunManifest(manifest) {
   const root = document.querySelector("#ingest-run-detail");
   if (!manifest) {
@@ -418,6 +482,20 @@ function renderIngestRunManifest(manifest) {
       ${warningMarkup}
     </section>
   `;
+}
+
+function syncIngestQueueSelection() {
+  if (!state.ingestQueue?.length) {
+    state.ingestQueueSelectionId = null;
+    renderIngestQueueDetail(null);
+    return;
+  }
+
+  const selected =
+    state.ingestQueue.find((job) => String(job.id) === String(state.ingestQueueSelectionId || "")) ||
+    state.ingestQueue[0];
+  state.ingestQueueSelectionId = selected.id;
+  renderIngestQueueDetail(selected);
 }
 
 function renderAssets(assets) {
@@ -1010,7 +1088,7 @@ async function refreshMemoryExplorer(event) {
 }
 
 async function refreshMissionControl() {
-  const [blueprint, status, rooms, guards, datasets, audit, ingestStatus] = await Promise.all([
+  const [blueprint, status, rooms, guards, datasets, audit, ingestStatus, ingestQueue] = await Promise.all([
     fetchJson("/api/blueprint"),
     fetchJson("/api/status"),
     fetchJson("/api/rooms"),
@@ -1018,6 +1096,7 @@ async function refreshMissionControl() {
     fetchJson("/api/datasets"),
     fetchJson("/api/audit"),
     fetchJson("/api/ingest/status"),
+    fetchJson("/api/ingest/queue"),
   ]);
 
   state.blueprint = blueprint;
@@ -1027,6 +1106,7 @@ async function refreshMissionControl() {
   state.datasets = datasets;
   state.audit = audit;
   state.ingestStatus = ingestStatus;
+  state.ingestQueue = ingestQueue;
 
   renderMission(blueprint);
   renderStatusCards(status);
@@ -1037,6 +1117,8 @@ async function refreshMissionControl() {
   renderModules(blueprint.modules);
   renderAgents(blueprint.agents);
   renderPhases(blueprint.build_phases);
+  renderIngestQueueJobs(ingestQueue);
+  syncIngestQueueSelection();
   renderIngestRuns(ingestStatus);
   renderIngestPreview(state.ingestPreview);
   renderIngestRunManifest(state.ingestManifest);
@@ -1093,6 +1175,33 @@ async function previewIngestForm() {
   }
 }
 
+async function queueIngestForm() {
+  const form = document.querySelector("#ingest-form");
+  const queueButton = document.querySelector("#ingest-queue-button");
+  const feedback = document.querySelector("#ingest-feedback");
+  const payload = collectIngestPayload(form);
+
+  queueButton.disabled = true;
+  feedback.textContent = "Queueing dataset...";
+
+  try {
+    const result = await fetchJson("/api/ingest/queue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    state.ingestQueueSelectionId = result.job.id;
+    feedback.textContent = result.created
+      ? `Queue job ${result.job.id} is ${result.job.status} for ${result.job.label}.`
+      : `Reused queue job ${result.job.id} for ${result.job.label}.`;
+    await refreshMissionControl();
+  } catch (error) {
+    feedback.textContent = error.message;
+  } finally {
+    queueButton.disabled = false;
+  }
+}
+
 async function submitIngestForm(event) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -1119,12 +1228,75 @@ async function submitIngestForm(event) {
   }
 }
 
+async function executeIngestQueueJob(jobId) {
+  const feedback = document.querySelector("#ingest-feedback");
+  feedback.textContent = `Executing queue job ${jobId}...`;
+  try {
+    const result = await fetchJson(`/api/ingest/queue/${jobId}/execute`, {
+      method: "POST",
+    });
+    state.ingestQueueSelectionId = result.job.id;
+    feedback.textContent =
+      result.execution?.run?.summary ||
+      result.error ||
+      `Queue job ${result.job.id} is now ${result.job.status}.`;
+    await refreshMissionControl();
+    if (result.execution?.run?.id) {
+      await loadIngestRunManifest(result.execution.run.id);
+    }
+  } catch (error) {
+    feedback.textContent = error.message;
+  }
+}
+
+async function cancelIngestQueueJob(jobId) {
+  const feedback = document.querySelector("#ingest-feedback");
+  feedback.textContent = `Cancelling queue job ${jobId}...`;
+  try {
+    const job = await fetchJson(`/api/ingest/queue/${jobId}/cancel`, {
+      method: "POST",
+    });
+    state.ingestQueueSelectionId = job.id;
+    feedback.textContent = `Queue job ${job.id} is now ${job.status}.`;
+    await refreshMissionControl();
+  } catch (error) {
+    feedback.textContent = error.message;
+  }
+}
+
 function bindEvents() {
   document.querySelector("#ingest-form").addEventListener("submit", submitIngestForm);
   document.querySelector("#ingest-preview-button").addEventListener("click", previewIngestForm);
+  document.querySelector("#ingest-queue-button").addEventListener("click", queueIngestForm);
   document.querySelector("#asset-refresh").addEventListener("click", refreshAssetBrowser);
   document.querySelector("#asset-room-filter").addEventListener("change", refreshAssetBrowser);
   document.querySelector("#asset-dataset-filter").addEventListener("change", refreshAssetBrowser);
+  document.querySelector("#ingest-queue-jobs").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-queue-job-id]");
+    if (!button || button.disabled) {
+      return;
+    }
+    const { queueAction, queueJobId } = button.dataset;
+    if (queueAction === "inspect") {
+      state.ingestQueueSelectionId = queueJobId;
+      syncIngestQueueSelection();
+      return;
+    }
+    if (queueAction === "execute") {
+      executeIngestQueueJob(queueJobId);
+      return;
+    }
+    if (queueAction === "cancel") {
+      cancelIngestQueueJob(queueJobId);
+      return;
+    }
+    if (queueAction === "manifest") {
+      const job = state.ingestQueue.find((item) => String(item.id) === String(queueJobId));
+      if (job?.last_run_id) {
+        loadIngestRunManifest(job.last_run_id);
+      }
+    }
+  });
   document.querySelector("#ingest-runs").addEventListener("click", (event) => {
     const button = event.target.closest("[data-ingest-run-id]");
     if (!button || button.disabled) {

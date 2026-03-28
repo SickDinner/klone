@@ -5,6 +5,7 @@ import hashlib
 import mimetypes
 import os
 from pathlib import Path
+import json
 from typing import Any, Mapping
 
 from .audit import AuditService
@@ -291,6 +292,161 @@ def normalize_root_path(raw_root_path: str) -> Path:
     if not root_path.is_dir():
         raise NotADirectoryError(f"Dataset root is not a directory: {root_path}")
     return root_path
+
+
+def enqueue_ingest_job(
+    repository: KloneRepository,
+    request: DatasetIngestRequest,
+) -> dict[str, Any]:
+    root_path = normalize_root_path(request.root_path)
+    room = room_registry.default_room_for_classification(request.classification_level)
+    room_id = room.id
+    classification_decision = classification_guard.evaluate(
+        classification_level=request.classification_level,
+        room_id=room_id,
+    )
+    if classification_decision.decision != "allowed":
+        raise PermissionError(classification_decision.reason)
+    access_decision = access_guard.evaluate(
+        room_id=room_id,
+        actor_role="owner",
+        requested_permission="write",
+    )
+    if access_decision.decision != "allowed":
+        raise PermissionError(access_decision.reason)
+
+    normalized_request = request.model_copy(update={"root_path": str(root_path)})
+    with repository.connection() as conn:
+        job, created = repository.enqueue_ingest_queue_job(
+            label=normalized_request.label,
+            normalized_root_path=str(root_path),
+            room_id=room_id,
+            classification_level=normalized_request.classification_level,
+            collection=normalized_request.collection,
+            description=normalized_request.description,
+            request_payload=normalized_request.model_dump(mode="json"),
+            conn=conn,
+        )
+        AuditService(repository).log_event(
+            event_type="ingest_queue_enqueued" if created else "ingest_queue_reused",
+            actor="hypervisor",
+            target_type="ingest_queue_job",
+            target_id=str(job["id"]),
+            room_id=room_id,
+            classification_level=normalized_request.classification_level,
+            summary=(
+                f"Queued ingest job for '{normalized_request.label}'."
+                if created
+                else f"Reused active ingest queue job for '{normalized_request.label}'."
+            ),
+            metadata={
+                "queue_job_id": job["id"],
+                "normalized_root_path": str(root_path),
+                "collection": normalized_request.collection,
+                "classification_level": normalized_request.classification_level,
+                "created": created,
+            },
+            conn=conn,
+        )
+    return {"job": job, "created": created}
+
+
+def execute_ingest_job(
+    repository: KloneRepository,
+    *,
+    job_id: int,
+    room_id: str,
+) -> dict[str, Any]:
+    queued_job = repository.get_ingest_queue_job(job_id, room_id=room_id)
+    if queued_job is None:
+        raise ValueError(f"Ingest queue job {job_id} was not found in room {room_id}.")
+
+    started_job = repository.start_ingest_queue_job(job_id, room_id=room_id)
+    request = DatasetIngestRequest.model_validate(json.loads(started_job["request_json"]))
+
+    try:
+        execution = ingest_dataset(
+            repository,
+            request,
+            trigger_source="queue_job",
+        )
+    except (FileNotFoundError, NotADirectoryError, PermissionError, OSError) as error:
+        failed_job = repository.finish_ingest_queue_job(
+            job_id,
+            room_id=room_id,
+            status="failed",
+            last_error=str(error),
+        )
+        with repository.connection() as conn:
+            AuditService(repository).log_event(
+                event_type="ingest_queue_failed",
+                actor="hypervisor",
+                target_type="ingest_queue_job",
+                target_id=str(job_id),
+                room_id=room_id,
+                classification_level=request.classification_level,
+                summary=f"Ingest queue job {job_id} failed before completion.",
+                metadata={
+                    "queue_job_id": job_id,
+                    "last_error": str(error),
+                    "attempt_count": failed_job["attempt_count"],
+                },
+                conn=conn,
+            )
+        return {"job": failed_job, "execution": None, "error": str(error)}
+
+    completed_job = repository.finish_ingest_queue_job(
+        job_id,
+        room_id=room_id,
+        status="completed",
+        last_run_id=execution["run"]["id"],
+    )
+    with repository.connection() as conn:
+        AuditService(repository).log_event(
+            event_type="ingest_queue_completed",
+            actor="hypervisor",
+            target_type="ingest_queue_job",
+            target_id=str(job_id),
+            room_id=room_id,
+            classification_level=request.classification_level,
+            summary=f"Ingest queue job {job_id} completed.",
+            metadata={
+                "queue_job_id": job_id,
+                "attempt_count": completed_job["attempt_count"],
+                "ingest_run_id": execution["run"]["id"],
+            },
+            conn=conn,
+        )
+    return {"job": completed_job, "execution": execution, "error": None}
+
+
+def cancel_ingest_job(
+    repository: KloneRepository,
+    *,
+    job_id: int,
+    room_id: str,
+) -> dict[str, Any]:
+    job = repository.get_ingest_queue_job(job_id, room_id=room_id)
+    if job is None:
+        raise ValueError(f"Ingest queue job {job_id} was not found in room {room_id}.")
+    cancelled = repository.cancel_ingest_queue_job(job_id, room_id=room_id)
+    request = DatasetIngestRequest.model_validate(json.loads(cancelled["request_json"]))
+    with repository.connection() as conn:
+        AuditService(repository).log_event(
+            event_type="ingest_queue_cancelled",
+            actor="hypervisor",
+            target_type="ingest_queue_job",
+            target_id=str(job_id),
+            room_id=room_id,
+            classification_level=request.classification_level,
+            summary=f"Ingest queue job {job_id} was cancelled.",
+            metadata={
+                "queue_job_id": job_id,
+                "status": cancelled["status"],
+            },
+            conn=conn,
+        )
+    return cancelled
 
 
 def ingest_dataset(

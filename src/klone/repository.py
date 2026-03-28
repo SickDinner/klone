@@ -16,7 +16,9 @@ from .contracts import (
     INTERNAL_RUN_KIND_VALUES,
     INTERNAL_RUN_STATUS_VALUES,
     INTERNAL_RUN_TRIGGER_VALUES,
+    INGEST_QUEUE_STATUS_VALUES,
     IngestStatus,
+    IngestQueueStatus,
     MEMORY_STATUS_VALUES,
     MemoryStatus,
     SCHEMA_USER_VERSION,
@@ -30,6 +32,7 @@ EXPECTED_TABLES = (
     "audit_events",
     "control_plane_audit_chain",
     "datasets",
+    "ingest_queue_jobs",
     "ingest_run_manifests",
     "ingest_runs",
     "internal_runs",
@@ -99,6 +102,25 @@ class KloneRepository:
                     summary TEXT
                 );
 
+                CREATE TABLE IF NOT EXISTS ingest_queue_jobs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    label TEXT NOT NULL,
+                    normalized_root_path TEXT NOT NULL,
+                    room_id TEXT NOT NULL,
+                    classification_level TEXT NOT NULL,
+                    collection TEXT NOT NULL,
+                    description TEXT,
+                    request_json TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    started_at TEXT,
+                    completed_at TEXT,
+                    attempt_count INTEGER NOT NULL DEFAULT 0,
+                    last_run_id INTEGER REFERENCES ingest_runs(id),
+                    last_error TEXT
+                );
+
                 CREATE TABLE IF NOT EXISTS ingest_run_manifests (
                     ingest_run_id INTEGER PRIMARY KEY REFERENCES ingest_runs(id),
                     dataset_id INTEGER NOT NULL REFERENCES datasets(id),
@@ -142,6 +164,11 @@ class KloneRepository:
                 CREATE INDEX IF NOT EXISTS idx_assets_dataset_id ON assets(dataset_id);
                 CREATE INDEX IF NOT EXISTS idx_assets_sha256 ON assets(sha256);
                 CREATE INDEX IF NOT EXISTS idx_runs_dataset_id ON ingest_runs(dataset_id);
+                CREATE INDEX IF NOT EXISTS idx_ingest_queue_jobs_room_created_at
+                    ON ingest_queue_jobs(room_id, created_at DESC, id DESC);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_ingest_queue_jobs_active_root
+                    ON ingest_queue_jobs(room_id, normalized_root_path)
+                    WHERE status IN ('queued', 'running');
                 CREATE INDEX IF NOT EXISTS idx_ingest_run_manifests_room_created_at
                     ON ingest_run_manifests(room_id, created_at DESC, ingest_run_id DESC);
 
@@ -887,6 +914,236 @@ class KloneRepository:
                 (run_id,),
             ).fetchone()
             return dict(row)
+
+    # Ingest queue persistence
+    def enqueue_ingest_queue_job(
+        self,
+        *,
+        label: str,
+        normalized_root_path: str,
+        room_id: str,
+        classification_level: ClassificationLevel,
+        collection: str,
+        description: str | None,
+        request_payload: Mapping[str, Any],
+        conn: sqlite3.Connection | None = None,
+    ) -> tuple[dict[str, Any], bool]:
+        with self._borrowed_connection(conn) as active_conn:
+            existing = active_conn.execute(
+                """
+                SELECT *
+                FROM ingest_queue_jobs
+                WHERE room_id = ? AND normalized_root_path = ? AND status IN ('queued', 'running')
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+                """,
+                (room_id, normalized_root_path),
+            ).fetchone()
+            if existing is not None:
+                return dict(existing), False
+
+            created_at = utc_now_iso()
+            cursor = active_conn.execute(
+                """
+                INSERT INTO ingest_queue_jobs (
+                    label,
+                    normalized_root_path,
+                    room_id,
+                    classification_level,
+                    collection,
+                    description,
+                    request_json,
+                    status,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    label,
+                    normalized_root_path,
+                    room_id,
+                    classification_level,
+                    collection,
+                    description,
+                    json.dumps(request_payload, sort_keys=True),
+                    "queued",
+                    created_at,
+                    created_at,
+                ),
+            )
+            row = active_conn.execute(
+                """
+                SELECT *
+                FROM ingest_queue_jobs
+                WHERE id = ?
+                """,
+                (cursor.lastrowid,),
+            ).fetchone()
+            return dict(row), True
+
+    def list_ingest_queue_jobs(
+        self,
+        *,
+        room_id: str,
+        limit: int = 16,
+    ) -> list[dict[str, Any]]:
+        with self.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM ingest_queue_jobs
+                WHERE room_id = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                (room_id, limit),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def count_ingest_queue_jobs(
+        self,
+        *,
+        room_id: str,
+        statuses: tuple[IngestQueueStatus, ...] = ("queued",),
+        conn: sqlite3.Connection | None = None,
+    ) -> int:
+        if not statuses:
+            return 0
+        for status in statuses:
+            if status not in INGEST_QUEUE_STATUS_VALUES:
+                raise ValueError(f"Unsupported ingest queue status: {status}")
+        placeholders = ", ".join("?" for _ in statuses)
+        with self._borrowed_connection(conn) as active_conn:
+            row = active_conn.execute(
+                f"""
+                SELECT COUNT(*)
+                FROM ingest_queue_jobs
+                WHERE room_id = ?
+                  AND status IN ({placeholders})
+                """,
+                (room_id, *statuses),
+            ).fetchone()
+            return int(row[0]) if row is not None else 0
+
+    def get_ingest_queue_job(
+        self,
+        job_id: int,
+        *,
+        room_id: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any] | None:
+        with self._borrowed_connection(conn) as active_conn:
+            row = active_conn.execute(
+                """
+                SELECT *
+                FROM ingest_queue_jobs
+                WHERE id = ? AND room_id = ?
+                """,
+                (job_id, room_id),
+            ).fetchone()
+            return dict(row) if row is not None else None
+
+    def start_ingest_queue_job(
+        self,
+        job_id: int,
+        *,
+        room_id: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any]:
+        with self._borrowed_connection(conn) as active_conn:
+            current = self.get_ingest_queue_job(job_id, room_id=room_id, conn=active_conn)
+            if current is None:
+                raise ValueError(f"Ingest queue job {job_id} was not found in room {room_id}.")
+            if current["status"] not in {"queued", "failed"}:
+                raise ValueError(
+                    f"Ingest queue job {job_id} cannot start from status {current['status']}."
+                )
+            started_at = utc_now_iso()
+            active_conn.execute(
+                """
+                UPDATE ingest_queue_jobs
+                SET status = ?,
+                    started_at = ?,
+                    completed_at = NULL,
+                    updated_at = ?,
+                    attempt_count = attempt_count + 1,
+                    last_error = NULL
+                WHERE id = ? AND room_id = ?
+                """,
+                ("running", started_at, started_at, job_id, room_id),
+            )
+            row = active_conn.execute(
+                """
+                SELECT *
+                FROM ingest_queue_jobs
+                WHERE id = ? AND room_id = ?
+                """,
+                (job_id, room_id),
+            ).fetchone()
+            return dict(row)
+
+    def finish_ingest_queue_job(
+        self,
+        job_id: int,
+        *,
+        room_id: str,
+        status: IngestQueueStatus,
+        last_run_id: int | None = None,
+        last_error: str | None = None,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any]:
+        if status not in {"completed", "failed", "cancelled"}:
+            raise ValueError(f"Unsupported ingest queue terminal status: {status}")
+        with self._borrowed_connection(conn) as active_conn:
+            completed_at = utc_now_iso()
+            active_conn.execute(
+                """
+                UPDATE ingest_queue_jobs
+                SET status = ?,
+                    completed_at = ?,
+                    updated_at = ?,
+                    last_run_id = ?,
+                    last_error = ?
+                WHERE id = ? AND room_id = ?
+                """,
+                (status, completed_at, completed_at, last_run_id, last_error, job_id, room_id),
+            )
+            row = active_conn.execute(
+                """
+                SELECT *
+                FROM ingest_queue_jobs
+                WHERE id = ? AND room_id = ?
+                """,
+                (job_id, room_id),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"Ingest queue job {job_id} was not found in room {room_id}.")
+            return dict(row)
+
+    def cancel_ingest_queue_job(
+        self,
+        job_id: int,
+        *,
+        room_id: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any]:
+        with self._borrowed_connection(conn) as active_conn:
+            current = self.get_ingest_queue_job(job_id, room_id=room_id, conn=active_conn)
+            if current is None:
+                raise ValueError(f"Ingest queue job {job_id} was not found in room {room_id}.")
+            if current["status"] not in {"queued", "failed"}:
+                raise ValueError(
+                    f"Ingest queue job {job_id} cannot be cancelled from status {current['status']}."
+                )
+            return self.finish_ingest_queue_job(
+                job_id,
+                room_id=room_id,
+                status="cancelled",
+                last_run_id=current.get("last_run_id"),
+                last_error=current.get("last_error"),
+                conn=active_conn,
+            )
 
     # Audit persistence
     def record_audit_event(

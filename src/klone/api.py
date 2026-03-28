@@ -10,7 +10,7 @@ from .blueprint import SYSTEM_BLUEPRINT
 from .config import Settings, settings
 from .contracts import APP_VERSION, MODULE_REGISTRY_VERSION, MemoryEpisodeType, MemoryStatus
 from .guards import access_guard, governance_guard_catalog, output_guard
-from .ingest import ingest_dataset, preview_ingest_manifest
+from .ingest import cancel_ingest_job, enqueue_ingest_job, execute_ingest_job, ingest_dataset, preview_ingest_manifest
 from .memory import MemoryService
 from .repository import KloneRepository
 from .rooms import PERMISSION_LEVELS, room_registry
@@ -22,6 +22,9 @@ from .schemas import (
     GovernanceGuardRecord,
     IngestExecutionResponse,
     IngestPreflightResponse,
+    IngestQueueEnqueueResponse,
+    IngestQueueExecutionResponse,
+    IngestQueueJobRecord,
     IngestRunRecord,
     IngestRunManifestResponse,
     IngestStatusResponse,
@@ -424,6 +427,19 @@ def _ingest_run_manifest_from_payload(
     )
 
 
+def _ingest_queue_job_from_row(row: dict[str, Any]) -> IngestQueueJobRecord:
+    payload = dict(row)
+    decision = output_guard.evaluate(classification_level=payload["classification_level"])
+    if decision.decision == "summary_only":
+        payload["normalized_root_path"] = "[summary-only]"
+        payload["description"] = "summary_only"
+        if payload.get("last_error"):
+            payload["last_error"] = "[summary-only]"
+    payload["can_execute"] = payload["status"] in {"queued", "failed"}
+    payload["can_cancel"] = payload["status"] in {"queued", "failed"}
+    return IngestQueueJobRecord.model_validate(payload)
+
+
 def _module_registry_payload() -> list[ModuleCapabilityRecord]:
     return [
         ModuleCapabilityRecord(
@@ -619,14 +635,36 @@ def ingest_status(
     repository: KloneRepository = Depends(get_repository),
 ) -> IngestStatusResponse:
     recent_runs: list[dict[str, Any]] = []
+    recent_queue_jobs: list[dict[str, Any]] = []
+    queue_depth = 0
     for room in _resolve_rooms(requested_room_id=room_id, permission="discover"):
         recent_runs.extend(repository.list_ingest_runs(room_id=room.id, limit=8))
+        queue_depth += repository.count_ingest_queue_jobs(room_id=room.id)
+        recent_queue_jobs.extend(repository.list_ingest_queue_jobs(room_id=room.id, limit=8))
     recent_runs = sorted(recent_runs, key=lambda item: item["started_at"], reverse=True)[:8]
+    recent_queue_jobs = sorted(recent_queue_jobs, key=lambda item: item["created_at"], reverse=True)[:8]
     return IngestStatusResponse(
-        queue_depth=0,
+        queue_depth=queue_depth,
         latest_run=recent_runs[0] if recent_runs else None,
         recent_runs=recent_runs,
+        latest_queue_job=(
+            _ingest_queue_job_from_row(recent_queue_jobs[0]) if recent_queue_jobs else None
+        ),
+        recent_queue_jobs=[_ingest_queue_job_from_row(row) for row in recent_queue_jobs],
     )
+
+
+@router.get("/ingest/queue", response_model=list[IngestQueueJobRecord])
+def ingest_queue(
+    room_id: str | None = Query(default=None),
+    limit: int = Query(default=16, ge=1, le=64),
+    repository: KloneRepository = Depends(get_repository),
+) -> list[IngestQueueJobRecord]:
+    rows: list[dict[str, Any]] = []
+    for room in _resolve_rooms(requested_room_id=room_id, permission="discover"):
+        rows.extend(repository.list_ingest_queue_jobs(room_id=room.id, limit=limit))
+    rows = sorted(rows, key=lambda item: (item["created_at"], item["id"]), reverse=True)[:limit]
+    return [_ingest_queue_job_from_row(row) for row in rows]
 
 
 @router.get("/ingest/runs/{run_id}/manifest", response_model=IngestRunManifestResponse)
@@ -646,6 +684,67 @@ def ingest_run_manifest(
             manifest_payload=manifest_payload,
         )
     raise HTTPException(status_code=404, detail=f"Ingest run {run_id} was not found.")
+
+
+@router.post("/ingest/queue", response_model=IngestQueueEnqueueResponse)
+def ingest_queue_enqueue(
+    request: DatasetIngestRequest,
+    repository: KloneRepository = Depends(get_repository),
+) -> IngestQueueEnqueueResponse:
+    try:
+        result = enqueue_ingest_job(repository, request)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except NotADirectoryError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except PermissionError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
+    except OSError as error:
+        raise HTTPException(status_code=500, detail=f"Ingest queueing failed: {error}") from error
+    return IngestQueueEnqueueResponse(
+        job=_ingest_queue_job_from_row(result["job"]),
+        created=result["created"],
+    )
+
+
+@router.post("/ingest/queue/{job_id}/execute", response_model=IngestQueueExecutionResponse)
+def ingest_queue_execute(
+    job_id: int,
+    repository: KloneRepository = Depends(get_repository),
+) -> IngestQueueExecutionResponse:
+    for room in _resolve_rooms(requested_room_id=None, permission="discover"):
+        job = repository.get_ingest_queue_job(job_id, room_id=room.id)
+        if job is None:
+            continue
+        try:
+            result = execute_ingest_job(repository, job_id=job_id, room_id=room.id)
+        except ValueError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        return IngestQueueExecutionResponse.model_validate(
+            {
+                "job": _ingest_queue_job_from_row(result["job"]),
+                "execution": result["execution"],
+                "error": result["error"],
+            }
+        )
+    raise HTTPException(status_code=404, detail=f"Ingest queue job {job_id} was not found.")
+
+
+@router.post("/ingest/queue/{job_id}/cancel", response_model=IngestQueueJobRecord)
+def ingest_queue_cancel(
+    job_id: int,
+    repository: KloneRepository = Depends(get_repository),
+) -> IngestQueueJobRecord:
+    for room in _resolve_rooms(requested_room_id=None, permission="discover"):
+        job = repository.get_ingest_queue_job(job_id, room_id=room.id)
+        if job is None:
+            continue
+        try:
+            cancelled = cancel_ingest_job(repository, job_id=job_id, room_id=room.id)
+        except ValueError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        return _ingest_queue_job_from_row(cancelled)
+    raise HTTPException(status_code=404, detail=f"Ingest queue job {job_id} was not found.")
 
 
 @router.post("/ingest/preflight", response_model=IngestPreflightResponse)

@@ -71,6 +71,7 @@
             </label>
             <div class="form-actions">
               <button class="button button-secondary" id="ingest-preview-button" type="button">Preview Manifest</button>
+              <button class="button button-secondary" id="ingest-queue-button" type="button">Queue Dataset</button>
               <button class="button" type="submit">Scan Dataset</button>
               <span class="feedback" id="ingest-feedback">No ingest run started yet.</span>
             </div>
@@ -260,8 +261,14 @@
         </article>
         <article>
           <div class="section-head">
+            <h2>Ingest Queue and Runs</h2>
+            <p>Manual queue jobs first, then completed ingest-run history with typed status and indexing counts.</p>
+          </div>
+          <div class="stack" id="ingest-queue-jobs"></div>
+          <div id="ingest-queue-detail" class="detail-card empty-state">Select a queued ingest job.</div>
+          <div class="section-head section-head-tight">
             <h2>Ingest Runs</h2>
-            <p>Recent ingest run history with typed status and indexing counts.</p>
+            <p>Completed runs remain inspectable through stored manifest history.</p>
           </div>
           <div class="stack" id="ingest-runs"></div>
           <div id="ingest-run-detail" class="detail-card empty-state">Select an ingest run manifest.</div>

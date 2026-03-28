@@ -8,6 +8,7 @@ from .contracts import (
     DedupStatus,
     ExtractionStatus,
     GuardDecision,
+    IngestQueueStatus,
     IngestStatus,
     InternalRunKind,
     InternalRunStatus,
@@ -126,6 +127,26 @@ class IngestRunRecord(BaseModel):
     errors_detected: int
     summary: str | None = None
     has_manifest: bool = False
+
+
+class IngestQueueJobRecord(BaseModel):
+    id: int
+    label: str
+    normalized_root_path: str
+    room_id: str
+    classification_level: ClassificationLevel
+    collection: str
+    description: str | None = None
+    status: IngestQueueStatus
+    created_at: str
+    updated_at: str
+    started_at: str | None = None
+    completed_at: str | None = None
+    attempt_count: int
+    last_run_id: int | None = None
+    last_error: str | None = None
+    can_execute: bool
+    can_cancel: bool
 
 
 class IngestManifestKindRecord(BaseModel):
@@ -393,12 +414,25 @@ class IngestStatusResponse(BaseModel):
     queue_depth: int
     latest_run: IngestRunRecord | None = None
     recent_runs: list[IngestRunRecord]
+    latest_queue_job: IngestQueueJobRecord | None = None
+    recent_queue_jobs: list[IngestQueueJobRecord] = Field(default_factory=list)
 
 
 class IngestExecutionResponse(BaseModel):
     dataset: DatasetRecord
     run: IngestRunRecord
     errors: list[str]
+
+
+class IngestQueueEnqueueResponse(BaseModel):
+    job: IngestQueueJobRecord
+    created: bool
+
+
+class IngestQueueExecutionResponse(BaseModel):
+    job: IngestQueueJobRecord
+    execution: IngestExecutionResponse | None = None
+    error: str | None = None
 
 
 class IngestPreflightResponse(BaseModel):

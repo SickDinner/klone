@@ -3,7 +3,7 @@
 Last updated: 2026-03-28
 
 ## Current approved phase
-Phase G1.2 closeout complete / awaiting next approved phase
+Phase G1.3 closeout complete / awaiting next approved phase
 
 ## Baseline
 - 2B.1 through 2B.5 complete
@@ -20,14 +20,15 @@ Phase G1.2 closeout complete / awaiting next approved phase
 - A1.8 public room-scoped audit preview query kind exists in repo reality
 - G1.1 read-only ingest preflight manifest exists in repo reality
 - G1.2 bounded ingest run manifest history exists in repo reality
+- G1.3 local ingest queue shell exists in repo reality
 
 ## Immediate goal
-Phase G1.2 is complete. No further approved G1 substep is enumerated in canonical repo evidence.
-Await explicit roadmap extension or approval before widening the ingest spine. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, G1.1 preflight manifest work, or G1.2 manifest history work.
+Phase G1.3 is complete. No further approved G1 substep is enumerated in canonical repo evidence.
+Await explicit roadmap extension or approval before widening the ingest spine. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, G1.1 preflight manifest work, G1.2 manifest history work, or G1.3 local ingest queue shell work.
 
 ## Approved scope
-- canonical docs closeout after completed Phase G1.2
-- verified confirmation that no further post-G1.2 approved substep is currently defined
+- canonical docs closeout after completed Phase G1.3
+- verified confirmation that no further post-G1.3 approved substep is currently defined
 - duplicate-work prevention
 - no unrelated runtime behavior
 - no unrelated API widening
@@ -36,6 +37,9 @@ Await explicit roadmap extension or approval before widening the ingest spine. D
 - do not modify ingest behavior
 - do not regress the completed read-only preflight manifest seam at `/api/ingest/preflight`
 - do not regress the completed bounded manifest-history seam at `/api/ingest/runs/{run_id}/manifest`
+- do not regress the completed local ingest queue shell at `/api/ingest/queue`
+- do not regress the completed explicit queue execution shell at `/api/ingest/queue/{job_id}/execute`
+- do not regress the completed explicit queue cancellation shell at `/api/ingest/queue/{job_id}/cancel`
 - do not modify evidence_text
 - do not add public write endpoints
 - do not add semantic search
@@ -61,10 +65,11 @@ Await explicit roadmap extension or approval before widening the ingest spine. D
 - do not widen supported object kinds beyond `dataset`, `asset`, `memory_event`, and `memory_episode` without a new approved phase
 - do not widen blob semantics beyond deterministic metadata detail over existing asset-backed rows
 - do not widen ingest preview into writes, audit side effects, or background workers without a new approved phase
+- do not widen the local queue shell into resumable queue state, async interruption, or startup auto-resume without a new approved phase
 
 ## Required verification
 - compile pass
-- focused G1.2 tests green
+- focused G1.3 tests green
 - regression slice for G1.1 green
 - full unittest suite green
 - local verification if read behavior changes

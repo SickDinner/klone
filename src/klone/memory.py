@@ -11,6 +11,7 @@ from .repository import KloneRepository, utc_now_iso
 from .rooms import room_registry
 from .schemas import (
     MemoryCorrectionResult,
+    MemoryContextPackageRecord,
     MemoryReplayRequestInternal,
     MemoryReplayResult,
     MemorySeedResult,
@@ -516,6 +517,243 @@ class MemoryService:
                 payload=_decode_row_metadata(row),
             )
             for row in rows
+        ]
+
+    def assemble_context_package(
+        self,
+        *,
+        room_id: str,
+        event_id: int | None = None,
+        episode_id: str | None = None,
+        conn: sqlite3.Connection | None = None,
+    ) -> MemoryContextPackageRecord:
+        self._require_room(room_id)
+        if (event_id is None) == (episode_id is None):
+            raise ValueError("Exactly one of event_id or episode_id is required.")
+        if event_id is not None:
+            return self._assemble_event_context_package(
+                room_id=room_id,
+                event_id=event_id,
+                conn=conn,
+            )
+        return self._assemble_episode_context_package(
+            room_id=room_id,
+            episode_id=episode_id,
+            conn=conn,
+        )
+
+    def _assemble_event_context_package(
+        self,
+        *,
+        room_id: str,
+        event_id: int,
+        conn: sqlite3.Connection | None = None,
+    ) -> MemoryContextPackageRecord:
+        event_detail = self.get_event_detail(room_id=room_id, event_id=event_id, conn=conn)
+        if event_detail is None:
+            raise ValueError(f"Memory event {event_id} was not found in room {room_id}.")
+
+        included_episodes: list[dict[str, Any]] = []
+        seen_episode_ids: set[str] = set()
+        for membership in event_detail.get("episode_memberships", []):
+            membership_episode_id = membership["episode"]["id"]
+            if membership_episode_id in seen_episode_ids:
+                continue
+            episode_detail = self.get_episode_detail(
+                room_id=room_id,
+                episode_id=membership_episode_id,
+                conn=conn,
+            )
+            if episode_detail is None:
+                continue
+            seen_episode_ids.add(membership_episode_id)
+            included_episodes.append(episode_detail)
+
+        included_events = [event_detail]
+        return MemoryContextPackageRecord.model_validate(
+            {
+                "room_id": room_id,
+                "query_scope": {
+                    "scope_kind": "event_detail",
+                    "primary_event_id": event_id,
+                    "primary_episode_id": None,
+                },
+                "included_events": included_events,
+                "included_episodes": included_episodes,
+                "provenance_summary": self._build_context_provenance_summary(
+                    event_payloads=included_events,
+                    episode_payloads=included_episodes,
+                ),
+                "correction_summary": self._build_context_correction_summary(
+                    event_payloads=included_events,
+                    episode_payloads=included_episodes,
+                ),
+                "warnings": self._build_context_warnings(
+                    scope_kind="event_detail",
+                    included_events=included_events,
+                    included_episodes=included_episodes,
+                ),
+                "limitations": self._context_limitations(),
+                "assembly_reasoning": [
+                    "Used the requested room-scoped event detail as the primary record.",
+                    "Included episode details from stored event memberships in deterministic sequence order.",
+                    "Preserved stored provenance, correction state, supersession visibility, and evidence text without inference.",
+                ],
+            }
+        )
+
+    def _assemble_episode_context_package(
+        self,
+        *,
+        room_id: str,
+        episode_id: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> MemoryContextPackageRecord:
+        episode_detail = self.get_episode_detail(room_id=room_id, episode_id=episode_id, conn=conn)
+        if episode_detail is None:
+            raise ValueError(f"Memory episode {episode_id} was not found in room {room_id}.")
+
+        included_events: list[dict[str, Any]] = []
+        seen_event_ids: set[int] = set()
+        for linked_event in episode_detail.get("linked_events", []):
+            linked_event_id = int(linked_event["event"]["id"])
+            if linked_event_id in seen_event_ids:
+                continue
+            event_detail = self.get_event_detail(
+                room_id=room_id,
+                event_id=linked_event_id,
+                conn=conn,
+            )
+            if event_detail is None:
+                continue
+            seen_event_ids.add(linked_event_id)
+            included_events.append(event_detail)
+
+        included_episodes = [episode_detail]
+        return MemoryContextPackageRecord.model_validate(
+            {
+                "room_id": room_id,
+                "query_scope": {
+                    "scope_kind": "episode_detail",
+                    "primary_event_id": None,
+                    "primary_episode_id": episode_id,
+                },
+                "included_events": included_events,
+                "included_episodes": included_episodes,
+                "provenance_summary": self._build_context_provenance_summary(
+                    event_payloads=included_events,
+                    episode_payloads=included_episodes,
+                ),
+                "correction_summary": self._build_context_correction_summary(
+                    event_payloads=included_events,
+                    episode_payloads=included_episodes,
+                ),
+                "warnings": self._build_context_warnings(
+                    scope_kind="episode_detail",
+                    included_events=included_events,
+                    included_episodes=included_episodes,
+                ),
+                "limitations": self._context_limitations(),
+                "assembly_reasoning": [
+                    "Used the requested room-scoped episode detail as the primary record.",
+                    "Included event details from stored episode memberships in deterministic sequence order.",
+                    "Preserved stored provenance, correction state, supersession visibility, and evidence text without inference.",
+                ],
+            }
+        )
+
+    def _build_context_provenance_summary(
+        self,
+        *,
+        event_payloads: list[dict[str, Any]],
+        episode_payloads: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        unique_provenance: dict[int, dict[str, Any]] = {}
+        for payload in [*event_payloads, *episode_payloads]:
+            for provenance_row in payload.get("provenance", []):
+                unique_provenance[int(provenance_row["id"])] = dict(provenance_row)
+
+        ordered_rows = sorted(
+            unique_provenance.values(),
+            key=lambda row: (
+                row["owner_type"],
+                row["owner_id"],
+                row["provenance_type"],
+                row["source_table"],
+                row["source_record_id"],
+                row["basis_type"],
+                row["id"],
+            ),
+        )
+        return self._build_provenance_summary(ordered_rows)
+
+    def _build_context_correction_summary(
+        self,
+        *,
+        event_payloads: list[dict[str, Any]],
+        episode_payloads: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        corrected_event_ids = sorted(
+            event["id"] for event in event_payloads if event["status"] in {"rejected", "superseded"}
+        )
+        corrected_episode_ids = sorted(
+            episode["id"] for episode in episode_payloads if episode["status"] != "active"
+        )
+        rejected_event_ids = sorted(
+            event["id"] for event in event_payloads if event["status"] == "rejected"
+        )
+        rejected_episode_ids = sorted(
+            episode["id"] for episode in episode_payloads if episode["status"] == "rejected"
+        )
+        superseded_event_ids = sorted(
+            event["id"] for event in event_payloads if event["status"] == "superseded"
+        )
+
+        supersession_links: dict[str, dict[str, Any]] = {}
+        for event in event_payloads:
+            for relationship in event.get("supersession_relationships", []):
+                supersession_links[relationship["id"]] = {
+                    "id": relationship["id"],
+                    "room_id": relationship["room_id"],
+                    "old_event_id": relationship["old_event_id"],
+                    "new_event_id": relationship["new_event_id"],
+                    "reason": relationship.get("reason"),
+                    "created_at": relationship["created_at"],
+                    "created_by_role": relationship["created_by_role"],
+                }
+
+        return {
+            "corrected_event_ids": corrected_event_ids,
+            "corrected_episode_ids": corrected_episode_ids,
+            "rejected_event_ids": rejected_event_ids,
+            "rejected_episode_ids": rejected_episode_ids,
+            "superseded_event_ids": superseded_event_ids,
+            "supersession_links": sorted(
+                supersession_links.values(),
+                key=lambda item: (item["old_event_id"], item["new_event_id"], item["id"]),
+            ),
+        }
+
+    def _build_context_warnings(
+        self,
+        *,
+        scope_kind: str,
+        included_events: list[dict[str, Any]],
+        included_episodes: list[dict[str, Any]],
+    ) -> list[str]:
+        warnings: list[str] = []
+        if scope_kind == "event_detail" and not included_episodes:
+            warnings.append("no_linked_episodes_included")
+        if scope_kind == "episode_detail" and not included_events:
+            warnings.append("no_linked_events_included")
+        return warnings
+
+    def _context_limitations(self) -> list[str]:
+        return [
+            "Read-only package assembled from stored room-scoped memory only.",
+            "No LLM calls, semantic ranking, embeddings, or inferred facts were used.",
+            "Package includes only stored records reachable from the requested root record.",
+            "evidence_text is preserved exactly from stored memory rows.",
         ]
 
     def list_event_episode_memberships(

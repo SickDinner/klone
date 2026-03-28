@@ -430,3 +430,40 @@ class MemoryEpisodeDetailRecord(MemoryEpisodeRecord):
     provenance: list[MemoryProvenanceRecord]
     provenance_summary: MemoryProvenanceSummaryRecord
     linked_events: list[MemoryEpisodeMemberRecord]
+
+
+class MemoryContextQueryScopeRecord(BaseModel):
+    scope_kind: str
+    primary_event_id: int | None = None
+    primary_episode_id: str | None = None
+
+
+class MemoryContextSupersessionLinkRecord(BaseModel):
+    id: str
+    room_id: str
+    old_event_id: str
+    new_event_id: str
+    reason: str | None = None
+    created_at: str
+    created_by_role: str
+
+
+class MemoryContextCorrectionSummaryRecord(BaseModel):
+    corrected_event_ids: list[int]
+    corrected_episode_ids: list[str]
+    rejected_event_ids: list[int]
+    rejected_episode_ids: list[str]
+    superseded_event_ids: list[int]
+    supersession_links: list[MemoryContextSupersessionLinkRecord]
+
+
+class MemoryContextPackageRecord(BaseModel):
+    room_id: str
+    query_scope: MemoryContextQueryScopeRecord
+    included_events: list[MemoryEventDetailRecord]
+    included_episodes: list[MemoryEpisodeDetailRecord]
+    provenance_summary: MemoryProvenanceSummaryRecord
+    correction_summary: MemoryContextCorrectionSummaryRecord
+    warnings: list[str]
+    limitations: list[str]
+    assembly_reasoning: list[str]

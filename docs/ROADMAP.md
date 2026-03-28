@@ -81,7 +81,7 @@ Public Control-Plane Skeleton:
 - versioned /v1 API shell inside the existing FastAPI app
 - request context with request_id / trace_id / principal placeholder
 - in-process service seams for MemoryFacade / PolicyService / AuditService / BlobService
-- initial sequence: A1.1 request-context + GET /v1/capabilities, then A1.2 append-only audit chain foundation, then A1.3 local blob metadata shell via existing asset routes, then A1.4 local object envelope shell via existing read routes, then A1.5 public room-scoped object get
+- initial sequence: A1.1 request-context + GET /v1/capabilities, then A1.2 append-only audit chain foundation, then A1.3 local blob metadata shell via existing asset routes, then A1.4 local object envelope shell via existing read routes, then A1.5 public room-scoped object get, then A1.6 public room-scoped query shell, then A1.7 public room-scoped blob metadata get
 - stable object/query/changes/blob contracts
 - append-only audit chain reuse/extension
 - local blob metadata shell
@@ -116,7 +116,7 @@ Public Room-Scoped Query Shell:
 
 ## Phase A1.7
 Public Room-Scoped Blob Metadata Detail:
-- GET /v1/rooms/{room_id}/blobs/{blob_id}/meta
+- POST /v1/rooms/{room_id}/blobs/get
 - read-only blob metadata detail only
 - backed by the existing local blob metadata shell and deterministic asset-backed blob ids
 - preserve linked_object_id visibility and room-scoped asset ownership

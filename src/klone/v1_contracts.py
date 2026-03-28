@@ -199,15 +199,15 @@ def contract_registry_payload() -> list[PublicContractRecord]:
             name="Blob Metadata Shell",
             category="blob",
             status="contract_shell",
-            route_readiness="metadata_only_no_public_upload",
+            route_readiness="public_read_only_meta_available",
             description="Local blob metadata shell that reserves the future public blob boundary without exposing upload routes.",
             notes=[
-                "POST /v1/rooms/{room_id}/blobs/get is the first public read-only blob metadata route.",
+                "GET /v1/rooms/{room_id}/blobs/{blob_id}/meta is the first public read-only blob metadata route.",
                 "No /v1 blobs upload route exists yet.",
                 "This shell is metadata-only and remains local-first.",
             ],
             backing_routes=[
-                "/v1/rooms/{room_id}/blobs/get",
+                "/v1/rooms/{room_id}/blobs/{blob_id}/meta",
                 "/api/assets",
                 "/api/assets/{asset_id}",
             ],

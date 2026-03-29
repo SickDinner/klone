@@ -3,7 +3,7 @@
 Last updated: 2026-03-29
 
 ## Current approved phase
-Phase G1.5: Bounded Ingest Queue History Seam
+Phase G1.5 closeout complete / awaiting next approved phase
 
 ## Baseline
 - 2B.1 through 2B.5 complete
@@ -23,14 +23,15 @@ Phase G1.5: Bounded Ingest Queue History Seam
 - G1.2 bounded ingest run manifest history exists in repo reality
 - G1.3 local ingest queue shell exists in repo reality
 - G1.4 local resumable ingest queue exists in repo reality
+- G1.5 bounded ingest queue history seam exists in repo reality
 
 ## Immediate goal
-Phase G1.5 is the next approved ingest step. Implement one bounded room-scoped queue job history/detail read surface at `GET /api/ingest/queue/{job_id}/history`, backed only by existing `ingest_queue_jobs`, append-only `audit_events`, and linked ingest run / manifest references.
-Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local ingest queue shell work, or G1.4 local resumable queue work.
+Phase G1.5 is complete. No further approved A1 or G1 substep is enumerated in canonical repo evidence.
+Await explicit roadmap extension or approval before widening the public control-plane seam or the ingest spine. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local ingest queue shell work, G1.4 local resumable queue work, or G1.5 queue history seam work.
 
 ## Approved scope
-- one bounded room-scoped queue history/detail read surface at `GET /api/ingest/queue/{job_id}/history`
-- reuse existing `ingest_queue_jobs`, append-only `audit_events`, and linked ingest run / manifest references only
+- canonical docs closeout after completed Phase G1.5
+- verified confirmation that no further post-A1.9 or post-G1.5 approved substep is currently defined
 - duplicate-work prevention
 - no unrelated runtime behavior
 - no unrelated API widening

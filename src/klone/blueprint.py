@@ -105,10 +105,10 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
             zone_id="personal",
             supervisor="art supervisor",
             stage="phase-2c",
-            status="planned",
+            status="read_only_asset_metrics",
             purpose="Measure formal visual properties without drifting into personality or clinical inference.",
             key_inputs=["drawings", "visual archives", "image assets"],
-            outputs=["formal metrics", "composition features", "longitudinal comparisons"],
+            outputs=["asset formal metrics", "composition features", "longitudinal comparisons"],
         ),
         ModuleCard(
             id="genomics-lab",

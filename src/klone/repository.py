@@ -1727,6 +1727,7 @@ class KloneRepository:
         offset: int = 0,
         event_type: str | None = None,
         target_type: str | None = None,
+        target_id: str | None = None,
     ) -> list[dict[str, Any]]:
         with self.connection() as conn:
             clauses = ["room_id = ?"]
@@ -1737,6 +1738,9 @@ class KloneRepository:
             if target_type is not None:
                 clauses.append("target_type = ?")
                 params.append(target_type)
+            if target_id is not None:
+                clauses.append("target_id = ?")
+                params.append(target_id)
             rows = conn.execute(
                 f"""
                 SELECT *

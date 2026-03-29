@@ -11,6 +11,7 @@ requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115,<1.0",
   "uvicorn>=0.34,<1.0",
+  "pillow>=11,<12",
 ]
 
 [tool.setuptools.package-dir]
@@ -18,4 +19,3 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
-

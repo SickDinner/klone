@@ -10,6 +10,8 @@ const state = {
   ingestQueueSelectionId: null,
   ingestPreview: null,
   ingestManifest: null,
+  selectedAsset: null,
+  artMetrics: null,
   memory: {
     roomId: "",
     events: [],
@@ -554,6 +556,55 @@ function renderAssetDetail(asset) {
   `;
 }
 
+function renderArtMetrics(metrics, asset = null) {
+  const root = document.querySelector("#art-metrics");
+  if (!asset) {
+    root.className = "detail-card empty-state";
+    root.textContent = "Select an image asset to inspect formal metrics.";
+    return;
+  }
+  if (asset.asset_kind !== "image") {
+    root.className = "detail-card empty-state";
+    root.textContent = `Art metrics currently support image assets only. Selected asset kind: ${asset.asset_kind}.`;
+    return;
+  }
+  if (!metrics) {
+    root.className = "detail-card empty-state";
+    root.textContent = "No art metrics loaded yet.";
+    return;
+  }
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>${escapeHtml(metrics.file_name)}</h3>
+    <p>${escapeHtml(metrics.relative_path)} in ${escapeHtml(metrics.room_id)} is measured through deterministic formal image metrics only.</p>
+    <div class="meta">${chips([
+      `analysis_version: ${metrics.analysis_version}`,
+      `orientation: ${metrics.orientation}`,
+      `size: ${metrics.width_px}x${metrics.height_px}`,
+      `sample: ${metrics.sample_width_px}x${metrics.sample_height_px}`,
+      `edge_density: ${metrics.edge_density}`,
+      `ink_coverage: ${metrics.ink_coverage_ratio}`,
+      `colorfulness: ${metrics.colorfulness}`,
+    ])}</div>
+    <ul class="detail-list">
+      <li><strong>aspect_ratio</strong>: ${escapeHtml(metrics.aspect_ratio)}</li>
+      <li><strong>brightness_mean</strong>: ${escapeHtml(metrics.brightness_mean)}</li>
+      <li><strong>contrast_stddev</strong>: ${escapeHtml(metrics.contrast_stddev)}</li>
+      <li><strong>dark_pixel_ratio</strong>: ${escapeHtml(metrics.dark_pixel_ratio)}</li>
+      <li><strong>light_pixel_ratio</strong>: ${escapeHtml(metrics.light_pixel_ratio)}</li>
+      <li><strong>entropy</strong>: ${escapeHtml(metrics.entropy)}</li>
+      <li><strong>symmetry_vertical</strong>: ${escapeHtml(metrics.symmetry_vertical)}</li>
+      <li><strong>symmetry_horizontal</strong>: ${escapeHtml(metrics.symmetry_horizontal)}</li>
+      <li><strong>center_of_mass_x</strong>: ${escapeHtml(metrics.center_of_mass_x)}</li>
+      <li><strong>center_of_mass_y</strong>: ${escapeHtml(metrics.center_of_mass_y)}</li>
+      <li><strong>quantized_color_count</strong>: ${escapeHtml(metrics.quantized_color_count)}</li>
+      <li><strong>notes</strong>: ${metrics.notes.map((item) => escapeHtml(item)).join(", ")}</li>
+      <li><strong>warnings</strong>: ${metrics.warnings.map((item) => escapeHtml(item)).join(", ") || "none"}</li>
+    </ul>
+  `;
+}
+
 function renderMission(blueprint) {
   document.querySelector("#mission").textContent = blueprint.mission;
   document.querySelector("#hypervisor-answer").textContent = blueprint.hypervisor_answer;
@@ -890,9 +941,28 @@ async function refreshAssetBrowser() {
 async function loadAssetDetail(assetId) {
   try {
     const asset = await fetchJson(`/api/assets/${assetId}`);
+    state.selectedAsset = asset;
     renderAssetDetail(asset);
+    if (asset.asset_kind !== "image") {
+      state.artMetrics = null;
+      renderArtMetrics(null, asset);
+      return;
+    }
+    try {
+      const metrics = await fetchJson(`/api/art/assets/${assetId}/metrics`);
+      state.artMetrics = metrics;
+      renderArtMetrics(metrics, asset);
+    } catch (error) {
+      state.artMetrics = null;
+      const root = document.querySelector("#art-metrics");
+      root.className = "detail-card";
+      root.textContent = error.message;
+    }
   } catch (error) {
+    state.selectedAsset = null;
+    state.artMetrics = null;
     document.querySelector("#asset-detail").textContent = error.message;
+    renderArtMetrics(null, null);
   }
 }
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 
+from .art import ArtLabService
 from .audit import AuditService
 from .blueprint import SYSTEM_BLUEPRINT
 from .guards import governance_guard_catalog, output_guard
@@ -679,6 +680,7 @@ class ServiceContainer:
     policy: PolicyService
     audit: AuditService
     blob: BlobService
+    art: ArtLabService
     object_envelope: _ObjectEnvelopeProjector
 
     @classmethod
@@ -688,6 +690,7 @@ class ServiceContainer:
             policy=PolicyService(),
             audit=AuditService(repository),
             blob=BlobService(repository),
+            art=ArtLabService(repository),
             object_envelope=_ObjectEnvelopeProjector(repository),
         )
 
@@ -706,6 +709,7 @@ class ServiceContainer:
                 ],
             ),
             self.blob.seam_descriptor(),
+            self.art.seam_descriptor(),
             self.object_envelope.seam_descriptor(),
         ]
 
@@ -726,6 +730,7 @@ class ServiceContainer:
             *self.policy.public_capabilities(),
             *self.memory.public_capabilities(),
             *self.blob.public_capabilities(),
+            *self.art.public_capabilities(),
             *self.object_envelope.public_capabilities(),
             PublicCapabilityRecord(
                 id="audit.preview.read",

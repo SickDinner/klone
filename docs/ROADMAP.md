@@ -203,7 +203,26 @@ Bounded Ingest Queue History Seam:
 - make interrupted, resumed, completed, failed, and cancelled lifecycle transitions inspectable when already present in stored evidence
 - no new queue states, no automatic resume/execute, no background workers, and no `/v1` widening in this phase
 
+## Phase V1
+Read-Only Art and Drawing Lab:
+- add deterministic formal visual metrics over existing governed image assets
+- keep the surface read-only and asset-backed
+- block personality profiling and clinical-style interpretation
+- expose art-lab readiness through Mission Control and public capability visibility
+- do not widen into OCR, embeddings, batch profiling, or longitudinal inference in the first step
+
+## Phase V1.1
+Read-Only Asset Formal Metrics:
+- GET /api/art/assets/{asset_id}/metrics
+- single asset, room-scoped image analysis only
+- deterministic size, brightness, contrast, edge-density, symmetry, balance, entropy, and colorfulness metrics
+- capability visibility through /v1/capabilities
+- Mission Control asset detail shows an Art Metrics panel for supported image assets
+- no OCR, no embeddings, no batch comparison surface, and no personality or clinical inference
+
 ## Not approved yet
+- G1.5 bounded ingest queue history seam
+- V1.2 batch art metrics and longitudinal comparisons
 - semantic search
 - embeddings
 - OCR/transcription

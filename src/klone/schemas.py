@@ -74,6 +74,37 @@ class AssetRecord(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
+class ArtAssetMetricsRecord(BaseModel):
+    analysis_version: str
+    asset_id: int
+    room_id: str
+    classification_level: ClassificationLevel
+    asset_kind: AssetKind
+    file_name: str
+    relative_path: str
+    width_px: int
+    height_px: int
+    sample_width_px: int
+    sample_height_px: int
+    orientation: Literal["portrait", "landscape", "square"]
+    aspect_ratio: float
+    brightness_mean: float
+    contrast_stddev: float
+    dark_pixel_ratio: float
+    light_pixel_ratio: float
+    ink_coverage_ratio: float
+    edge_density: float
+    colorfulness: float
+    entropy: float
+    symmetry_vertical: float
+    symmetry_horizontal: float
+    center_of_mass_x: float
+    center_of_mass_y: float
+    quantized_color_count: int
+    notes: list[str]
+    warnings: list[str]
+
+
 class BlobMetadataRecord(BaseModel):
     blob_id: str
     asset_id: int
@@ -488,6 +519,18 @@ class IngestRunManifestResponse(BaseModel):
     sample_limit: int
     sample_assets: list[IngestManifestSampleRecord]
     warnings: list[str]
+
+
+class IngestQueueHistoryResponse(BaseModel):
+    room_id: str
+    read_only: bool = True
+    history_limit: int
+    history_event_count: int
+    job: IngestQueueJobRecord
+    history_events: list[AuditEventRecord]
+    linked_run: IngestRunRecord | None = None
+    linked_manifest_available: bool = False
+    linked_manifest_route: str | None = None
 
 
 class MemoryEventRecord(BaseModel):

@@ -3,7 +3,7 @@
 Last updated: 2026-03-29
 
 ## Current phase
-Phase G1.5 approved; implementation pending
+Phase G1.5 complete; no further approved A1 or G1 substep is defined yet
 
 ## Phase state
 - Phase 2B.1 complete
@@ -32,7 +32,7 @@ Phase G1.5 approved; implementation pending
 - Phase G1.2 complete
 - Phase G1.3 complete
 - Phase G1.4 complete
-- Phase G1.5 approved
+- Phase G1.5 complete
 
 ## Completed in 2B.5
 - stress verification for replay/correction/provenance/room isolation
@@ -230,10 +230,19 @@ Phase G1.5 approved; implementation pending
 - keep queue execution semantics unchanged
 - no new queue states, no worker daemon, no automatic resume, and no startup auto-execution
 
+## Completed in G1.5
+- first bounded room-scoped ingest queue history/detail read surface
+- GET `/api/ingest/queue/{job_id}/history` only
+- backed only by existing `ingest_queue_jobs`, append-only `audit_events`, and linked ingest run / manifest references
+- preserves room scope, deterministic ordering, and bounded history visibility
+- linked ingest run and manifest visibility exposed when already present
+- no ingest execution, queue state, worker, retry, or startup auto-execute behavior changes
+- focused G1.5 tests green
+- full unittest suite green
+- local HTTP verification green
+
 ## Next approved substep
-- Phase G1.5 approved: bounded ingest queue history seam
-- add one bounded room-scoped queue job history/detail read surface at `GET /api/ingest/queue/{job_id}/history`
-- reuse existing `ingest_queue_jobs`, append-only `audit_events`, and linked ingest run / manifest references only
-- keep queue execution semantics unchanged; no new workers, no automatic resume, no startup auto-execute, and no `/v1` widening
-- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, or G1.4 local resumable queue work
+- no further approved A1 or G1 substep is enumerated in canonical repo evidence
+- require explicit roadmap extension or approval before widening the public control-plane seam beyond the completed A1.9 change preview route or the ingest spine beyond the completed G1.5 queue history seam
+- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, G1.4 local resumable queue work, or G1.5 queue history seam work
 

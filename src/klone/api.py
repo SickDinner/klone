@@ -6,6 +6,12 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from .art import (
+    ArtAssetSourceMissingError,
+    ArtDependencyError,
+    ArtLabService,
+    UnsupportedArtAssetError,
+)
 from .blueprint import SYSTEM_BLUEPRINT
 from .config import Settings, settings
 from .contracts import APP_VERSION, MODULE_REGISTRY_VERSION, MemoryEpisodeType, MemoryStatus
@@ -15,6 +21,7 @@ from .memory import MemoryService
 from .repository import KloneRepository
 from .rooms import PERMISSION_LEVELS, room_registry
 from .schemas import (
+    ArtAssetMetricsRecord,
     AssetRecord,
     AuditEventRecord,
     DatasetIngestRequest,
@@ -24,6 +31,7 @@ from .schemas import (
     IngestPreflightResponse,
     IngestQueueEnqueueResponse,
     IngestQueueExecutionResponse,
+    IngestQueueHistoryResponse,
     IngestQueueJobRecord,
     IngestRunRecord,
     IngestRunManifestResponse,
@@ -629,6 +637,27 @@ def asset_detail(asset_id: int, repository: KloneRepository = Depends(get_reposi
     raise HTTPException(status_code=404, detail=f"Asset {asset_id} was not found.")
 
 
+@router.get("/art/assets/{asset_id}/metrics", response_model=ArtAssetMetricsRecord)
+def art_asset_metrics(
+    asset_id: int,
+    repository: KloneRepository = Depends(get_repository),
+) -> ArtAssetMetricsRecord:
+    art_service = ArtLabService(repository)
+    for room in _resolve_rooms(requested_room_id=None, permission="read"):
+        row = repository.get_asset(asset_id, room_id=room.id)
+        if row is None:
+            continue
+        try:
+            return art_service.metrics_from_asset_row(row)
+        except UnsupportedArtAssetError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except ArtAssetSourceMissingError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        except ArtDependencyError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+    raise HTTPException(status_code=404, detail=f"Asset {asset_id} was not found.")
+
+
 @router.get("/ingest/status", response_model=IngestStatusResponse)
 def ingest_status(
     room_id: str | None = Query(default=None),
@@ -668,6 +697,52 @@ def ingest_queue(
         rows.extend(repository.list_ingest_queue_jobs(room_id=room.id, limit=limit))
     rows = sorted(rows, key=lambda item: (item["created_at"], item["id"]), reverse=True)[:limit]
     return [_ingest_queue_job_from_row(row) for row in rows]
+
+
+@router.get("/ingest/queue/{job_id}/history", response_model=IngestQueueHistoryResponse)
+def ingest_queue_history(
+    job_id: int,
+    room_id: str = Query(..., min_length=1),
+    limit: int = Query(default=16, ge=1, le=32),
+    repository: KloneRepository = Depends(get_repository),
+) -> IngestQueueHistoryResponse:
+    room = _resolve_rooms(requested_room_id=room_id, permission="summarize")[0]
+    job = repository.get_ingest_queue_job(job_id, room_id=room.id)
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Ingest queue job {job_id} was not found in room {room.id}.",
+        )
+
+    history_rows = repository.list_audit_events(
+        room_id=room.id,
+        limit=limit,
+        target_type="ingest_queue_job",
+        target_id=str(job_id),
+    )
+    history_rows = list(reversed(history_rows))
+
+    linked_run = None
+    linked_manifest_available = False
+    linked_manifest_route = None
+    if job.get("last_run_id") is not None:
+        linked_run_payload = repository.get_ingest_run(int(job["last_run_id"]), room_id=room.id)
+        if linked_run_payload is not None:
+            linked_run = IngestRunRecord.model_validate(linked_run_payload)
+            linked_manifest_available = bool(linked_run_payload.get("has_manifest"))
+            if linked_manifest_available:
+                linked_manifest_route = f"/api/ingest/runs/{int(job['last_run_id'])}/manifest"
+
+    return IngestQueueHistoryResponse(
+        room_id=room.id,
+        history_limit=limit,
+        history_event_count=len(history_rows),
+        job=_ingest_queue_job_from_row(job),
+        history_events=[_audit_event_from_row(row) for row in history_rows],
+        linked_run=linked_run,
+        linked_manifest_available=linked_manifest_available,
+        linked_manifest_route=linked_manifest_route,
+    )
 
 
 @router.get("/ingest/runs/{run_id}/manifest", response_model=IngestRunManifestResponse)

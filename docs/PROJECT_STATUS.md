@@ -3,7 +3,7 @@
 Last updated: 2026-03-29
 
 ## Current phase
-Phase G1.5 complete; no further approved A1 or G1 substep is defined yet
+Phase A1.9, G1.4, and V1.1 complete; no further approved A1, G1, or V1 substep is defined yet
 
 ## Phase state
 - Phase 2B.1 complete
@@ -32,7 +32,8 @@ Phase G1.5 complete; no further approved A1 or G1 substep is defined yet
 - Phase G1.2 complete
 - Phase G1.3 complete
 - Phase G1.4 complete
-- Phase G1.5 complete
+- Phase V1 approved
+- Phase V1.1 complete
 
 ## Completed in 2B.5
 - stress verification for replay/correction/provenance/room isolation
@@ -223,26 +224,20 @@ Phase G1.5 complete; no further approved A1 or G1 substep is defined yet
 - full unittest suite green
 - compile pass green
 
-## Approved for G1.5
-- one bounded room-scoped ingest queue history/detail read surface
-- reuse existing `ingest_queue_jobs`, append-only `audit_events`, and linked ingest run / manifest references only
-- expose interrupted, reused, completed, failed, and cancelled lifecycle visibility when present
-- keep queue execution semantics unchanged
-- no new queue states, no worker daemon, no automatic resume, and no startup auto-execution
-
-## Completed in G1.5
-- first bounded room-scoped ingest queue history/detail read surface
-- GET `/api/ingest/queue/{job_id}/history` only
-- backed only by existing `ingest_queue_jobs`, append-only `audit_events`, and linked ingest run / manifest references
-- preserves room scope, deterministic ordering, and bounded history visibility
-- linked ingest run and manifest visibility exposed when already present
-- no ingest execution, queue state, worker, retry, or startup auto-execute behavior changes
-- focused G1.5 tests green
+## Completed in V1.1
+- first read-only Art and Drawing Lab seam over existing governed image assets
+- GET `/api/art/assets/{asset_id}/metrics` returns deterministic formal image metrics for one supported asset
+- formal metrics include size, aspect ratio, brightness, contrast, edge density, ink coverage, colorfulness, entropy, symmetry, and darkness center-of-mass balance
+- non-image assets are rejected explicitly rather than being force-fit into pseudo-analysis
+- `/v1/capabilities` now exposes the art-lab service seam and asset formal metrics capability
+- Mission Control Asset Detail now includes an Art Metrics panel for supported image assets
+- the phase remains read-only and explicitly avoids OCR, embeddings, personality profiling, and clinical inference
+- focused V1.1 tests green
 - full unittest suite green
-- local HTTP verification green
+- compile pass green
 
 ## Next approved substep
-- no further approved A1 or G1 substep is enumerated in canonical repo evidence
-- require explicit roadmap extension or approval before widening the public control-plane seam beyond the completed A1.9 change preview route or the ingest spine beyond the completed G1.5 queue history seam
-- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, G1.4 local resumable queue work, or G1.5 queue history seam work
+- no further approved A1, G1, or V1 substep is enumerated in canonical repo evidence
+- require explicit roadmap extension or approval before widening the public control-plane seam beyond the completed A1.9 change preview route, the ingest spine beyond the completed G1.4 local resumable queue shell, or the art-lab beyond the completed V1.1 single-asset formal metrics seam
+- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, G1.4 local resumable queue work, or V1.1 asset formal metrics work
 

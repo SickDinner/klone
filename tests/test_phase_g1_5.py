@@ -30,7 +30,7 @@ class PhaseG15Tests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def test_queue_history_returns_job_events_and_linked_manifest(self) -> None:
+    def test_queue_history_returns_job_events_and_linked_manifest_reference(self) -> None:
         folder = self.root / "g15_history_completed"
         folder.mkdir(parents=True, exist_ok=True)
         (folder / "one.txt").write_text("alpha", encoding="utf-8")
@@ -83,8 +83,11 @@ class PhaseG15Tests(unittest.TestCase):
         )
         self.assertEqual(history["json"]["linked_run"]["id"], run_id)
         self.assertTrue(history["json"]["linked_run"]["has_manifest"])
-        self.assertEqual(history["json"]["linked_manifest"]["run"]["id"], run_id)
-        self.assertEqual(history["json"]["linked_manifest"]["run"]["files_discovered"], 1)
+        self.assertTrue(history["json"]["linked_manifest_available"])
+        self.assertEqual(
+            history["json"]["linked_manifest_route"],
+            f"/api/ingest/runs/{run_id}/manifest",
+        )
 
     def test_queue_history_is_bounded_and_deterministic(self) -> None:
         folder = self.root / "g15_history_bounded"
@@ -198,6 +201,12 @@ class PhaseG15Tests(unittest.TestCase):
         self.assertIn("was not found in room public-room", wrong_room["json"]["detail"])
         self.assertEqual(missing["status_code"], 404)
         self.assertIn("was not found in room restricted-room", missing["json"]["detail"])
+
+    def test_queue_history_ui_copy_is_present(self) -> None:
+        js = (PROJECT_ROOT / "src" / "klone" / "static" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("/api/ingest/queue/${jobId}/history?room_id=", js)
+        self.assertIn("Queue History", js)
+        self.assertIn("Use Inspect to load bounded queue lifecycle history.", js)
 
     async def _perform_request(
         self,

@@ -3,7 +3,7 @@
 Last updated: 2026-03-29
 
 ## Current approved phase
-Phase G1.5 closeout complete / awaiting next approved phase
+Phase A1.9, G1.4, and V1.1 closeout complete / awaiting next approved phase
 
 ## Baseline
 - 2B.1 through 2B.5 complete
@@ -23,15 +23,15 @@ Phase G1.5 closeout complete / awaiting next approved phase
 - G1.2 bounded ingest run manifest history exists in repo reality
 - G1.3 local ingest queue shell exists in repo reality
 - G1.4 local resumable ingest queue exists in repo reality
-- G1.5 bounded ingest queue history seam exists in repo reality
+- V1.1 read-only asset formal metrics exists in repo reality
 
 ## Immediate goal
-Phase G1.5 is complete. No further approved A1 or G1 substep is enumerated in canonical repo evidence.
-Await explicit roadmap extension or approval before widening the public control-plane seam or the ingest spine. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local ingest queue shell work, G1.4 local resumable queue work, or G1.5 queue history seam work.
+Phase A1.9, G1.4, and V1.1 are complete. No further approved A1, G1, or V1 substep is enumerated in canonical repo evidence.
+Await explicit roadmap extension or approval before widening the public control-plane seam, the ingest spine, or the art-lab. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local ingest queue shell work, G1.4 local resumable queue work, or V1.1 asset formal metrics work.
 
 ## Approved scope
-- canonical docs closeout after completed Phase G1.5
-- verified confirmation that no further post-A1.9 or post-G1.5 approved substep is currently defined
+- canonical docs closeout after completed Phase V1.1
+- verified confirmation that no further post-A1.9, post-G1.4, or post-V1.1 approved substep is currently defined
 - duplicate-work prevention
 - no unrelated runtime behavior
 - no unrelated API widening
@@ -47,9 +47,9 @@ Await explicit roadmap extension or approval before widening the public control-
 - do not regress startup recovery that marks orphaned queue jobs as `interrupted`
 - do not regress interrupted job reuse on POST `/api/ingest/queue` for the same room/root path
 - do not regress manual resume behavior for `interrupted` queue jobs through the existing execute route
-- do not add new queue states
-- do not add background workers, scheduler behavior, or distributed queue orchestration
-- do not add automatic retry, automatic resume, or startup auto-execute behavior
+- do not regress the completed read-only art metrics seam at `/api/art/assets/{asset_id}/metrics`
+- do not regress explicit non-image rejection for art metrics
+- do not widen art metrics into personality inference, clinical interpretation, OCR, embeddings, or batch profiling without a new approved phase
 - do not modify evidence_text
 - do not add public write endpoints
 - do not add semantic search
@@ -77,13 +77,14 @@ Await explicit roadmap extension or approval before widening the public control-
 - do not widen change preview beyond the existing room-scoped audit preview backing or add a change detail/write surface without a new approved phase
 - do not widen ingest preview into writes, audit side effects, or background workers without a new approved phase
 - do not widen the local resumable queue shell into async interruption, background auto-retry, or startup auto-execute without a new approved phase
+- do not widen the art-lab beyond the completed single-asset formal metrics shell without a new approved phase
 
 ## Required verification
 - compile pass
 - focused A1.9 tests green
 - regression slice for A1.2, A1.6, and A1.8 green
 - focused G1.3 and G1.4 tests green
-- focused G1.5 tests green
+- focused V1.1 tests green
 - regression slice for G1.1 green
 - full unittest suite green
 - local verification if read behavior changes

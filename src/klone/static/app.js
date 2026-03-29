@@ -8,6 +8,7 @@ const state = {
   ingestStatus: null,
   ingestQueue: [],
   ingestQueueSelectionId: null,
+  ingestQueueHistory: null,
   ingestPreview: null,
   ingestManifest: null,
   selectedAsset: null,
@@ -391,6 +392,30 @@ function renderIngestQueueDetail(job) {
     return;
   }
 
+  const history =
+    state.ingestQueueHistory && String(state.ingestQueueHistory.job?.id || "") === String(job.id)
+      ? state.ingestQueueHistory
+      : null;
+  const historyMarkup = !history
+    ? '<div class="empty-state">Use Inspect to load bounded queue lifecycle history.</div>'
+    : history.history_events?.length
+      ? `<ul class="manifest-list">${history.history_events
+          .map(
+            (event) =>
+              `<li><strong>${escapeHtml(event.event_type)}</strong>: ${escapeHtml(event.summary)} <span class="table-subtitle">${escapeHtml(formatTime(event.created_at))}</span></li>`,
+          )
+          .join("")}</ul>`
+      : '<div class="empty-state">No queue lifecycle events recorded for this job yet.</div>';
+  const linkedRunMarkup = history?.linked_run
+    ? `<ul class="detail-list">
+        <li><strong>run_id</strong>: ${escapeHtml(history.linked_run.id)}</li>
+        <li><strong>run_status</strong>: ${escapeHtml(history.linked_run.status)}</li>
+        <li><strong>dataset_label</strong>: ${escapeHtml(history.linked_run.dataset_label)}</li>
+        <li><strong>has_manifest</strong>: ${escapeHtml(history.linked_manifest_available)}</li>
+        <li><strong>manifest_route</strong>: ${escapeHtml(history.linked_manifest_route || "none")}</li>
+      </ul>`
+    : '<div class="empty-state">No linked ingest run is attached to this queue job yet.</div>';
+
   root.className = "detail-card";
   root.innerHTML = `
     <h3>Queue Job ${job.id}</h3>
@@ -410,6 +435,16 @@ function renderIngestQueueDetail(job) {
       <li><strong>completed_at</strong>: ${escapeHtml(formatTime(job.completed_at))}</li>
       <li><strong>last_error</strong>: ${escapeHtml(job.last_error || "none")}</li>
     </ul>
+    <div class="preview-grid">
+      <section class="preview-block">
+        <h4>Queue History</h4>
+        ${historyMarkup}
+      </section>
+      <section class="preview-block">
+        <h4>Linked Run Reference</h4>
+        ${linkedRunMarkup}
+      </section>
+    </div>
   `;
 }
 
@@ -489,6 +524,7 @@ function renderIngestRunManifest(manifest) {
 function syncIngestQueueSelection() {
   if (!state.ingestQueue?.length) {
     state.ingestQueueSelectionId = null;
+    state.ingestQueueHistory = null;
     renderIngestQueueDetail(null);
     return;
   }
@@ -497,6 +533,9 @@ function syncIngestQueueSelection() {
     state.ingestQueue.find((job) => String(job.id) === String(state.ingestQueueSelectionId || "")) ||
     state.ingestQueue[0];
   state.ingestQueueSelectionId = selected.id;
+  if (String(state.ingestQueueHistory?.job?.id || "") !== String(selected.id)) {
+    state.ingestQueueHistory = null;
+  }
   renderIngestQueueDetail(selected);
 }
 
@@ -1212,6 +1251,32 @@ async function loadIngestRunManifest(runId) {
   }
 }
 
+async function inspectIngestQueueJob(jobId) {
+  const feedback = document.querySelector("#ingest-feedback");
+  const job = state.ingestQueue.find((item) => String(item.id) === String(jobId));
+  state.ingestQueueSelectionId = jobId;
+  syncIngestQueueSelection();
+  if (!job?.room_id) {
+    return;
+  }
+
+  feedback.textContent = `Loading history for queue job ${jobId}...`;
+  try {
+    const history = await fetchJson(
+      `/api/ingest/queue/${jobId}/history?room_id=${encodeURIComponent(job.room_id)}`,
+    );
+    state.ingestQueueHistory = history;
+    renderIngestQueueDetail(history.job);
+    feedback.textContent = `Loaded ${history.history_event_count} queue history events for job ${jobId}.`;
+  } catch (error) {
+    state.ingestQueueHistory = null;
+    const root = document.querySelector("#ingest-queue-detail");
+    root.className = "detail-card";
+    root.textContent = error.message;
+    feedback.textContent = error.message;
+  }
+}
+
 function collectIngestPayload(form) {
   return Object.fromEntries(new FormData(form).entries());
 }
@@ -1265,6 +1330,7 @@ async function queueIngestForm() {
       ? `Queue job ${result.job.id} is ${result.job.status} for ${result.job.label}.`
       : `Reused queue job ${result.job.id} for ${result.job.label}.`;
     await refreshMissionControl();
+    await inspectIngestQueueJob(result.job.id);
   } catch (error) {
     feedback.textContent = error.message;
   } finally {
@@ -1311,6 +1377,7 @@ async function executeIngestQueueJob(jobId) {
       result.error ||
       `Queue job ${result.job.id} is now ${result.job.status}.`;
     await refreshMissionControl();
+    await inspectIngestQueueJob(result.job.id);
     if (result.execution?.run?.id) {
       await loadIngestRunManifest(result.execution.run.id);
     }
@@ -1329,6 +1396,7 @@ async function cancelIngestQueueJob(jobId) {
     state.ingestQueueSelectionId = job.id;
     feedback.textContent = `Queue job ${job.id} is now ${job.status}.`;
     await refreshMissionControl();
+    await inspectIngestQueueJob(job.id);
   } catch (error) {
     feedback.textContent = error.message;
   }
@@ -1348,8 +1416,7 @@ function bindEvents() {
     }
     const { queueAction, queueJobId } = button.dataset;
     if (queueAction === "inspect") {
-      state.ingestQueueSelectionId = queueJobId;
-      syncIngestQueueSelection();
+      inspectIngestQueueJob(queueJobId);
       return;
     }
     if (queueAction === "execute") {

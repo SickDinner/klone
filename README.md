@@ -33,7 +33,7 @@ Nykyinen kanoninen tila on:
 - `G1.2 bounded ingest run manifest history complete`
 - `G1.3 local ingest queue shell complete`
 - `G1.4 local resumable ingest queue complete`
-- `G1.5 bounded ingest queue history seam approved`
+- `V1.1 read-only asset formal metrics complete`
 
 Uutta tässä versiossa:
 
@@ -42,7 +42,7 @@ Uutta tässä versiossa:
 - `request context`
   `request_id`, `trace_id`, `principal` ja `actor_role` kulkevat nyt pyynnön mukana
 - `service boundaries`
-  `MemoryFacade`, `PolicyService`, `AuditService` ja `BlobService` näkyvät nyt eksplisiittisinä in-process seameina
+  `MemoryFacade`, `PolicyService`, `AuditService`, `BlobService` ja `ArtLabService` näkyvät nyt eksplisiittisinä in-process seameina
 - `contract shells`
   stable `object`, `query`, `change` ja `blob` contract shellit näkyvät nyt `/v1/capabilities`-vastauksessa
 - `append-only control-plane audit chain`
@@ -79,6 +79,10 @@ Uutta tässä versiossa:
   startup merkitsee orvoiksi jääneet local `running` queue-jobit tilaan `interrupted`, UI näyttää ne edelleen operatorin työjonona, ja sama `POST /api/ingest/queue/{job_id}/execute` toimii nyt myös hallittuna resume-polkuina ilman automaattista startup-ajamista
 - `mission control queue flow`
   Dataset Intake tukee nyt `Queue Dataset` -askelta, ja Mission Control näyttää queue depthin sekä inspect/execute/resume/cancel -kontrollit ennen kuin ingest-run muuttuu manifestoituneeksi historialle
+- `art and drawing metrics shell`
+  `GET /api/art/assets/{asset_id}/metrics` laskee nyt olemassa oleville image-asseteille deterministiset formaalit mittarit kuten brightness, contrast, edge density, symmetry, balance, entropy ja colorfulness ilman persoonallisuustulkintaa
+- `mission control art metrics`
+  Asset Detail -paneelin alla näkyy nyt Art Metrics -kortti, joka analysoi valitun image-assetin read-only-tilassa ja kertoo selvästi, jos asset ei ole kuva
 
 Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, joka näkyy käyttöliittymässä asti:
 
@@ -94,6 +98,8 @@ Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, j
   access, classification, audit ja output toimivat sääntöpohjaisina tarkistuksina
 - `mission control UI`
   dataset intake, dataset list, asset browser, room registry, governance guards, audit preview
+- `art metrics UI`
+  asset-backed formal metrics for selected image assets without pseudo-clinical interpretation
 - `memory explorer UI`
   room-scoped events, episodes, detail-paneeli, provenance lens, context payload ja bounded read-only answer preview
 - `memory context APIs`
@@ -142,6 +148,7 @@ Supervisor hallitsee liikennettä vyöhykkeiden välillä. Moduulit eivät saa l
 │  └─ klone/
 │     ├─ __init__.py
 │     ├─ api.py
+│     ├─ art.py
 │     ├─ audit.py
 │     ├─ blueprint.py
 │     ├─ config.py
@@ -149,6 +156,7 @@ Supervisor hallitsee liikennettä vyöhykkeiden välillä. Moduulit eivät saa l
 │     ├─ guards.py
 │     ├─ ingest.py
 │     ├─ main.py
+│     ├─ memory.py
 │     ├─ models.py
 │     ├─ request_context.py
 │     ├─ repository.py
@@ -156,6 +164,7 @@ Supervisor hallitsee liikennettä vyöhykkeiden välillä. Moduulit eivät saa l
 │     ├─ schemas.py
 │     ├─ services.py
 │     ├─ v1_api.py
+│     ├─ v1_contracts.py
 │     └─ static/
 │        ├─ app.js
 │        ├─ index.html
@@ -188,6 +197,7 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 - `GET /api/datasets`
 - `GET /api/assets`
 - `GET /api/assets/{asset_id}`
+- `GET /api/art/assets/{asset_id}/metrics`
 - `POST /api/ingest/preflight`
 - `GET /api/ingest/queue`
 - `POST /api/ingest/queue`
@@ -218,9 +228,9 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ## Seuraavat järkevät rakennusvaiheet
 
-1. Toteuta `G1.5 bounded ingest queue history seam` kanonisten docsien rajojen sisällä ennen uusia ingest-laajennuksia.
-2. Memory Explorerin jatko A1.9:n jälkeen: provenance-UX, change-preview-linkitys, kontekstin parempi visualisointi ja selaintason smoke-testit.
-3. Art and Drawing Lab: formaalit piirros- ja kuvamittarit ilman pseudopsykologista tulkintaa.
+1. Seuraava post-A1/G1/V1-vaihe vasta erillisellä hyväksynnällä kanonisissa docs-tiedostoissa.
+2. Art and Drawing Labin seuraava askel vasta erillisellä hyväksynnällä: batch-metrics, longitudinal comparisons tai piirroskohtainen klusterointi.
+3. Memory Explorerin jatko A1.9:n jälkeen: provenance-UX, change-preview-linkitys, kontekstin parempi visualisointi ja selaintason smoke-testit.
 4. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
 5. Constitution Layer: hitaasti muuttuvat parametrit, provenance ja change logit.
 6. Syvempi ingest: OCR, transkriptio, extraction pipeline -tilat ja parempi dedup, mutta ei ennen seuraavan ingest-vaiheen erillistä hyväksyntää.

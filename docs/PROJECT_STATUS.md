@@ -3,7 +3,7 @@
 Last updated: 2026-03-29
 
 ## Current phase
-Phase A1.9, G1.4, and V1.1 complete; no further approved A1, G1, or V1 substep is defined yet
+Phase A1.9, G1.5, and V1.1 complete; no further approved A1, G1, or V1 substep is defined yet
 
 ## Phase state
 - Phase 2B.1 complete
@@ -32,6 +32,7 @@ Phase A1.9, G1.4, and V1.1 complete; no further approved A1, G1, or V1 substep i
 - Phase G1.2 complete
 - Phase G1.3 complete
 - Phase G1.4 complete
+- Phase G1.5 complete
 - Phase V1 approved
 - Phase V1.1 complete
 
@@ -224,6 +225,17 @@ Phase A1.9, G1.4, and V1.1 complete; no further approved A1, G1, or V1 substep i
 - full unittest suite green
 - compile pass green
 
+## Completed in G1.5
+- first bounded room-scoped ingest queue history/detail seam over the existing governed queue shell
+- GET `/api/ingest/queue/{job_id}/history` now exposes deterministic queue lifecycle audit history for one room-scoped queue job
+- queue history is bounded by `limit` and ordered chronologically from existing append-only audit evidence only
+- linked ingest run visibility is exposed when present, and manifest linkage remains reference-only via `linked_manifest_available` and `linked_manifest_route`
+- Mission Control queue inspect now loads bounded queue lifecycle history without adding write controls or background behavior
+- the phase remains read-only and does not add new queue states, automatic resume/execute, worker runtime, or `/v1` widening
+- focused G1.5 tests green
+- full unittest suite green
+- compile pass green
+
 ## Completed in V1.1
 - first read-only Art and Drawing Lab seam over existing governed image assets
 - GET `/api/art/assets/{asset_id}/metrics` returns deterministic formal image metrics for one supported asset
@@ -238,6 +250,6 @@ Phase A1.9, G1.4, and V1.1 complete; no further approved A1, G1, or V1 substep i
 
 ## Next approved substep
 - no further approved A1, G1, or V1 substep is enumerated in canonical repo evidence
-- require explicit roadmap extension or approval before widening the public control-plane seam beyond the completed A1.9 change preview route, the ingest spine beyond the completed G1.4 local resumable queue shell, or the art-lab beyond the completed V1.1 single-asset formal metrics seam
-- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, G1.4 local resumable queue work, or V1.1 asset formal metrics work
+- require explicit roadmap extension or approval before widening the public control-plane seam beyond the completed A1.9 change preview route, the ingest spine beyond the completed G1.5 bounded queue history seam, or the art-lab beyond the completed V1.1 single-asset formal metrics seam
+- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, G1.4 local resumable queue work, G1.5 queue history work, or V1.1 asset formal metrics work
 

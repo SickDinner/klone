@@ -3,7 +3,7 @@
 Last updated: 2026-03-29
 
 ## Current approved phase
-Phase A1.9, G1.4, and V1.1 closeout complete / awaiting next approved phase
+Phase A1.9, G1.5, and V1.1 closeout complete / awaiting next approved phase
 
 ## Baseline
 - 2B.1 through 2B.5 complete
@@ -23,11 +23,12 @@ Phase A1.9, G1.4, and V1.1 closeout complete / awaiting next approved phase
 - G1.2 bounded ingest run manifest history exists in repo reality
 - G1.3 local ingest queue shell exists in repo reality
 - G1.4 local resumable ingest queue exists in repo reality
+- G1.5 bounded ingest queue history/detail seam exists in repo reality
 - V1.1 read-only asset formal metrics exists in repo reality
 
 ## Immediate goal
-Phase A1.9, G1.4, and V1.1 are complete. No further approved A1, G1, or V1 substep is enumerated in canonical repo evidence.
-Await explicit roadmap extension or approval before widening the public control-plane seam, the ingest spine, or the art-lab. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local ingest queue shell work, G1.4 local resumable queue work, or V1.1 asset formal metrics work.
+Phase A1.9, G1.5, and V1.1 are complete. No further approved A1, G1, or V1 substep is enumerated in canonical repo evidence.
+Await explicit roadmap extension or approval before widening the public control-plane seam, the ingest spine, or the art-lab. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local ingest queue shell work, G1.4 local resumable queue work, G1.5 queue history work, or V1.1 asset formal metrics work.
 
 ## Approved scope
 - canonical docs closeout after completed Phase V1.1
@@ -43,6 +44,7 @@ Await explicit roadmap extension or approval before widening the public control-
 - do not regress the completed local ingest queue shell at `/api/ingest/queue`
 - do not regress the completed explicit queue execution shell at `/api/ingest/queue/{job_id}/execute`
 - do not regress the completed explicit queue cancellation shell at `/api/ingest/queue/{job_id}/cancel`
+- do not regress the completed bounded queue history seam at `/api/ingest/queue/{job_id}/history`
 - do not regress the completed room-scoped change preview seam at `/v1/rooms/{room_id}/changes`
 - do not regress startup recovery that marks orphaned queue jobs as `interrupted`
 - do not regress interrupted job reuse on POST `/api/ingest/queue` for the same room/root path
@@ -84,6 +86,7 @@ Await explicit roadmap extension or approval before widening the public control-
 - focused A1.9 tests green
 - regression slice for A1.2, A1.6, and A1.8 green
 - focused G1.3 and G1.4 tests green
+- focused G1.5 tests green
 - focused V1.1 tests green
 - regression slice for G1.1 green
 - full unittest suite green

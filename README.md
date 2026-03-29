@@ -33,6 +33,7 @@ Nykyinen kanoninen tila on:
 - `G1.2 bounded ingest run manifest history complete`
 - `G1.3 local ingest queue shell complete`
 - `G1.4 local resumable ingest queue complete`
+- `G1.5 bounded ingest queue history seam complete`
 - `V1.1 read-only asset formal metrics complete`
 
 Uutta tässä versiossa:
@@ -77,8 +78,10 @@ Uutta tässä versiossa:
   `POST /api/ingest/queue` stageaa tai reuseaa local-first ingest-jobin, `POST /api/ingest/queue/{job_id}/execute` ajaa sen eksplisiittisesti, ja `POST /api/ingest/queue/{job_id}/cancel` peruuttaa queued/failed/interrupted-jobin ilman background worker -oopperaa
 - `local resumable ingest queue`
   startup merkitsee orvoiksi jääneet local `running` queue-jobit tilaan `interrupted`, UI näyttää ne edelleen operatorin työjonona, ja sama `POST /api/ingest/queue/{job_id}/execute` toimii nyt myös hallittuna resume-polkuina ilman automaattista startup-ajamista
+- `bounded ingest queue history`
+  `GET /api/ingest/queue/{job_id}/history` näyttää nyt yhden room-scoped queue-jobin bounded lifecycle-audit historian kronologisessa järjestyksessä sekä linkitetyn runin ja manifest-route-viitteen ilman uutta write-surfacea
 - `mission control queue flow`
-  Dataset Intake tukee nyt `Queue Dataset` -askelta, ja Mission Control näyttää queue depthin sekä inspect/execute/resume/cancel -kontrollit ennen kuin ingest-run muuttuu manifestoituneeksi historialle
+  Dataset Intake tukee nyt `Queue Dataset` -askelta, ja Mission Control näyttää queue depthin sekä inspect/execute/resume/cancel -kontrollit ennen kuin ingest-run muuttuu manifestoituneeksi historialle; Inspect lataa nyt myös bounded queue historyn detail-paneeliin
 - `art and drawing metrics shell`
   `GET /api/art/assets/{asset_id}/metrics` laskee nyt olemassa oleville image-asseteille deterministiset formaalit mittarit kuten brightness, contrast, edge density, symmetry, balance, entropy ja colorfulness ilman persoonallisuustulkintaa
 - `mission control art metrics`

@@ -221,7 +221,6 @@ Read-Only Asset Formal Metrics:
 - no OCR, no embeddings, no batch comparison surface, and no personality or clinical inference
 
 ## Not approved yet
-- G1.5 bounded ingest queue history seam
 - V1.2 batch art metrics and longitudinal comparisons
 - semantic search
 - embeddings

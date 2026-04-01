@@ -3,8 +3,8 @@ from typing import Literal, get_args
 
 APP_VERSION = "0.2.0"
 BOOTSTRAP_VERSION = "b00.1"
-SCHEMA_VERSION = "phase_2b_4_memory_correction"
-SCHEMA_USER_VERSION = 204
+SCHEMA_VERSION = "w1_4_world_memory_place_shell"
+SCHEMA_USER_VERSION = 205
 MODULE_REGISTRY_VERSION = "system_blueprint_v1"
 SYSTEM_SCOPE_ID = "system"
 BOOTSTRAP_TASK_ID = "task:bootstrap:system_startup"

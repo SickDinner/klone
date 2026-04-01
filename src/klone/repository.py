@@ -43,6 +43,8 @@ EXPECTED_TABLES = (
     "memory_event_supersessions",
     "memory_events",
     "memory_provenance",
+    "world_memory_depth_jobs",
+    "world_memory_depth_results",
 )
 
 
@@ -134,6 +136,44 @@ class KloneRepository:
                     created_at TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS world_memory_depth_jobs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    room_id TEXT NOT NULL,
+                    renderer TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    requested_node_ids_json TEXT NOT NULL,
+                    result_count INTEGER NOT NULL DEFAULT 0,
+                    notes_json TEXT,
+                    warnings_json TEXT,
+                    error_text TEXT,
+                    created_at TEXT NOT NULL,
+                    started_at TEXT,
+                    completed_at TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS world_memory_depth_results (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    job_id INTEGER NOT NULL REFERENCES world_memory_depth_jobs(id) ON DELETE CASCADE,
+                    room_id TEXT NOT NULL,
+                    node_id TEXT NOT NULL,
+                    cluster_id TEXT NOT NULL,
+                    asset_id INTEGER NOT NULL REFERENCES assets(id),
+                    label TEXT NOT NULL,
+                    relative_path TEXT NOT NULL,
+                    asset_kind TEXT NOT NULL,
+                    renderer TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    source_image_path TEXT NOT NULL,
+                    depth_preview_path TEXT NOT NULL,
+                    depth_raw_path TEXT NOT NULL,
+                    width_px INTEGER NOT NULL,
+                    height_px INTEGER NOT NULL,
+                    notes_json TEXT,
+                    warnings_json TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS assets (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     dataset_id INTEGER NOT NULL REFERENCES datasets(id),
@@ -171,6 +211,12 @@ class KloneRepository:
                     WHERE status IN ('queued', 'running');
                 CREATE INDEX IF NOT EXISTS idx_ingest_run_manifests_room_created_at
                     ON ingest_run_manifests(room_id, created_at DESC, ingest_run_id DESC);
+                CREATE INDEX IF NOT EXISTS idx_world_memory_depth_jobs_room_created_at
+                    ON world_memory_depth_jobs(room_id, created_at DESC, id DESC);
+                CREATE INDEX IF NOT EXISTS idx_world_memory_depth_results_job_id
+                    ON world_memory_depth_results(job_id, id ASC);
+                CREATE INDEX IF NOT EXISTS idx_world_memory_depth_results_room_node
+                    ON world_memory_depth_results(room_id, node_id, updated_at DESC, id DESC);
 
                 CREATE TABLE IF NOT EXISTS audit_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1563,6 +1609,276 @@ class KloneRepository:
                 WHERE a.id = ? AND a.room_id = ?
                 """,
                 (asset_id, room_id),
+            ).fetchone()
+            return dict(row) if row is not None else None
+
+    # World-memory depth job persistence
+    def create_world_memory_depth_job(
+        self,
+        *,
+        room_id: str,
+        renderer: str,
+        requested_node_ids: list[str],
+        notes: list[str] | None = None,
+        warnings: list[str] | None = None,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any]:
+        with self._borrowed_connection(conn) as active_conn:
+            created_at = utc_now_iso()
+            cursor = active_conn.execute(
+                """
+                INSERT INTO world_memory_depth_jobs (
+                    room_id,
+                    renderer,
+                    status,
+                    requested_node_ids_json,
+                    result_count,
+                    notes_json,
+                    warnings_json,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, 0, ?, ?, ?)
+                """,
+                (
+                    room_id,
+                    renderer,
+                    "queued",
+                    json.dumps(requested_node_ids, sort_keys=True),
+                    json.dumps(notes or [], sort_keys=True),
+                    json.dumps(warnings or [], sort_keys=True),
+                    created_at,
+                ),
+            )
+            row = active_conn.execute(
+                "SELECT * FROM world_memory_depth_jobs WHERE id = ?",
+                (cursor.lastrowid,),
+            ).fetchone()
+            return dict(row)
+
+    def mark_world_memory_depth_job_running(
+        self,
+        *,
+        job_id: int,
+        room_id: str,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any] | None:
+        with self._borrowed_connection(conn) as active_conn:
+            started_at = utc_now_iso()
+            active_conn.execute(
+                """
+                UPDATE world_memory_depth_jobs
+                SET status = ?, started_at = ?, completed_at = NULL, error_text = NULL
+                WHERE id = ? AND room_id = ?
+                """,
+                ("running", started_at, job_id, room_id),
+            )
+            row = active_conn.execute(
+                "SELECT * FROM world_memory_depth_jobs WHERE id = ? AND room_id = ?",
+                (job_id, room_id),
+            ).fetchone()
+            return dict(row) if row is not None else None
+
+    def complete_world_memory_depth_job(
+        self,
+        *,
+        job_id: int,
+        room_id: str,
+        result_count: int,
+        notes: list[str] | None = None,
+        warnings: list[str] | None = None,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any] | None:
+        with self._borrowed_connection(conn) as active_conn:
+            completed_at = utc_now_iso()
+            active_conn.execute(
+                """
+                UPDATE world_memory_depth_jobs
+                SET status = ?,
+                    result_count = ?,
+                    notes_json = ?,
+                    warnings_json = ?,
+                    completed_at = ?,
+                    error_text = NULL
+                WHERE id = ? AND room_id = ?
+                """,
+                (
+                    "completed",
+                    result_count,
+                    json.dumps(notes or [], sort_keys=True),
+                    json.dumps(warnings or [], sort_keys=True),
+                    completed_at,
+                    job_id,
+                    room_id,
+                ),
+            )
+            row = active_conn.execute(
+                "SELECT * FROM world_memory_depth_jobs WHERE id = ? AND room_id = ?",
+                (job_id, room_id),
+            ).fetchone()
+            return dict(row) if row is not None else None
+
+    def fail_world_memory_depth_job(
+        self,
+        *,
+        job_id: int,
+        room_id: str,
+        error_text: str,
+        notes: list[str] | None = None,
+        warnings: list[str] | None = None,
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any] | None:
+        with self._borrowed_connection(conn) as active_conn:
+            completed_at = utc_now_iso()
+            active_conn.execute(
+                """
+                UPDATE world_memory_depth_jobs
+                SET status = ?,
+                    notes_json = ?,
+                    warnings_json = ?,
+                    error_text = ?,
+                    completed_at = ?
+                WHERE id = ? AND room_id = ?
+                """,
+                (
+                    "failed",
+                    json.dumps(notes or [], sort_keys=True),
+                    json.dumps(warnings or [], sort_keys=True),
+                    error_text,
+                    completed_at,
+                    job_id,
+                    room_id,
+                ),
+            )
+            row = active_conn.execute(
+                "SELECT * FROM world_memory_depth_jobs WHERE id = ? AND room_id = ?",
+                (job_id, room_id),
+            ).fetchone()
+            return dict(row) if row is not None else None
+
+    def replace_world_memory_depth_results(
+        self,
+        *,
+        job_id: int,
+        room_id: str,
+        results: list[Mapping[str, Any]],
+        conn: sqlite3.Connection | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._borrowed_connection(conn) as active_conn:
+            active_conn.execute(
+                "DELETE FROM world_memory_depth_results WHERE job_id = ? AND room_id = ?",
+                (job_id, room_id),
+            )
+            timestamp = utc_now_iso()
+            for result in results:
+                active_conn.execute(
+                    """
+                    INSERT INTO world_memory_depth_results (
+                        job_id,
+                        room_id,
+                        node_id,
+                        cluster_id,
+                        asset_id,
+                        label,
+                        relative_path,
+                        asset_kind,
+                        renderer,
+                        status,
+                        source_image_path,
+                        depth_preview_path,
+                        depth_raw_path,
+                        width_px,
+                        height_px,
+                        notes_json,
+                        warnings_json,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        job_id,
+                        room_id,
+                        result["node_id"],
+                        result["cluster_id"],
+                        result["asset_id"],
+                        result["label"],
+                        result["relative_path"],
+                        result["asset_kind"],
+                        result["renderer"],
+                        result["status"],
+                        result["source_image_path"],
+                        result["depth_preview_path"],
+                        result["depth_raw_path"],
+                        result["width_px"],
+                        result["height_px"],
+                        json.dumps(list(result.get("notes", [])), sort_keys=True),
+                        json.dumps(list(result.get("warnings", [])), sort_keys=True),
+                        timestamp,
+                        timestamp,
+                    ),
+                )
+            rows = active_conn.execute(
+                """
+                SELECT *
+                FROM world_memory_depth_results
+                WHERE job_id = ? AND room_id = ?
+                ORDER BY id ASC
+                """,
+                (job_id, room_id),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def list_world_memory_depth_jobs(self, *, room_id: str, limit: int = 12) -> list[dict[str, Any]]:
+        with self.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM world_memory_depth_jobs
+                WHERE room_id = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                (room_id, limit),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def get_world_memory_depth_job(self, job_id: int, *, room_id: str) -> dict[str, Any] | None:
+        with self.connection() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM world_memory_depth_jobs
+                WHERE id = ? AND room_id = ?
+                """,
+                (job_id, room_id),
+            ).fetchone()
+            return dict(row) if row is not None else None
+
+    def list_world_memory_depth_results(self, *, job_id: int, room_id: str) -> list[dict[str, Any]]:
+        with self.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM world_memory_depth_results
+                WHERE job_id = ? AND room_id = ?
+                ORDER BY id ASC
+                """,
+                (job_id, room_id),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def latest_world_memory_depth_result(self, *, node_id: str, room_id: str) -> dict[str, Any] | None:
+        with self.connection() as conn:
+            row = conn.execute(
+                """
+                SELECT r.*
+                FROM world_memory_depth_results r
+                JOIN world_memory_depth_jobs j ON j.id = r.job_id
+                WHERE r.node_id = ? AND r.room_id = ? AND j.room_id = ? AND j.status = 'completed'
+                ORDER BY r.updated_at DESC, r.id DESC
+                LIMIT 1
+                """,
+                (node_id, room_id, room_id),
             ).fetchone()
             return dict(row) if row is not None else None
 

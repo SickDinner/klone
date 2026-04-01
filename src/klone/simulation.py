@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from collections import Counter
+from array import array
 from dataclasses import dataclass, field
 import hashlib
 import json
 import math
+from pathlib import Path
 
 from .memory import MemoryService
-from .repository import KloneRepository
+from .repository import KloneRepository, utc_now_iso
 from .schemas import (
     HybridBoardAxisRecord,
     HybridBoardSourceRecord,
@@ -19,8 +21,13 @@ from .schemas import (
     HybridMemoryBoardRecord,
     WorldMemoryClusterDetailRecord,
     WorldMemoryClusterRecord,
+    WorldMemoryDepthJobListRecord,
+    WorldMemoryDepthJobNodeRecord,
+    WorldMemoryDepthJobRecord,
+    WorldMemoryDepthJobRequest,
     WorldMemoryNodeDetailRecord,
     WorldMemoryNodeRecord,
+    WorldMemoryPlaceViewRecord,
     WorldMemoryPlaceShellRecord,
     WorldMemoryRecord,
     WorldMemorySquareLinkRecord,
@@ -303,6 +310,30 @@ def _decode_metadata_json(raw: object) -> dict[str, object] | None:
     except json.JSONDecodeError:
         return None
     return payload if isinstance(payload, dict) else None
+
+
+def _decode_string_list(raw: object) -> list[str]:
+    if not isinstance(raw, str) or not raw:
+        return []
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(payload, list):
+        return []
+    return [str(item) for item in payload]
+
+
+def _asset_content_route(asset_id: int) -> str:
+    return f"/api/assets/{asset_id}/content"
+
+
+def _depth_preview_route(job_id: int, node_id: str) -> str:
+    return f"/api/simulation/world-memory/depth/jobs/{job_id}/nodes/{node_id}/preview"
+
+
+def _depth_raw_route(job_id: int, node_id: str) -> str:
+    return f"/api/simulation/world-memory/depth/jobs/{job_id}/nodes/{node_id}/raw"
 
 
 class HybridMemoryBoardService:

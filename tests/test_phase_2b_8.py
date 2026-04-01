@@ -98,6 +98,7 @@ class Phase2B8Tests(unittest.TestCase):
         self.assertEqual(payload["backend_mode"], "bounded_local")
         self.assertFalse(payload["llm_call_performed"])
         self.assertIn("Alice Example", payload["reply"]["content"])
+        self.assertIn("Näyttää siltä", payload["reply"]["content"])
         self.assertTrue(payload["answer"]["supported"])
 
     def test_clone_chat_respond_route_falls_back_when_gpt_requested_without_key(self) -> None:
@@ -169,6 +170,7 @@ class Phase2B8Tests(unittest.TestCase):
         self.assertEqual(payload["reply"]["content"], "Tama tuli OpenAI-polun kautta.")
         outbound_payload = captured_payload["payload"]
         self.assertIn("You are Klone", outbound_payload["instructions"])
+        self.assertIn("first-person phrasing is allowed", outbound_payload["instructions"])
         self.assertEqual(outbound_payload["input"][-1]["role"], "user")
         self.assertIsInstance(outbound_payload["input"][-1]["content"], str)
 
@@ -178,6 +180,7 @@ class Phase2B8Tests(unittest.TestCase):
         self.assertIn("#clone-test-room", html)
         self.assertIn("/api/clone-chat/respond", js)
         self.assertIn("/api/clone-chat/openai/configure", js)
+        self.assertNotIn("supported:", js)
 
     async def _perform_request(
         self,

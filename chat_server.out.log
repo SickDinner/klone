@@ -1,7 +1,6 @@
-INFO:     127.0.0.1:62683 - "GET /api/clone-chat/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:62687 - "GET /api/clone-chat/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:51799 - "POST /api/clone-chat/respond HTTP/1.1" 200 OK
-INFO:     127.0.0.1:52795 - "GET /static/styles.css HTTP/1.1" 304 Not Modified
-INFO:     127.0.0.1:52795 - "GET /api/clone-chat/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58032 - "POST /api/clone-chat/respond HTTP/1.1" 200 OK
-INFO:     127.0.0.1:53036 - "POST /api/clone-chat/respond HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61649 - "GET /api/clone-chat/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55910 - "GET /static/styles.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:55910 - "GET /api/clone-chat/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55910 - "POST /api/clone-chat/respond HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61650 - "POST /api/clone-chat/respond HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65091 - "POST /api/clone-chat/respond HTTP/1.1" 200 OK

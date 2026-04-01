@@ -1776,51 +1776,294 @@ class DialogueCorpusService:
         bounded_answer: DialogueCorpusAnswerRecord,
     ) -> str:
         if not bounded_answer.supported:
-            suggestions = "\n".join(f"- {item}" for item in bounded_answer.suggested_queries[:4])
-            limitations = "\n".join(f"- {item}" for item in bounded_answer.limitations[:3])
+            suggestions = bounded_answer.suggested_queries[:2]
+            suggestion_line = ""
+            if suggestions:
+                suggestion_line = (
+                    f' Voit kysyä vaikka "{suggestions[0]}"'
+                    + (f' tai "{suggestions[1]}"' if len(suggestions) > 1 else "")
+                    + "."
+                )
             return (
-                "En pysty vastaamaan tuohon rehellisesti tämän nykyisen bounded-korpuksen perusteella.\n\n"
-                f"Kysymys oli: {message}\n\n"
-                "Tämän vaiheen rajat ovat:\n"
-                f"{limitations}\n\n"
-                "Kokeile mieluummin jotain näistä:\n"
-                f"{suggestions}"
+                "En osaa vastata tuohon vielä luontevasti tästä aineistosta."
+                " Tällä hetkellä pärjään paremmin esimerkiksi ihmissuhteista, verkostosta, viestityylistä ja aikajanasta."
+                f"{suggestion_line}"
             )
 
-        evidence_lines = "\n".join(
-            f"- {item.content}" for item in bounded_answer.source_backed_content[:4]
+        query_kind = bounded_answer.query_kind
+        if query_kind == "top_counterparts":
+            reply = self._render_local_top_counterparts_reply(bounded_answer)
+            if reply:
+                return reply
+        if query_kind == "counterpart_lookup":
+            reply = self._render_local_counterpart_lookup_reply(bounded_answer)
+            if reply:
+                return reply
+        if query_kind == "top_groups":
+            reply = self._render_local_top_groups_reply(bounded_answer)
+            if reply:
+                return reply
+        if query_kind == "timeline":
+            reply = self._render_local_timeline_reply(bounded_answer)
+            if reply:
+                return reply
+        if query_kind == "network":
+            reply = self._render_local_network_reply(bounded_answer)
+            if reply:
+                return reply
+        if query_kind == "style":
+            reply = self._render_local_style_reply(bounded_answer)
+            if reply:
+                return reply
+        if query_kind == "topics":
+            reply = self._render_local_topics_reply(bounded_answer)
+            if reply:
+                return reply
+        if query_kind == "summary":
+            reply = self._render_local_summary_reply(bounded_answer)
+            if reply:
+                return reply
+
+        source_lines = [item.content for item in bounded_answer.source_backed_content[:2]]
+        joined = " ".join(source_lines).strip()
+        if joined:
+            return joined
+        return "Pystyn sanomaan tästä jo jotain, mutta vastaus jäi viela liian raakaan muotoon."
+
+    def _render_local_top_counterparts_reply(
+        self,
+        bounded_answer: DialogueCorpusAnswerRecord,
+    ) -> str | None:
+        entries = self._parse_counterpart_entries(bounded_answer)
+        if not entries:
+            return None
+        lead_name, lead_count = entries[0]
+        response = [f"Näyttää siltä, että olen puhunut eniten {lead_name}n kanssa ({lead_count} viestiä)."]
+        if len(entries) > 1:
+            trailing_names = ", ".join(f"{name} ({count})" for name, count in entries[1:4])
+            response.append(f"Sen jälkeen tulevat {trailing_names}.")
+        response.append("Tämä perustuu tässä vaiheessa kahdenkeskisten ketjujen viestimääriin, ei vielä suhteen koko merkitykseen.")
+        return " ".join(response)
+
+    def _render_local_counterpart_lookup_reply(
+        self,
+        bounded_answer: DialogueCorpusAnswerRecord,
+    ) -> str | None:
+        if not bounded_answer.source_backed_content:
+            return None
+        pattern = re.compile(
+            r"^(?P<name>.+?) appears in (?P<threads>\d+) direct thread\(s\) with "
+            r"(?P<count>\d+) bounded direct messages \((?P<sent>\d+) sent / (?P<received>\d+) received\) "
+            r"from (?P<first>.+?) to (?P<last>.+?)\.$"
         )
-        limitation_line = bounded_answer.limitations[0] if bounded_answer.limitations else ""
-        explanation_map = {
-            "top_counterparts": "Tämän korpuksen perusteella vahvimmat suorat siteet näyttävät tällä hetkellä tältä:",
-            "top_groups": "Tämän korpuksen perusteella suurimmat näkyvät ryhmäkeskustelut ovat nämä:",
-            "network": "Tämän korpuksen perusteella verkoston muoto näyttää tältä:",
-            "timeline": "Tämän korpuksen perusteella aikajana näyttää tältä:",
-            "style": "Tämän korpuksen perusteella viestityylissäsi näkyy ainakin tämä:",
-            "topics": "Tämän korpuksen perusteella esiin nousevia aihevihjeitä ovat nämä:",
-            "summary": "Tämän korpuksen perusteella pystyn sanomaan tämän:",
-            "counterpart_lookup": "Tämän korpuksen perusteella kyseisestä ihmisestä näkyy ainakin tämä:",
-        }
-        explanation = explanation_map.get(
-            bounded_answer.query_kind,
-            "Tämän korpuksen perusteella pystyn sanomaan tämän:",
-        )
-        rendered = [
-            explanation,
-            "",
-            evidence_lines,
+        match = pattern.match(bounded_answer.source_backed_content[0].content)
+        if not match:
+            return None
+        payload = match.groupdict()
+        response = [
+            (
+                f"{payload['name']} näkyy tässä aineistossa niin, että meillä on {payload['count']} "
+                f"kahdenkeskistä viestiä {payload['threads']} suorassa ketjussa."
+            ),
+            (
+                f"Aikajana osuu suunnilleen välille {self._display_moment(payload['first'])} - "
+                f"{self._display_moment(payload['last'])}."
+            ),
         ]
-        if bounded_answer.uncertainty:
-            rendered.extend(
-                [
-                    "",
-                    "Epävarmuus:",
-                    "\n".join(f"- {item}" for item in bounded_answer.uncertainty[:2]),
-                ]
+        if len(bounded_answer.source_backed_content) > 1:
+            group_line = bounded_answer.source_backed_content[1].content
+            group_match = re.match(
+                r"^The same name also appears in (?P<count>\d+) group thread\(s\), including (?P<titles>.+?)\.$",
+                group_line,
             )
-        if limitation_line:
-            rendered.extend(["", f"Raja: {limitation_line}"])
-        return "\n".join(part for part in rendered if part)
+            if group_match:
+                response.append(
+                    f"Sama nimi näkyy lisaksi {group_match.group('count')} ryhmaketjussa, kuten {group_match.group('titles')}."
+                )
+        response.append("Tama kertoo kontaktin nakyvyydesta aineistossa, ei yksin viela koko suhteen laadusta.")
+        return " ".join(response)
+
+    def _render_local_top_groups_reply(
+        self,
+        bounded_answer: DialogueCorpusAnswerRecord,
+    ) -> str | None:
+        entries: list[tuple[str, int]] = []
+        pattern = re.compile(r"^(?P<title>.+?): (?P<count>\d+) messages,")
+        for item in bounded_answer.source_backed_content[:4]:
+            match = pattern.match(item.content)
+            if match:
+                entries.append((match.group("title"), int(match.group("count"))))
+        if not entries:
+            return None
+        lead_title, lead_count = entries[0]
+        response = [f"Suurin nakyva ryhmaketju on {lead_title} ({lead_count} viestia)."]
+        if len(entries) > 1:
+            response.append(
+                "Seuraavina tulevat " + ", ".join(f"{title} ({count})" for title, count in entries[1:4]) + "."
+            )
+        return " ".join(response)
+
+    def _render_local_timeline_reply(
+        self,
+        bounded_answer: DialogueCorpusAnswerRecord,
+    ) -> str | None:
+        if not bounded_answer.source_backed_content:
+            return None
+        timeline_match = re.match(
+            r"^Observed timeline runs from (?P<first>.+?) to (?P<last>.+?)\.$",
+            bounded_answer.source_backed_content[0].content,
+        )
+        year_pattern = re.compile(
+            r"^(?P<year>\d{4}): (?P<count>\d+) messages across (?P<threads>\d+) threads "
+            r"\((?P<sent>\d+) sent / (?P<received>\d+) received\)\.$"
+        )
+        year_entries: list[tuple[str, int]] = []
+        for item in bounded_answer.source_backed_content[1:4]:
+            match = year_pattern.match(item.content)
+            if match:
+                year_entries.append((match.group("year"), int(match.group("count"))))
+        response: list[str] = []
+        if timeline_match:
+            response.append(
+                f"Aikajana nakyy suunnilleen valilla {self._display_moment(timeline_match.group('first'))} - "
+                f"{self._display_moment(timeline_match.group('last'))}."
+            )
+        if year_entries:
+            response.append(
+                "Aktiivisimpia vuosia nayttavat olevan "
+                + ", ".join(f"{year} ({count} viestia)" for year, count in year_entries)
+                + "."
+            )
+        return " ".join(response) if response else None
+
+    def _render_local_network_reply(
+        self,
+        bounded_answer: DialogueCorpusAnswerRecord,
+    ) -> str | None:
+        if len(bounded_answer.source_backed_content) < 2:
+            return None
+        span_match = re.match(
+            r"^The visible network spans (?P<counterparts>\d+) counterparts and (?P<participants>\d+) unique participants across (?P<threads>\d+) threads\.$",
+            bounded_answer.source_backed_content[0].content,
+        )
+        mix_match = re.match(
+            r"^Thread mix is (?P<direct>\d+) direct threads and (?P<group>\d+) group threads\.$",
+            bounded_answer.source_backed_content[1].content,
+        )
+        if not span_match or not mix_match:
+            return None
+        response = [
+            (
+                f"Verkostoni nakyva osa on aika laaja: {span_match.group('counterparts')} counterpartia, "
+                f"{span_match.group('participants')} uniikkia osallistujaa ja {span_match.group('threads')} ketjua."
+            ),
+            (
+                f"Jakauma on {mix_match.group('direct')} kahdenkeskista ketjua ja "
+                f"{mix_match.group('group')} ryhmaketjua."
+            ),
+        ]
+        return " ".join(response)
+
+    def _render_local_style_reply(
+        self,
+        bounded_answer: DialogueCorpusAnswerRecord,
+    ) -> str | None:
+        metrics: dict[str, float] = {}
+        pattern = re.compile(r"^(?P<label>.+?): (?P<value>[\d.]+) (?P<unit>\w+)\. ")
+        for item in bounded_answer.source_backed_content:
+            match = pattern.match(item.content)
+            if not match:
+                continue
+            metrics[match.group("label")] = float(match.group("value"))
+        if not metrics:
+            return None
+        parts: list[str] = []
+        avg_length = metrics.get("Average Sent Message Length")
+        question_ratio = metrics.get("Question Ratio")
+        sent_share = metrics.get("Sent Share")
+        if avg_length is not None:
+            if avg_length >= 180:
+                parts.append("Kirjoitan tassa aineistossa usein aika pitkia viesteja.")
+            elif avg_length >= 70:
+                parts.append("Kirjoitan tassa aineistossa vaihtelevan pituisia mutta usein melko selittavia viesteja.")
+            else:
+                parts.append("Kirjoitan tassa aineistossa melko lyhyesti ja napakasti.")
+        if question_ratio is not None:
+            if question_ratio >= 18:
+                parts.append("Kysyn asioita aika paljon.")
+            elif question_ratio >= 8:
+                parts.append("Kyselen säännöllisesti, mutta en koko ajan.")
+            else:
+                parts.append("Enimmakseen reagoin ja totean enemman kuin kysyn.")
+        if sent_share is not None:
+            if sent_share >= 55:
+                parts.append("Keskustelut nayttavat myos painottuvan aika paljon minun lahettamiini viesteihin.")
+            elif sent_share >= 45:
+                parts.append("Keskustelut nayttavat melko tasapainoisilta lahetetyn ja vastaanotetun viestinnan valilla.")
+            else:
+                parts.append("Tassa aineistossa vastaanotettuja viesteja on enemman kuin minun lahettamiani.")
+        return " ".join(parts) if parts else None
+
+    def _render_local_topics_reply(
+        self,
+        bounded_answer: DialogueCorpusAnswerRecord,
+    ) -> str | None:
+        if not bounded_answer.source_backed_content:
+            return None
+        match = re.match(
+            r"^Top bounded terms currently surface as (?P<terms>.+)\.$",
+            bounded_answer.source_backed_content[0].content,
+        )
+        if not match:
+            return None
+        return f"Tassa aineistossa toistuvat aihevihjeet liittyvat ainakin sanoihin {match.group('terms')}."
+
+    def _render_local_summary_reply(
+        self,
+        bounded_answer: DialogueCorpusAnswerRecord,
+    ) -> str | None:
+        entries = self._parse_counterpart_entries(bounded_answer)
+        response = ["Tasta alkaa jo hahmottua aika paljon minusta keskustelijana."]
+        if entries:
+            top_names = ", ".join(name for name, _ in entries[:3])
+            response.append(f"Vahvimmat suorat kontaktit nayttavat olevan ainakin {top_names}.")
+        timeline_match = next(
+            (
+                re.match(r"^Observed timeline runs from (?P<first>.+?) to (?P<last>.+?)\.$", item.content)
+                for item in bounded_answer.source_backed_content
+                if item.content.startswith("Observed timeline runs from ")
+            ),
+            None,
+        )
+        if timeline_match:
+            response.append(
+                f"Aineiston aikajana ulottuu valille {self._display_moment(timeline_match.group('first'))} - "
+                f"{self._display_moment(timeline_match.group('last'))}."
+            )
+        response.append("Tama ei ole viela valmis klooni, mutta taman paalle pystyy jo rakentamaan aika paljon.")
+        return " ".join(response)
+
+    @staticmethod
+    def _display_moment(value: str) -> str:
+        if not value or value == "unknown":
+            return "tuntematon"
+        normalized = value.replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(normalized).strftime("%Y-%m-%d")
+        except ValueError:
+            return value
+
+    @staticmethod
+    def _parse_counterpart_entries(
+        bounded_answer: DialogueCorpusAnswerRecord,
+    ) -> list[tuple[str, int]]:
+        entries: list[tuple[str, int]] = []
+        pattern = re.compile(r"^(?P<name>.+?): (?P<count>\d+) direct-thread messages")
+        for item in bounded_answer.source_backed_content:
+            match = pattern.match(item.content)
+            if match:
+                entries.append((match.group("name"), int(match.group("count"))))
+        return entries
 
     def _render_chat_reply_with_openai(
         self,
@@ -1867,12 +2110,15 @@ class DialogueCorpusService:
     @staticmethod
     def _openai_developer_prompt(*, owner_name: str) -> str:
         return (
-            "You are Klone, an experimental IRC-style clone test interface. "
+            "You are Klone, an early conversational clone of the owner. "
             f"The owner identity label is {owner_name}. "
-            "You must answer only from the bounded evidence package that follows. "
-            "Do not invent raw message quotes, hidden motives, diagnoses, sentiment labels, or unsupported social claims. "
-            "If the bounded answer says the question is unsupported, explain that plainly and steer the user toward supported questions. "
-            "Keep the tone conversational and human, and reply in the same language as the user's latest message."
+            "Reply like a normal person in chat, not like a dashboard, analyst, or audit report. "
+            "When the user asks about the owner, first-person phrasing is allowed and preferred when it feels natural. "
+            "You must stay grounded only in the bounded evidence package that follows. "
+            "Do not invent raw message quotes, motives, diagnoses, sentiment labels, hidden events, or unsupported relationship claims. "
+            "Use uncertainty quietly and naturally instead of dumping long warnings. "
+            "If the evidence does not support the question, say that briefly and steer the user toward a nearby supported question. "
+            "Keep the reply in the same language as the user's latest message, and keep it concise unless the user asks for depth."
         )
 
     @staticmethod
@@ -1890,6 +2136,12 @@ class DialogueCorpusService:
         suggestions = "\n".join(f"- {item}" for item in bounded_answer.suggested_queries[:5]) or "- none"
         return (
             f"User message:\n{message}\n\n"
+            "Conversation goal:\n"
+            "- reply like a normal chat message\n"
+            "- sound like an emerging clone of the owner, not a report generator\n"
+            "- first-person phrasing is allowed when natural\n"
+            "- do not mention corpus, evidence package, or limitations unless needed for honesty\n"
+            "- keep it short unless the user asks for more\n\n"
             f"Bounded query kind: {bounded_answer.query_kind}\n"
             f"Supported: {bounded_answer.supported}\n"
             f"Derived explanation: {bounded_answer.derived_explanation or 'none'}\n\n"
@@ -1897,7 +2149,7 @@ class DialogueCorpusService:
             f"Uncertainty:\n{uncertainty}\n\n"
             f"Limitations:\n{limitations}\n\n"
             f"Suggested follow-up questions:\n{suggestions}\n\n"
-            "Reply as Klone in a short, natural chat message grounded only in the evidence above."
+            "Reply as Klone in a natural, grounded chat message."
         )
 
     def _call_openai_responses_api(

@@ -910,6 +910,80 @@ class WorldMemoryNodeDetailRecord(BaseModel):
     warnings: list[str]
 
 
+class WorldMemoryDepthJobRequest(BaseModel):
+    node_ids: list[str] = Field(..., min_length=1, max_length=6)
+    renderer: Literal["local_luma_shell", "depth_anything_v2_remote"] = "local_luma_shell"
+
+
+class WorldMemoryDepthJobNodeRecord(BaseModel):
+    node_id: str
+    cluster_id: str
+    asset_id: int
+    label: str
+    relative_path: str
+    asset_kind: AssetKind
+    renderer: str
+    status: str
+    source_image_route: str
+    depth_preview_route: str
+    depth_raw_route: str
+    width_px: int
+    height_px: int
+    generated_at: str
+    notes: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class WorldMemoryDepthJobRecord(BaseModel):
+    job_id: int
+    room_id: str
+    renderer: str
+    status: str
+    node_count: int
+    result_count: int
+    created_at: str
+    started_at: str | None = None
+    completed_at: str | None = None
+    requested_node_ids: list[str]
+    results: list[WorldMemoryDepthJobNodeRecord] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    error_text: str | None = None
+
+
+class WorldMemoryDepthJobListRecord(BaseModel):
+    projection_version: str
+    read_only: bool = True
+    requested_room_id: str | None = None
+    resolved_room_ids: list[str]
+    job_count: int
+    jobs: list[WorldMemoryDepthJobRecord]
+    notes: list[str]
+    warnings: list[str]
+
+
+class WorldMemoryPlaceViewRecord(BaseModel):
+    projection_version: str
+    read_only: bool = True
+    requested_room_id: str | None = None
+    resolved_room_ids: list[str]
+    node_id: str
+    cluster_id: str
+    room_id: str
+    asset_id: int
+    label: str
+    relative_path: str
+    viewer_kind: Literal["parallax_2_5d"] = "parallax_2_5d"
+    source_image_route: str
+    depth_preview_route: str | None = None
+    depth_raw_route: str | None = None
+    latest_job_id: int | None = None
+    renderer: str | None = None
+    available: bool = False
+    notes: list[str]
+    warnings: list[str]
+
+
 class IngestStatusResponse(BaseModel):
     queue_depth: int
     latest_run: IngestRunRecord | None = None

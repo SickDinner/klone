@@ -255,16 +255,10 @@ async function submitChatMessage(rawValue) {
       body: JSON.stringify(payload),
     });
 
-    const meta = [
-      `mode: ${response.backend_mode}`,
-      response.model ? `model: ${response.model}` : "model: local",
-      `supported: ${response.answer.supported}`,
-    ];
     appendLine({
       role: "assistant",
       speaker: response.reply.speaker,
       content: response.reply.content,
-      meta,
     });
 
     response.system_notes.forEach((note) => {
@@ -280,7 +274,7 @@ async function submitChatMessage(rawValue) {
     }
     setFeedback(
       response.answer.supported
-        ? `Vastaus valmis (${response.backend_mode}).`
+        ? "Vastaus valmis."
         : "Kysymys meni nykyisen rajatun evidenssipaketin ulkopuolelle.",
     );
   } catch (error) {

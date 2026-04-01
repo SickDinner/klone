@@ -4,6 +4,12 @@ const chatState = {
   pending: false,
 };
 
+const CHAT_STORAGE_KEYS = {
+  sourcePath: "klone.chat.sourcePath",
+  ownerName: "klone.chat.ownerName",
+  mode: "klone.chat.mode",
+};
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -40,6 +46,23 @@ function setFeedback(message) {
   document.querySelector("#chat-feedback").textContent = message;
 }
 
+function loadStoredValue(key) {
+  try {
+    return window.localStorage.getItem(key) || "";
+  } catch (error) {
+    console.error(error);
+    return "";
+  }
+}
+
+function saveStoredValue(key, value) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
 function setModeBadge(message) {
   document.querySelector("#chat-mode-badge").textContent = message;
 }
@@ -70,8 +93,15 @@ function renderStatus(status) {
     )
     .join("");
 
-  document.querySelector("#chat-source-path").value = status.default_source_path || "";
-  setModeBadge(status.openai_api_configured ? "auto -> GPT-5.4 available" : "auto -> bounded local");
+  const sourceInput = document.querySelector("#chat-source-path");
+  const ownerInput = document.querySelector("#chat-owner-name");
+  const modeSelect = document.querySelector("#chat-mode");
+
+  sourceInput.value = loadStoredValue(CHAT_STORAGE_KEYS.sourcePath) || status.default_source_path || "";
+  ownerInput.value = loadStoredValue(CHAT_STORAGE_KEYS.ownerName);
+  modeSelect.value = loadStoredValue(CHAT_STORAGE_KEYS.mode) || "auto";
+
+  setModeBadge(status.openai_api_configured ? "auto -> GPT-5.4 kaytettavissa" : "auto -> bounded local");
 }
 
 function renderLog() {
@@ -153,8 +183,7 @@ function normalizeMessage(rawValue) {
   return text;
 }
 
-async function sendChatMessage(event) {
-  event.preventDefault();
+async function submitChatMessage(rawValue) {
   if (chatState.pending) {
     return;
   }
@@ -163,22 +192,22 @@ async function sendChatMessage(event) {
   const sourcePath = document.querySelector("#chat-source-path").value.trim();
   const ownerName = document.querySelector("#chat-owner-name").value.trim();
   const mode = document.querySelector("#chat-mode").value;
-  const message = normalizeMessage(input.value);
+  const message = normalizeMessage(rawValue);
 
   if (!message) {
-    setFeedback("Chat cleared." );
+    setFeedback("Keskustelu tyhjennettiin.");
     input.value = "";
     return;
   }
   if (!sourcePath) {
-    setFeedback("Source path is required before the clone can answer.");
+    setFeedback("Lahdepolku puuttuu. Tarkista Source Path ennen kysymysta.");
     return;
   }
 
   chatState.pending = true;
   document.querySelector("#chat-send").disabled = true;
   appendLine({ role: "user", speaker: "you", content: message });
-  setFeedback("Klone is thinking...");
+  setFeedback("Klone rakentaa vastausta...");
 
   const payload = {
     source_path: sourcePath,
@@ -222,8 +251,8 @@ async function sendChatMessage(event) {
     }
     setFeedback(
       response.answer.supported
-        ? `Answered via ${response.backend_mode}.`
-        : "Question was outside the current bounded evidence scope.",
+        ? `Vastaus valmis (${response.backend_mode}).`
+        : "Kysymys meni nykyisen rajatun evidenssipaketin ulkopuolelle.",
     );
   } catch (error) {
     appendLine({ role: "system", speaker: "system", content: error.message });
@@ -236,30 +265,46 @@ async function sendChatMessage(event) {
   }
 }
 
+async function sendChatMessage(event) {
+  event.preventDefault();
+  const input = document.querySelector("#chat-input");
+  await submitChatMessage(input.value);
+}
+
 function bindEvents() {
   document.querySelector("#chat-form").addEventListener("submit", sendChatMessage);
   document.querySelector("#chat-clear").addEventListener("click", () => {
     chatState.history = [];
     renderLog();
-    setFeedback("Chat log cleared.");
+    setFeedback("Keskusteluloki tyhjennettiin.");
   });
-  document.querySelector("#chat-suggestions").addEventListener("click", (event) => {
+  const suggestionHandler = async (event) => {
     const button = event.target.closest("[data-suggestion]");
     if (!button) {
       return;
     }
-    document.querySelector("#chat-input").value = button.dataset.suggestion;
-    document.querySelector("#chat-input").focus();
-  });
+    const suggestion = button.dataset.suggestion;
+    document.querySelector("#chat-input").value = suggestion;
+    await submitChatMessage(suggestion);
+  };
+  document.querySelector("#chat-suggestions").addEventListener("click", suggestionHandler);
+  document.querySelector("#chat-quickstart").addEventListener("click", suggestionHandler);
   document.querySelector("#chat-mode").addEventListener("change", (event) => {
     const value = event.currentTarget.value;
+    saveStoredValue(CHAT_STORAGE_KEYS.mode, value);
     if (value === "gpt-5.4") {
-      setModeBadge("requested -> GPT-5.4");
+      setModeBadge("pyydetty -> GPT-5.4");
     } else if (value === "bounded") {
-      setModeBadge("forced -> bounded local");
+      setModeBadge("pakotettu -> bounded local");
     } else {
-      setModeBadge(chatState.status?.openai_api_configured ? "auto -> GPT-5.4 available" : "auto -> bounded local");
+      setModeBadge(chatState.status?.openai_api_configured ? "auto -> GPT-5.4 kaytettavissa" : "auto -> bounded local");
     }
+  });
+  document.querySelector("#chat-source-path").addEventListener("change", (event) => {
+    saveStoredValue(CHAT_STORAGE_KEYS.sourcePath, event.currentTarget.value.trim());
+  });
+  document.querySelector("#chat-owner-name").addEventListener("change", (event) => {
+    saveStoredValue(CHAT_STORAGE_KEYS.ownerName, event.currentTarget.value.trim());
   });
 }
 
@@ -274,10 +319,11 @@ async function main() {
       role: "system",
       speaker: "system",
       content: status.openai_api_configured
-        ? "Clone room ready. GPT-5.4 is available in auto mode."
-        : "Clone room ready. OPENAI_API_KEY is missing, so replies stay in bounded local mode.",
+        ? "Huone on valmis. GPT-5.4 on kaytettavissa auto-tilassa."
+        : "Huone on valmis. OPENAI_API_KEY puuttuu, joten vastaukset tulevat nyt rajatusta paikallisesta tilasta.",
     });
-    setFeedback("Chat room ready.");
+    setFeedback("Huone on valmis kayttoon.");
+    document.querySelector("#chat-input").focus();
   } catch (error) {
     setFeedback(error.message);
     appendLine({ role: "system", speaker: "system", content: error.message });

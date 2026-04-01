@@ -102,7 +102,11 @@ class Phase2B8Tests(unittest.TestCase):
 
     def test_clone_chat_respond_route_falls_back_when_gpt_requested_without_key(self) -> None:
         app = create_app(self._settings_for("phase_2b_8_fallback.sqlite"))
-        with patch.dict("os.environ", {"OPENAI_API_KEY": ""}, clear=False):
+        with patch.dict(
+            "os.environ",
+            {"OPENAI_API_KEY": "", "LOCALAPPDATA": str(self.root / "localappdata_missing")},
+            clear=False,
+        ):
             observed = asyncio.run(
                 self._perform_request(
                     app,
@@ -128,6 +132,12 @@ class Phase2B8Tests(unittest.TestCase):
         key_dir = local_app_data / "Klone"
         key_dir.mkdir(parents=True, exist_ok=True)
         (key_dir / "openai_api_key.txt").write_text("sk-test-abcdefghijklmnopqrstuvwxyz", encoding="utf-8")
+        captured_payload: dict[str, object] = {}
+
+        def fake_openai_call(*, api_key: str, payload: dict[str, object]) -> dict[str, object]:
+            captured_payload["api_key"] = api_key
+            captured_payload["payload"] = payload
+            return {"output_text": "Tama tuli OpenAI-polun kautta."}
 
         with patch.dict(
             "os.environ",
@@ -136,7 +146,7 @@ class Phase2B8Tests(unittest.TestCase):
         ):
             with patch(
                 "klone.dialogue.DialogueCorpusService._call_openai_responses_api",
-                return_value={"output_text": "Tama tuli OpenAI-polun kautta."},
+                side_effect=fake_openai_call,
             ):
                 observed = asyncio.run(
                     self._perform_request(
@@ -157,6 +167,10 @@ class Phase2B8Tests(unittest.TestCase):
         self.assertEqual(payload["backend_mode"], "openai_gpt_5_4")
         self.assertTrue(payload["llm_call_performed"])
         self.assertEqual(payload["reply"]["content"], "Tama tuli OpenAI-polun kautta.")
+        outbound_payload = captured_payload["payload"]
+        self.assertIn("You are Klone", outbound_payload["instructions"])
+        self.assertEqual(outbound_payload["input"][-1]["role"], "user")
+        self.assertIsInstance(outbound_payload["input"][-1]["content"], str)
 
     def test_clone_chat_ui_copy_is_present(self) -> None:
         html = (PROJECT_ROOT / "src" / "klone" / "static" / "chat.html").read_text(encoding="utf-8")

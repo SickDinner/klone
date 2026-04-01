@@ -1835,41 +1835,27 @@ class DialogueCorpusService:
         if not api_key:
             raise ValueError("OPENAI_API_KEY is not configured.")
 
-        input_messages = [
-            {
-                "role": "developer",
-                "content": [
-                    {
-                        "type": "input_text",
-                        "text": self._openai_developer_prompt(owner_name=owner_name),
-                    }
-                ],
-            }
-        ]
+        input_messages: list[dict[str, Any]] = []
         for item in history[-6:]:
             if item.role not in {"user", "assistant"}:
                 continue
             input_messages.append(
                 {
                     "role": item.role,
-                    "content": [{"type": "input_text", "text": item.content[:3000]}],
+                    "content": item.content[:3000],
                 }
             )
         input_messages.append(
             {
                 "role": "user",
-                "content": [
-                    {
-                        "type": "input_text",
-                        "text": self._openai_user_prompt(message=message, bounded_answer=bounded_answer),
-                    }
-                ],
+                "content": self._openai_user_prompt(message=message, bounded_answer=bounded_answer),
             }
         )
 
         payload = {
             "model": model,
             "reasoning": {"effort": "medium"},
+            "instructions": self._openai_developer_prompt(owner_name=owner_name),
             "input": input_messages,
         }
         response_payload = self._call_openai_responses_api(api_key=api_key, payload=payload)

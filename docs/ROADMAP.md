@@ -220,8 +220,18 @@ Read-Only Asset Formal Metrics:
 - Mission Control asset detail shows an Art Metrics panel for supported image assets
 - no OCR, no embeddings, no batch comparison surface, and no personality or clinical inference
 
+## Phase V1.2
+Bounded Batch Art Metrics and Longitudinal Comparison:
+- GET /api/art/assets/compare
+- read-only room-scoped comparison only
+- compare only an explicit bounded set of existing image assets
+- reuse the existing deterministic V1.1 formal metrics set; do not invent new learned features
+- preserve deterministic ordering by existing asset timestamps with stable tie-breaks
+- expose ordered side-by-side metric values plus simple first-to-last metric deltas only
+- no OCR, no embeddings, no semantic similarity, no clustering, no profiling, no batch writeback, and no /v1 expansion
+
 ## Not approved yet
-- V1.2 batch art metrics and longitudinal comparisons
+- post-V1.2 art-lab expansion
 - semantic search
 - embeddings
 - OCR/transcription

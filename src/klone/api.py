@@ -7,9 +7,11 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .art import (
+    ArtAssetNotFoundError,
     ArtAssetSourceMissingError,
     ArtDependencyError,
     ArtLabService,
+    InvalidArtComparisonRequestError,
     UnsupportedArtAssetError,
 )
 from .blueprint import SYSTEM_BLUEPRINT
@@ -21,6 +23,7 @@ from .memory import MemoryService
 from .repository import KloneRepository
 from .rooms import PERMISSION_LEVELS, room_registry
 from .schemas import (
+    ArtAssetComparisonRecord,
     ArtAssetMetricsRecord,
     AssetRecord,
     AuditEventRecord,
@@ -656,6 +659,28 @@ def art_asset_metrics(
         except ArtDependencyError as error:
             raise HTTPException(status_code=503, detail=str(error)) from error
     raise HTTPException(status_code=404, detail=f"Asset {asset_id} was not found.")
+
+
+@router.get("/art/assets/compare", response_model=ArtAssetComparisonRecord)
+def art_asset_compare(
+    room_id: str = Query(..., min_length=1),
+    asset_id: list[int] = Query(...),
+    repository: KloneRepository = Depends(get_repository),
+) -> ArtAssetComparisonRecord:
+    room = _resolve_rooms(requested_room_id=room_id, permission="read")[0]
+    art_service = ArtLabService(repository)
+    try:
+        return art_service.compare_assets(room_id=room.id, asset_ids=asset_id)
+    except InvalidArtComparisonRequestError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except ArtAssetNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except UnsupportedArtAssetError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except ArtAssetSourceMissingError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except ArtDependencyError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @router.get("/ingest/status", response_model=IngestStatusResponse)

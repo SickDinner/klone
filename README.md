@@ -34,7 +34,7 @@ Nykyinen kanoninen tila on:
 - `G1.3 local ingest queue shell complete`
 - `G1.4 local resumable ingest queue complete`
 - `G1.5 bounded ingest queue history seam complete`
-- `V1.1 read-only asset formal metrics complete`
+- `V1.2 bounded batch art metrics and longitudinal comparison complete`
 
 Uutta tässä versiossa:
 
@@ -84,6 +84,8 @@ Uutta tässä versiossa:
   Dataset Intake tukee nyt `Queue Dataset` -askelta, ja Mission Control näyttää queue depthin sekä inspect/execute/resume/cancel -kontrollit ennen kuin ingest-run muuttuu manifestoituneeksi historialle; Inspect lataa nyt myös bounded queue historyn detail-paneeliin
 - `art and drawing metrics shell`
   `GET /api/art/assets/{asset_id}/metrics` laskee nyt olemassa oleville image-asseteille deterministiset formaalit mittarit kuten brightness, contrast, edge density, symmetry, balance, entropy ja colorfulness ilman persoonallisuustulkintaa
+- `bounded art comparison seam`
+  `GET /api/art/assets/compare` vertailee rajatun saman huoneen image-asset-joukon samoilla deterministisillä formaalimittareilla ja näyttää ajan mukaan järjestetyt mittarit sekä ensimmäisestä viimeiseen lasketut delta-arvot
 - `mission control art metrics`
   Asset Detail -paneelin alla näkyy nyt Art Metrics -kortti, joka analysoi valitun image-assetin read-only-tilassa ja kertoo selvästi, jos asset ei ole kuva
 
@@ -232,7 +234,7 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 ## Seuraavat järkevät rakennusvaiheet
 
 1. Seuraava post-A1/G1/V1-vaihe vasta erillisellä hyväksynnällä kanonisissa docs-tiedostoissa.
-2. Art and Drawing Labin seuraava askel vasta erillisellä hyväksynnällä: batch-metrics, longitudinal comparisons tai piirroskohtainen klusterointi.
+2. Art and Drawing Labin seuraava askel vasta erillisellä hyväksynnällä V1.2:n jälkeen: laajempi comparison-UX, batch-profiling, OCR, embeddings tai piirroskohtainen klusterointi.
 3. Memory Explorerin jatko A1.9:n jälkeen: provenance-UX, change-preview-linkitys, kontekstin parempi visualisointi ja selaintason smoke-testit.
 4. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
 5. Constitution Layer: hitaasti muuttuvat parametrit, provenance ja change logit.

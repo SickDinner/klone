@@ -1,6 +1,6 @@
 # Post-V1.1 Next Step Proposal
 
-Status: non-canonical architect proposal  
+Status: historical non-canonical architect proposal; superseded by Phase V1.2 completion on 2026-04-01  
 Date: 2026-04-01
 
 This file does not approve a new phase by itself.

@@ -18,16 +18,40 @@ else:  # pragma: no cover - import branch only
 
 from .guards import output_guard
 from .repository import KloneRepository
-from .schemas import ArtAssetMetricsRecord, PublicCapabilityRecord, ServiceSeamRecord
+from .schemas import (
+    ArtAssetComparisonItemRecord,
+    ArtAssetComparisonRecord,
+    ArtAssetMetricDeltaRecord,
+    ArtAssetMetricsRecord,
+    PublicCapabilityRecord,
+    ServiceSeamRecord,
+)
 
 
 ART_ANALYSIS_VERSION = "v1.1.formal_image_metrics"
+ART_COMPARISON_VERSION = "v1.2.formal_image_metrics_comparison"
 MAX_ANALYSIS_SIZE = 128
 SYMMETRY_SAMPLE_SIZE = 64
 EDGE_THRESHOLD = 32
 DARK_PIXEL_THRESHOLD = 64
 LIGHT_PIXEL_THRESHOLD = 192
 INK_PIXEL_THRESHOLD = 224
+MAX_COMPARISON_ASSET_COUNT = 8
+COMPARISON_METRIC_FIELDS = (
+    "aspect_ratio",
+    "brightness_mean",
+    "contrast_stddev",
+    "dark_pixel_ratio",
+    "light_pixel_ratio",
+    "ink_coverage_ratio",
+    "edge_density",
+    "colorfulness",
+    "entropy",
+    "symmetry_vertical",
+    "symmetry_horizontal",
+    "center_of_mass_x",
+    "center_of_mass_y",
+)
 
 
 class ArtLabError(RuntimeError):
@@ -43,6 +67,14 @@ class UnsupportedArtAssetError(ArtLabError):
 
 
 class ArtAssetSourceMissingError(ArtLabError):
+    pass
+
+
+class ArtAssetNotFoundError(ArtLabError):
+    pass
+
+
+class InvalidArtComparisonRequestError(ArtLabError):
     pass
 
 
@@ -203,9 +235,10 @@ class ArtLabService:
             id="art-lab-service",
             name="ArtLabService",
             implementation="in_process_read_only_shell",
-            status="formal_metrics_shell",
+            status="bounded_comparison_shell",
             notes=[
                 "Computes deterministic formal image metrics over existing governed image assets.",
+                "Supports bounded room-scoped comparison over existing image assets only.",
                 "Blocks psychological or clinical inference and does not mutate ingest or asset rows.",
             ],
         )
@@ -222,6 +255,21 @@ class ArtLabService:
                 room_scoped=True,
                 status="available",
                 description="Read deterministic formal image metrics for one governed image asset.",
+                backed_by=["ArtLabService", "PolicyService"],
+            ),
+            PublicCapabilityRecord(
+                id="art.asset.compare.read",
+                name="Asset Formal Metrics Comparison",
+                category="art",
+                path="/api/art/assets/compare",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=True,
+                status="available",
+                description=(
+                    "Compare a bounded set of room-scoped image assets using deterministic formal "
+                    "metrics only."
+                ),
                 backed_by=["ArtLabService", "PolicyService"],
             ),
         ]
@@ -288,3 +336,97 @@ class ArtLabService:
             ],
             warnings=list(analysis["warnings"]),
         )
+
+    def compare_assets(
+        self,
+        *,
+        room_id: str,
+        asset_ids: list[int],
+    ) -> ArtAssetComparisonRecord:
+        requested_asset_ids = self._normalize_asset_ids(asset_ids)
+        rows: list[dict[str, Any]] = []
+        for asset_id in requested_asset_ids:
+            row = self.repository.get_asset(asset_id, room_id=room_id)
+            if row is None:
+                raise ArtAssetNotFoundError(
+                    f"Asset {asset_id} was not found in room {room_id}."
+                )
+            rows.append(row)
+
+        ordered_rows = sorted(rows, key=lambda item: (str(item["fs_modified_at"]), int(item["id"])))
+        warnings: list[str] = []
+        if len({str(row["fs_modified_at"]) for row in ordered_rows}) != len(ordered_rows):
+            warnings.append("tied_fs_modified_at_ordering")
+
+        compared_assets: list[ArtAssetComparisonItemRecord] = []
+        for position, row in enumerate(ordered_rows, start=1):
+            metrics = self.metrics_from_asset_row(row)
+            compared_assets.append(
+                ArtAssetComparisonItemRecord(
+                    position=position,
+                    asset_id=int(row["id"]),
+                    dataset_label=str(row["dataset_label"]),
+                    room_id=str(row["room_id"]),
+                    asset_kind=str(row["asset_kind"]),
+                    file_name=metrics.file_name,
+                    relative_path=metrics.relative_path,
+                    fs_modified_at=str(row["fs_modified_at"]),
+                    indexed_at=str(row["indexed_at"]),
+                    metrics=metrics,
+                )
+            )
+
+        first_asset = compared_assets[0]
+        last_asset = compared_assets[-1]
+        deltas = [
+            ArtAssetMetricDeltaRecord(
+                metric_name=field_name,
+                start_asset_id=first_asset.asset_id,
+                end_asset_id=last_asset.asset_id,
+                start_value=float(getattr(first_asset.metrics, field_name)),
+                end_value=float(getattr(last_asset.metrics, field_name)),
+                delta=_round_metric(
+                    float(getattr(last_asset.metrics, field_name))
+                    - float(getattr(first_asset.metrics, field_name))
+                ),
+            )
+            for field_name in COMPARISON_METRIC_FIELDS
+        ]
+
+        return ArtAssetComparisonRecord(
+            comparison_version=ART_COMPARISON_VERSION,
+            analysis_version=ART_ANALYSIS_VERSION,
+            room_id=room_id,
+            requested_asset_ids=requested_asset_ids,
+            ordered_asset_ids=[item.asset_id for item in compared_assets],
+            asset_count=len(compared_assets),
+            ordering_basis="fs_modified_at",
+            compared_assets=compared_assets,
+            metric_deltas=deltas,
+            notes=[
+                "Compared assets are existing room-scoped image assets only.",
+                "Metric deltas are computed from the first and last asset after deterministic fs_modified_at ordering.",
+                "No OCR, embeddings, clustering, personality, or clinical inference is performed.",
+            ],
+            warnings=warnings,
+        )
+
+    @staticmethod
+    def _normalize_asset_ids(asset_ids: list[int]) -> list[int]:
+        normalized: list[int] = []
+        seen: set[int] = set()
+        for asset_id in asset_ids:
+            if asset_id in seen:
+                continue
+            seen.add(asset_id)
+            normalized.append(asset_id)
+
+        if len(normalized) < 2:
+            raise InvalidArtComparisonRequestError(
+                "At least two distinct asset_id values are required for comparison."
+            )
+        if len(normalized) > MAX_COMPARISON_ASSET_COUNT:
+            raise InvalidArtComparisonRequestError(
+                f"Art comparison supports at most {MAX_COMPARISON_ASSET_COUNT} assets per request."
+            )
+        return normalized

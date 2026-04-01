@@ -105,6 +105,43 @@ class ArtAssetMetricsRecord(BaseModel):
     warnings: list[str]
 
 
+class ArtAssetComparisonItemRecord(BaseModel):
+    position: int
+    asset_id: int
+    dataset_label: str
+    room_id: str
+    asset_kind: AssetKind
+    file_name: str
+    relative_path: str
+    fs_modified_at: str
+    indexed_at: str
+    metrics: ArtAssetMetricsRecord
+
+
+class ArtAssetMetricDeltaRecord(BaseModel):
+    metric_name: str
+    start_asset_id: int
+    end_asset_id: int
+    start_value: float
+    end_value: float
+    delta: float
+
+
+class ArtAssetComparisonRecord(BaseModel):
+    comparison_version: str
+    analysis_version: str
+    room_id: str
+    read_only: bool = True
+    requested_asset_ids: list[int]
+    ordered_asset_ids: list[int]
+    asset_count: int
+    ordering_basis: Literal["fs_modified_at"]
+    compared_assets: list[ArtAssetComparisonItemRecord]
+    metric_deltas: list[ArtAssetMetricDeltaRecord]
+    notes: list[str]
+    warnings: list[str]
+
+
 class BlobMetadataRecord(BaseModel):
     blob_id: str
     asset_id: int

@@ -11,8 +11,12 @@ const state = {
   ingestQueueHistory: null,
   ingestPreview: null,
   ingestManifest: null,
+  assets: [],
   selectedAsset: null,
   artMetrics: null,
+  artComparisonSelectionIds: [],
+  artComparison: null,
+  artComparisonError: null,
   memory: {
     roomId: "",
     events: [],
@@ -24,6 +28,18 @@ const state = {
     answer: null,
   },
 };
+
+const MAX_ART_COMPARISON_ASSETS = 8;
+const ART_COMPARISON_METRIC_FIELDS = [
+  "brightness_mean",
+  "contrast_stddev",
+  "edge_density",
+  "ink_coverage_ratio",
+  "colorfulness",
+  "entropy",
+  "symmetry_vertical",
+  "symmetry_horizontal",
+];
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -541,8 +557,10 @@ function syncIngestQueueSelection() {
 
 function renderAssets(assets) {
   const root = document.querySelector("#asset-table");
+  const roomId = document.querySelector("#asset-room-filter")?.value || "";
+  const selectedIds = new Set(state.artComparisonSelectionIds.map((item) => String(item)));
   if (!assets.length) {
-    root.innerHTML = '<tr><td colspan="7" class="empty-cell">No assets in the current room scope.</td></tr>';
+    root.innerHTML = '<tr><td colspan="8" class="empty-cell">No assets in the current room scope.</td></tr>';
     return;
   }
   root.innerHTML = assets
@@ -558,6 +576,17 @@ function renderAssets(assets) {
           <td>${escapeHtml(asset.classification_level)}</td>
           <td>${escapeHtml(asset.extraction_status)}</td>
           <td>${escapeHtml(formatTime(asset.indexed_at))}</td>
+          <td>
+            <label class="table-checkbox">
+              <input
+                type="checkbox"
+                data-compare-asset-id="${asset.id}"
+                ${selectedIds.has(String(asset.id)) ? "checked" : ""}
+                ${roomId && asset.asset_kind === "image" ? "" : "disabled"}
+              />
+              <span>${roomId ? (asset.asset_kind === "image" ? "select" : "image only") : "pick room"}</span>
+            </label>
+          </td>
           <td><button class="link-button" data-asset-id="${asset.id}" type="button">Inspect</button></td>
         </tr>
       `,
@@ -641,6 +670,151 @@ function renderArtMetrics(metrics, asset = null) {
       <li><strong>notes</strong>: ${metrics.notes.map((item) => escapeHtml(item)).join(", ")}</li>
       <li><strong>warnings</strong>: ${metrics.warnings.map((item) => escapeHtml(item)).join(", ") || "none"}</li>
     </ul>
+  `;
+}
+
+function renderArtComparison() {
+  const root = document.querySelector("#art-comparison");
+  const roomId = document.querySelector("#asset-room-filter")?.value || "";
+  const selectedAssets = state.artComparisonSelectionIds
+    .map((assetId) => state.assets.find((asset) => String(asset.id) === String(assetId)))
+    .filter(Boolean);
+  const selectedMarkup = selectedAssets.length
+    ? `<ul class="manifest-list">${selectedAssets
+        .map(
+          (asset) =>
+            `<li><strong>${escapeHtml(asset.file_name)}</strong>: ${escapeHtml(asset.dataset_label)} (${escapeHtml(
+              formatTime(asset.fs_modified_at),
+            )})</li>`,
+        )
+        .join("")}</ul>`
+    : '<div class="empty-state">No image assets selected for comparison yet.</div>';
+  const actionsMarkup = `
+    <div class="form-actions">
+      <button
+        class="button button-secondary"
+        data-art-compare-action="run"
+        type="button"
+        ${roomId && selectedAssets.length >= 2 ? "" : "disabled"}
+      >
+        Run Compare
+      </button>
+      <button
+        class="button button-secondary"
+        data-art-compare-action="clear"
+        type="button"
+        ${selectedAssets.length ? "" : "disabled"}
+      >
+        Clear Selection
+      </button>
+    </div>
+  `;
+
+  if (!roomId) {
+    root.className = "detail-card";
+    root.innerHTML = `
+      <h3>Bounded Art Comparison</h3>
+      <p>Select one room in the asset browser first. Comparison stays room-scoped and only works over the assets visible in that room.</p>
+      ${actionsMarkup}
+    `;
+    return;
+  }
+
+  const errorMarkup = state.artComparisonError
+    ? `<div class="empty-state">${escapeHtml(state.artComparisonError)}</div>`
+    : "";
+
+  if (selectedAssets.length < 2 || !state.artComparison) {
+    root.className = "detail-card";
+    root.innerHTML = `
+      <h3>Bounded Art Comparison</h3>
+      <p>Select 2 to ${MAX_ART_COMPARISON_ASSETS} image assets from the current room to inspect the existing V1.2 comparison payload in Mission Control.</p>
+      <div class="meta">${chips([
+        `room: ${roomId}`,
+        `selected_assets: ${selectedAssets.length}`,
+        `max_assets: ${MAX_ART_COMPARISON_ASSETS}`,
+      ])}</div>
+      ${actionsMarkup}
+      ${errorMarkup}
+      <section class="preview-block warning-list">
+        <h4>Selected Assets</h4>
+        ${selectedMarkup}
+      </section>
+    `;
+    return;
+  }
+
+  const comparison = state.artComparison;
+  const deltaMarkup = comparison.metric_deltas?.length
+    ? `<ul class="manifest-list">${comparison.metric_deltas
+        .map(
+          (item) =>
+            `<li><strong>${escapeHtml(item.metric_name)}</strong>: ${escapeHtml(item.start_value)} -> ${escapeHtml(
+              item.end_value,
+            )} (delta ${escapeHtml(item.delta)})</li>`,
+        )
+        .join("")}</ul>`
+    : '<div class="empty-state">No metric deltas returned.</div>';
+  const comparedAssetsMarkup = comparison.compared_assets?.length
+    ? comparison.compared_assets
+        .map((item) => {
+          const metricMarkup = ART_COMPARISON_METRIC_FIELDS.map(
+            (metricName) =>
+              `<li><strong>${escapeHtml(metricName)}</strong>: ${escapeHtml(item.metrics[metricName])}</li>`,
+          ).join("");
+          return `
+            <li>
+              <strong>#${item.position} ${escapeHtml(item.file_name)}</strong>
+              <div class="meta">${chips([
+                `asset_id: ${item.asset_id}`,
+                `dataset: ${item.dataset_label}`,
+                `modified: ${formatTime(item.fs_modified_at)}`,
+              ])}</div>
+              <ul class="detail-list compact-list">${metricMarkup}</ul>
+            </li>
+          `;
+        })
+        .join("")
+    : "<li>No compared asset records returned.</li>";
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>Bounded Art Comparison</h3>
+    <p>The current room selection reuses the existing read-only V1.2 comparison seam without adding new metrics, learned features, or writeback behavior.</p>
+    <div class="meta">${chips([
+      `room: ${comparison.room_id}`,
+      `comparison_version: ${comparison.comparison_version}`,
+      `analysis_version: ${comparison.analysis_version}`,
+      `asset_count: ${comparison.asset_count}`,
+      `ordering_basis: ${comparison.ordering_basis}`,
+    ])}</div>
+    ${actionsMarkup}
+    ${errorMarkup}
+    <div class="preview-grid">
+      <section class="preview-block">
+        <h4>Selected Assets</h4>
+        ${selectedMarkup}
+      </section>
+      <section class="preview-block">
+        <h4>Metric Deltas</h4>
+        ${deltaMarkup}
+      </section>
+    </div>
+    <section class="preview-block warning-list">
+      <h4>Compared Assets</h4>
+      <ul class="manifest-list">${comparedAssetsMarkup}</ul>
+    </section>
+    <section class="preview-block warning-list">
+      <h4>Notes and Warnings</h4>
+      <ul class="manifest-list">
+        ${comparison.notes.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+        ${
+          comparison.warnings.length
+            ? comparison.warnings.map((item) => `<li>${escapeHtml(item)}</li>`).join("")
+            : "<li>No comparison warnings.</li>"
+        }
+      </ul>
+    </section>
   `;
 }
 
@@ -974,7 +1148,18 @@ async function refreshAssetBrowser() {
     params.set("dataset_id", datasetId);
   }
   const assets = await fetchJson(`/api/assets?${params.toString()}`);
+  state.assets = assets;
+  state.artComparisonSelectionIds = roomId
+    ? state.artComparisonSelectionIds.filter((assetId) =>
+        assets.some(
+          (asset) => String(asset.id) === String(assetId) && asset.asset_kind === "image",
+        ),
+      )
+    : [];
+  state.artComparison = null;
+  state.artComparisonError = null;
   renderAssets(assets);
+  renderArtComparison();
 }
 
 async function loadAssetDetail(assetId) {
@@ -1002,6 +1187,77 @@ async function loadAssetDetail(assetId) {
     state.artMetrics = null;
     document.querySelector("#asset-detail").textContent = error.message;
     renderArtMetrics(null, null);
+  }
+}
+
+function toggleArtComparisonSelection(assetId, checked) {
+  const normalizedId = String(assetId);
+  const nextSelection = state.artComparisonSelectionIds
+    .map((item) => String(item))
+    .filter((item) => item !== normalizedId);
+
+  if (checked) {
+    if (nextSelection.length >= MAX_ART_COMPARISON_ASSETS) {
+      state.artComparisonError = `Art comparison supports at most ${MAX_ART_COMPARISON_ASSETS} assets per request.`;
+      renderAssets(state.assets);
+      renderArtComparison();
+      return;
+    }
+    nextSelection.push(normalizedId);
+  }
+
+  state.artComparisonSelectionIds = nextSelection;
+  state.artComparison = null;
+  state.artComparisonError = null;
+  renderAssets(state.assets);
+  renderArtComparison();
+}
+
+function clearArtComparisonSelection() {
+  state.artComparisonSelectionIds = [];
+  state.artComparison = null;
+  state.artComparisonError = null;
+  renderAssets(state.assets);
+  renderArtComparison();
+}
+
+async function runArtComparison() {
+  const roomId = document.querySelector("#asset-room-filter").value;
+  if (!roomId) {
+    state.artComparison = null;
+    state.artComparisonError = "Select a single room in the asset browser before comparing art assets.";
+    renderArtComparison();
+    return;
+  }
+
+  if (state.artComparisonSelectionIds.length < 2) {
+    state.artComparison = null;
+    state.artComparisonError = "Select at least two image assets for comparison.";
+    renderArtComparison();
+    return;
+  }
+
+  const root = document.querySelector("#art-comparison");
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>Bounded Art Comparison</h3>
+    <p>Loading comparison for ${state.artComparisonSelectionIds.length} selected assets in ${escapeHtml(roomId)}...</p>
+  `;
+
+  const params = new URLSearchParams({ room_id: roomId });
+  state.artComparisonSelectionIds.forEach((assetId) => {
+    params.append("asset_id", String(assetId));
+  });
+
+  try {
+    const comparison = await fetchJson(`/api/art/assets/compare?${params.toString()}`);
+    state.artComparison = comparison;
+    state.artComparisonError = null;
+    renderArtComparison();
+  } catch (error) {
+    state.artComparison = null;
+    state.artComparisonError = error.message;
+    renderArtComparison();
   }
 }
 
@@ -1447,6 +1703,26 @@ function bindEvents() {
       return;
     }
     loadAssetDetail(button.dataset.assetId);
+  });
+  document.querySelector("#asset-table").addEventListener("change", (event) => {
+    const checkbox = event.target.closest("[data-compare-asset-id]");
+    if (!checkbox) {
+      return;
+    }
+    toggleArtComparisonSelection(checkbox.dataset.compareAssetId, checkbox.checked);
+  });
+  document.querySelector("#art-comparison").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-art-compare-action]");
+    if (!button || button.disabled) {
+      return;
+    }
+    if (button.dataset.artCompareAction === "run") {
+      runArtComparison();
+      return;
+    }
+    if (button.dataset.artCompareAction === "clear") {
+      clearArtComparisonSelection();
+    }
   });
 
   document.querySelector("#memory-filter-form").addEventListener("submit", refreshMemoryExplorer);

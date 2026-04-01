@@ -92,7 +92,7 @@
         <article>
           <div class="section-head">
             <h2>Indexed Asset Browser</h2>
-            <p>Inspectable asset index with hashing, extraction status, room scope, and ingest timestamps.</p>
+            <p>Inspectable asset index with hashing, extraction status, room scope, ingest timestamps, and bounded art comparison selection.</p>
           </div>
           <div class="panel table-panel">
             <div class="toolbar">
@@ -116,6 +116,7 @@
                     <th>Classification</th>
                     <th>Extraction</th>
                     <th>Indexed</th>
+                    <th>Compare</th>
                     <th>Details</th>
                   </tr>
                 </thead>
@@ -136,6 +137,13 @@
             <p>Formal visual metrics for supported image assets, without personality inference.</p>
           </div>
           <div id="art-metrics" class="detail-card empty-state">Select an image asset to inspect formal metrics.</div>
+          <div class="section-head section-head-tight">
+            <h2>Art Comparison</h2>
+            <p>Bounded same-room comparison over the existing deterministic V1.2 metrics seam.</p>
+          </div>
+          <div id="art-comparison" class="detail-card empty-state">
+            Choose a room in the asset browser and select 2 to 8 image assets to compare.
+          </div>
         </article>
       </section>
 

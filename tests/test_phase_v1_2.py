@@ -125,6 +125,14 @@ class PhaseV12Tests(unittest.TestCase):
         self.assertTrue(capability_map["art.asset.compare.read"]["read_only"])
         self.assertTrue(capability_map["art.asset.compare.read"]["room_scoped"])
 
+    def test_art_comparison_ui_copy_is_present(self) -> None:
+        html = (PROJECT_ROOT / "src" / "klone" / "static" / "index.html").read_text(encoding="utf-8")
+        js = (PROJECT_ROOT / "src" / "klone" / "static" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("Art Comparison", html)
+        self.assertIn("renderArtComparison", js)
+        self.assertIn("/api/art/assets/compare", js)
+        self.assertIn("data-compare-asset-id", js)
+
     async def _perform_request(
         self,
         app,

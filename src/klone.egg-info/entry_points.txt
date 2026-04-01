@@ -1,0 +1,2 @@
+[console_scripts]
+klone = klone.cli:main

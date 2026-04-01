@@ -3,7 +3,7 @@
 Last updated: 2026-04-01
 
 ## Current phase
-Phase 2B.6 complete; no further approved 2B.6, 2E, A1, G1, or V1 substep is defined yet
+Phase 2B.7 complete; no further approved 2B.7, 2E, A1, G1, or V1 substep is defined yet
 
 ## Phase state
 - Phase 2B.1 complete
@@ -12,6 +12,7 @@ Phase 2B.6 complete; no further approved 2B.6, 2E, A1, G1, or V1 substep is defi
 - Phase 2B.4 complete
 - Phase 2B.5 complete
 - Phase 2B.6 complete
+- Phase 2B.7 complete
 - Phase 2C.1 complete
 - Phase 2C.2 complete
 - Phase 2C.3 complete
@@ -56,6 +57,16 @@ Phase 2B.6 complete; no further approved 2B.6, 2E, A1, G1, or V1 substep is defi
 - Mission Control now includes a Dialogue Corpus panel for running the analysis from the cockpit
 - `/v1/capabilities` now exposes the dialogue-corpus service seam and capability
 - focused 2B.6 tests green
+- compile pass green
+
+## Completed in 2B.7
+- bounded read-only dialogue question shell over the completed 2B.6 aggregate corpus analysis
+- POST `/api/dialogue-corpus/answer` now answers supported dialogue-corpus questions without enabling memory writes or raw semantic retrieval
+- supported bounded query classes are summary, top direct ties, top groups, network shape, timeline, owner-side style, topic hints, and named counterpart lookup
+- named counterpart lookup stays structural and thread-backed rather than inferring relationship meaning or psychology from raw message text
+- repo now exposes a local `klone` CLI command for direct parser testing against a source path such as `C:\META`
+- `/v1/capabilities` now exposes the dialogue-corpus answer capability alongside the existing analysis capability
+- focused 2B.7 tests green
 - compile pass green
 
 
@@ -287,7 +298,7 @@ Phase 2B.6 complete; no further approved 2B.6, 2E, A1, G1, or V1 substep is defi
 - compile pass green
 
 ## Next approved substep
-- no further approved 2B.6, 2E, A1, G1, or V1 substep is enumerated in canonical repo evidence
-- require explicit roadmap extension or approval before widening the dialogue-corpus shell beyond the completed 2B.6 read-only export-analysis route, the constitution layer beyond the completed 2E.1 read-only shell, the public control-plane seam beyond the completed A1.9 change preview route, the ingest spine beyond the completed G1.5 bounded queue history seam, or the art-lab beyond the completed V1.2 bounded comparison seam
+- no further approved 2B.7, 2E, A1, G1, or V1 substep is enumerated in canonical repo evidence
+- require explicit roadmap extension or approval before widening the dialogue-corpus shell beyond the completed 2B.7 bounded export-query route, the constitution layer beyond the completed 2E.1 read-only shell, the public control-plane seam beyond the completed A1.9 change preview route, the ingest spine beyond the completed G1.5 bounded queue history seam, or the art-lab beyond the completed V1.2 bounded comparison seam
 - do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, G1.4 local resumable queue work, G1.5 queue history work, V1.1 asset formal metrics work, V1.2 bounded comparison work, or 2E.1 constitution shell work
 

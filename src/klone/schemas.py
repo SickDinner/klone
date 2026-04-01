@@ -180,6 +180,12 @@ class DialogueCorpusAnalysisRequest(BaseModel):
     owner_name: str | None = Field(default=None, min_length=1, max_length=200)
 
 
+class DialogueCorpusAnswerRequest(BaseModel):
+    source_path: str = Field(..., min_length=1)
+    question: str = Field(..., min_length=1, max_length=320)
+    owner_name: str | None = Field(default=None, min_length=1, max_length=200)
+
+
 class DialogueCorpusSourceRecord(BaseModel):
     label: str
     path: str
@@ -235,6 +241,11 @@ class DialogueCorpusStyleSignalRecord(BaseModel):
     summary: str
 
 
+class DialogueCorpusAnswerSourceRecord(BaseModel):
+    content: str
+    source_refs: list[str]
+
+
 class DialogueCorpusAnalysisRecord(BaseModel):
     analysis_version: str
     source_kind: str
@@ -267,6 +278,24 @@ class DialogueCorpusAnalysisRecord(BaseModel):
     clone_foundation: list[str]
     notes: list[str]
     warnings: list[str]
+
+
+class DialogueCorpusAnswerRecord(BaseModel):
+    answer_version: str
+    analysis_version: str
+    source_kind: str
+    requested_path: str
+    selected_source_path: str
+    owner_name: str
+    question: str
+    query_kind: str
+    supported: bool
+    read_only: bool = True
+    source_backed_content: list[DialogueCorpusAnswerSourceRecord]
+    derived_explanation: str | None = None
+    uncertainty: list[str]
+    limitations: list[str]
+    suggested_queries: list[str]
 
 
 class BlobMetadataRecord(BaseModel):
@@ -626,6 +655,57 @@ class MissionControlStatus(BaseModel):
     module_registry: list[ModuleCapabilityRecord]
     latest_internal_run: InternalRunRecord | None = None
     recent_internal_runs: list[InternalRunRecord]
+
+
+class HybridBoardAxisRecord(BaseModel):
+    id: str
+    index: int
+    label: str
+    description: str
+
+
+class HybridBoardSourceTotalsRecord(BaseModel):
+    memory_events: int
+    memory_episodes: int
+    audit_events: int
+
+
+class HybridBoardSquareRecord(BaseModel):
+    square_id: str
+    row_id: str
+    row_index: int
+    column_id: str
+    column_index: int
+    title: str
+    dominant_polarity: Literal["infernal", "celestial", "neutral"]
+    infernal_pressure: float
+    celestial_pressure: float
+    neutral_residue: float
+    scar_score: float
+    activity_score: float
+    intensity: float
+    alignment_score: float
+    signal_count: int
+    event_count: int
+    episode_count: int
+    audit_count: int
+    source_room_ids: list[str]
+    top_markers: list[str]
+    last_touched_at: str | None = None
+
+
+class HybridMemoryBoardRecord(BaseModel):
+    projection_version: str
+    read_only: bool = True
+    requested_room_id: str | None = None
+    resolved_room_ids: list[str]
+    square_count: int
+    source_totals: HybridBoardSourceTotalsRecord
+    row_axes: list[HybridBoardAxisRecord]
+    column_axes: list[HybridBoardAxisRecord]
+    squares: list[HybridBoardSquareRecord]
+    notes: list[str]
+    warnings: list[str]
 
 
 class IngestStatusResponse(BaseModel):

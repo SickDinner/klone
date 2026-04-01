@@ -30,9 +30,12 @@ from .schemas import (
     ConstitutionSnapshotRecord,
     DialogueCorpusAnalysisRecord,
     DialogueCorpusAnalysisRequest,
+    DialogueCorpusAnswerRecord,
+    DialogueCorpusAnswerRequest,
     DatasetIngestRequest,
     DatasetRecord,
     GovernanceGuardRecord,
+    HybridMemoryBoardRecord,
     IngestExecutionResponse,
     IngestPreflightResponse,
     IngestQueueEnqueueResponse,
@@ -578,6 +581,22 @@ def blueprint() -> dict:
     return SYSTEM_BLUEPRINT.to_dict()
 
 
+@router.get("/simulation/hybrid-board", response_model=HybridMemoryBoardRecord)
+def simulation_hybrid_board(
+    room_id: str | None = Query(default=None),
+    services: ServiceContainer = Depends(get_service_container),
+) -> HybridMemoryBoardRecord:
+    rooms = _resolve_rooms(
+        requested_room_id=room_id,
+        permission="summarize",
+        accept_requires_approval=True,
+    )
+    return services.simulation.hybrid_board.build_board(
+        room_ids=[room.id for room in rooms],
+        requested_room_id=room_id,
+    )
+
+
 @router.get("/constitution", response_model=ConstitutionSnapshotRecord)
 def constitution_snapshot(
     services: ServiceContainer = Depends(get_service_container),
@@ -601,6 +620,25 @@ def dialogue_corpus_analyze(
         raise HTTPException(status_code=400, detail=str(error)) from error
     except OSError as error:
         raise HTTPException(status_code=500, detail=f"Dialogue corpus analysis failed: {error}") from error
+
+
+@router.post("/dialogue-corpus/answer", response_model=DialogueCorpusAnswerRecord)
+def dialogue_corpus_answer(
+    request: DialogueCorpusAnswerRequest,
+    services: ServiceContainer = Depends(get_service_container),
+) -> DialogueCorpusAnswerRecord:
+    try:
+        return services.dialogue_corpus.answer(
+            source_path=request.source_path,
+            question=request.question,
+            owner_name=request.owner_name,
+        )
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except OSError as error:
+        raise HTTPException(status_code=500, detail=f"Dialogue corpus answer failed: {error}") from error
 
 
 @router.get("/modules")

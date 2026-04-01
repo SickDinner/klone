@@ -19,7 +19,7 @@
 
 Nykyinen kanoninen tila on:
 
-- `Phase 2B.6 read-only dialogue corpus shell complete`
+- `Phase 2B.7 bounded dialogue query shell complete`
 - `Phase 2E.1 read-only constitution shell complete`
 - `Phase A1 approved`
 - `A1.1 public control-plane seam kickoff complete`
@@ -92,6 +92,8 @@ Uutta tässä versiossa:
   Asset Detail -paneelin alla näkyy nyt Art Metrics -kortti, joka analysoi valitun image-assetin read-only-tilassa ja kertoo selvästi, jos asset ei ole kuva
 - `dialogue corpus shell`
   `POST /api/dialogue-corpus/analyze` analysoi nyt local Messenger-export-rootit tai ChatGPT-export-JSONit read-only-tilassa ja nostaa näkyviin suhteet, verkoston laajuuden, tyyli-signaalit ja aikajanan silloin kun lähde oikeasti tukee niitä
+- `bounded dialogue query shell`
+  `POST /api/dialogue-corpus/answer` ja paikallinen `klone`-CLI vastaavat nyt rajattuihin kysymyksiin kuten vahvimmat kontaktit, suurimmat ryhmät, verkoston koko, aikajana, tyyli, top-termit ja nimellä haettu counterpart ilman raw semantic searchia
 - `constitution layer shell`
   `GET /api/constitution` näyttää nyt hitaasti muuttuvat malliparametrit, approval-tilan ja append-only muutosmuistiinpanot erillään memorystä
 
@@ -157,6 +159,7 @@ Supervisor hallitsee liikennettä vyöhykkeiden välillä. Moduulit eivät saa l
 ├─ docs/
 │  ├─ ARCHITECTURE.md
 │  ├─ DATA_GOVERNANCE.md
+│  ├─ DIALOGUE_CORPUS_NEXT_AND_TRAINING_PLAN.md
 │  ├─ PHASE_2B_4_CLOSEOUT.md
 │  └─ PHASE_2A_HANDOFF.md
 ├─ src/
@@ -166,6 +169,7 @@ Supervisor hallitsee liikennettä vyöhykkeiden välillä. Moduulit eivät saa l
 │     ├─ art.py
 │     ├─ audit.py
 │     ├─ blueprint.py
+│     ├─ cli.py
 │     ├─ config.py
 │     ├─ contracts.py
 │     ├─ guards.py
@@ -199,6 +203,14 @@ uvicorn klone.main:app --reload
 
 Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
+Ensimmäinen paikallinen parseritesti onnistuu nyt myös suoraan komentoriviltä:
+
+```powershell
+klone "Keiden kanssa olen puhunut eniten?"
+klone --source C:\META "Mitä tiedät Katja Asumasta tämän korpuksen perusteella?"
+klone --analyze
+```
+
 ## Nykyinen API
 
 - `GET /api/health`
@@ -212,6 +224,7 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 - `GET /api/governance/guards`
 - `GET /api/constitution`
 - `POST /api/dialogue-corpus/analyze`
+- `POST /api/dialogue-corpus/answer`
 - `GET /api/datasets`
 - `GET /api/assets`
 - `GET /api/assets/{asset_id}`

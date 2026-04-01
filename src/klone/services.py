@@ -19,6 +19,7 @@ from .schemas import (
     PublicCapabilityRecord,
     ServiceSeamRecord,
 )
+from .simulation import HybridMemoryBoardService
 
 
 def module_registry_payload() -> list[ModuleCapabilityRecord]:
@@ -191,6 +192,39 @@ class PolicyService:
                 description="Read deterministic guard visibility for access, classification, audit, and output.",
                 backed_by=["PolicyService"],
             ),
+        ]
+
+
+class SimulationService:
+    def __init__(self, repository: KloneRepository) -> None:
+        self.hybrid_board = HybridMemoryBoardService(repository)
+
+    def seam_descriptor(self) -> ServiceSeamRecord:
+        return ServiceSeamRecord(
+            id="simulation-service",
+            name="SimulationService",
+            implementation="in_process_read_only_projection",
+            status="active_projection",
+            notes=[
+                "Projects governed audit and memory records into a read-only hybrid board surface.",
+                "Does not create a second source of truth and does not enable simulation writes.",
+            ],
+        )
+
+    def public_capabilities(self) -> list[PublicCapabilityRecord]:
+        return [
+            PublicCapabilityRecord(
+                id="simulation.hybrid_board.read",
+                name="Hybrid Memory Board",
+                category="simulation",
+                path="/api/simulation/hybrid-board",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=True,
+                status="available",
+                description="Read a governed 8x8 hybrid board projected from audit, memory event, and episode surfaces.",
+                backed_by=["SimulationService", "MemoryFacade", "AuditService", "PolicyService"],
+            )
         ]
 
 
@@ -680,6 +714,7 @@ class _ObjectEnvelopeProjector:
 class ServiceContainer:
     memory: MemoryFacade
     policy: PolicyService
+    simulation: SimulationService
     audit: AuditService
     blob: BlobService
     art: ArtLabService
@@ -692,6 +727,7 @@ class ServiceContainer:
         return cls(
             memory=MemoryFacade(repository),
             policy=PolicyService(),
+            simulation=SimulationService(repository),
             audit=AuditService(repository),
             blob=BlobService(repository),
             art=ArtLabService(repository),
@@ -704,6 +740,7 @@ class ServiceContainer:
         return [
             self.memory.seam_descriptor(),
             self.policy.seam_descriptor(),
+            self.simulation.seam_descriptor(),
             ServiceSeamRecord(
                 id="audit-service",
                 name="AuditService",
@@ -736,6 +773,7 @@ class ServiceContainer:
                 backed_by=["PolicyService", "AuditService"],
             ),
             *self.policy.public_capabilities(),
+            *self.simulation.public_capabilities(),
             *self.memory.public_capabilities(),
             *self.blob.public_capabilities(),
             *self.art.public_capabilities(),

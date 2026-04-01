@@ -5,6 +5,7 @@ src/klone/api.py
 src/klone/art.py
 src/klone/audit.py
 src/klone/blueprint.py
+src/klone/cli.py
 src/klone/config.py
 src/klone/constitution.py
 src/klone/contracts.py
@@ -19,11 +20,13 @@ src/klone/request_context.py
 src/klone/rooms.py
 src/klone/schemas.py
 src/klone/services.py
+src/klone/simulation.py
 src/klone/v1_api.py
 src/klone/v1_contracts.py
 src/klone.egg-info/PKG-INFO
 src/klone.egg-info/SOURCES.txt
 src/klone.egg-info/dependency_links.txt
+src/klone.egg-info/entry_points.txt
 src/klone.egg-info/requires.txt
 src/klone.egg-info/top_level.txt
 tests/test_bedrock_b00_1.py
@@ -38,6 +41,7 @@ tests/test_memory_phase_2c3.py
 tests/test_memory_phase_2c4.py
 tests/test_memory_phase_2c5.py
 tests/test_phase_2b_6.py
+tests/test_phase_2b_7.py
 tests/test_phase_2e_1.py
 tests/test_phase_a1_1.py
 tests/test_phase_a1_2.py
@@ -53,5 +57,6 @@ tests/test_phase_g1_2.py
 tests/test_phase_g1_3.py
 tests/test_phase_g1_4.py
 tests/test_phase_g1_5.py
+tests/test_phase_s1_1.py
 tests/test_phase_v1_1.py
 tests/test_phase_v1_2.py

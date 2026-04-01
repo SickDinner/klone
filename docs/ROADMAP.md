@@ -48,6 +48,15 @@ Read-Only Dialogue Corpus Shell:
 - Mission Control dialogue corpus panel
 - no memory writes, no durable identity labels, no OCR/transcription, no embeddings, and no sentiment or psychological inference in this phase
 
+## Phase 2B.7
+Bounded Dialogue Query Shell:
+- POST /api/dialogue-corpus/answer
+- local `klone` CLI command for bounded dialogue-corpus querying
+- reuse the completed 2B.6 aggregate export analysis rather than adding a raw semantic retrieval layer
+- support only bounded aggregate question classes: summary, top direct ties, top groups, network shape, timeline, owner-side style, topic hints, and named counterpart lookup
+- keep named counterpart lookup structural and thread-backed; do not summarize raw message meaning or relationship psychology
+- no memory writes, no durable identity labels, no raw-message semantic search, no embeddings, no OCR/transcription, and no sentiment or psychological inference in this phase
+
 ## Phase 2C.1
 Query / Retrieval Primitives:
 - status-aware filtering
@@ -250,6 +259,7 @@ Read-Only Constitution Layer Shell:
 - no write route, no live routing influence, no self-modification loop, and no agent authority expansion in this phase
 
 ## Not approved yet
+- post-2B.7 dialogue expansion
 - post-2E.1 constitution expansion
 - post-V1.2 art-lab expansion
 - semantic search

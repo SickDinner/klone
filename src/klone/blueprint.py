@@ -93,11 +93,20 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
             name="Dialogue Corpus",
             zone_id="intimate",
             supervisor="memory supervisor",
-            stage="phase-2b6",
-            status="read_only_corpus_shell",
-            purpose="Analyze local conversation exports into relationship, network, style, and history priors before any memory write path is enabled.",
+            stage="phase-2b7",
+            status="read_only_query_shell",
+            purpose=(
+                "Analyze local conversation exports into relationship, network, style, and history priors and "
+                "answer bounded aggregate questions before any memory write path is enabled."
+            ),
             key_inputs=["messenger exports", "chat exports", "thread metadata"],
-            outputs=["corpus summaries", "relationship priors", "network visibility", "style signals"],
+            outputs=[
+                "corpus summaries",
+                "relationship priors",
+                "network visibility",
+                "style signals",
+                "bounded dialogue answers",
+            ],
         ),
         ModuleCard(
             id="media-lake",
@@ -142,6 +151,17 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
             purpose="Expose slow-cycle model defaults, provenance notes, and append-only change tracking without mixing them into memory rows.",
             key_inputs=["approved parameter updates", "lineage references", "version history", "governance posture"],
             outputs=["constitution snapshot", "change logs", "stable weights"],
+        ),
+        ModuleCard(
+            id="simulation-lab",
+            name="Simulation Lab",
+            zone_id="public",
+            supervisor="simulation supervisor",
+            stage="phase-3",
+            status="read_only_projection",
+            purpose="Project governed audit and memory evidence into runtime-visible boards and other read-only simulation surfaces without creating a second source of truth.",
+            key_inputs=["audit evidence", "memory events", "memory episodes", "room registry"],
+            outputs=["hybrid board", "pressure summaries", "projection diagnostics"],
         ),
         ModuleCard(
             id="circadian-layer",
@@ -246,8 +266,8 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
             id="simulation-supervisor",
             name="Simulation Supervisor",
             layer="domain",
-            responsibility="Translate approved biology questions into targeted structure or modeling work.",
-            watches=["scope control", "compute jobs", "result validity"],
+            responsibility="Project governed evidence into read-only simulation surfaces and translate later approved biology questions into targeted structure or modeling work.",
+            watches=["scope control", "projection drift", "compute jobs", "result validity"],
         ),
         AgentRole(
             id="ingest-worker",

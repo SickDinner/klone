@@ -13,6 +13,9 @@ const state = {
   ingestManifest: null,
   dialogueCorpus: null,
   constitution: null,
+  simulation: {
+    board: null,
+  },
   assets: [],
   selectedAsset: null,
   artMetrics: null,
@@ -373,6 +376,94 @@ function renderConstitution(constitution) {
         ${constitution.warnings.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
       </ul>
     </section>
+  `;
+}
+
+function renderHybridBoard(board) {
+  const summaryRoot = document.querySelector("#simulation-board-summary");
+  const boardRoot = document.querySelector("#simulation-board-shell");
+  if (!board) {
+    summaryRoot.className = "detail-card empty-state";
+    summaryRoot.textContent = "No hybrid board projection loaded yet.";
+    boardRoot.className = "detail-card empty-state";
+    boardRoot.textContent = "No board projection loaded yet.";
+    return;
+  }
+
+  summaryRoot.className = "detail-card";
+  summaryRoot.innerHTML = `
+    <h3>Projection Summary</h3>
+    <p>The hybrid board is a governed runtime surface projected from audit and memory evidence. It does not replace the source of truth.</p>
+    <div class="meta">${chips([
+      `version: ${board.projection_version}`,
+      `read_only: ${board.read_only}`,
+      board.requested_room_id ? `room: ${board.requested_room_id}` : `rooms: ${board.resolved_room_ids.length}`,
+      `events: ${board.source_totals.memory_events}`,
+      `episodes: ${board.source_totals.memory_episodes}`,
+      `audit: ${board.source_totals.audit_events}`,
+    ])}</div>
+    <ul class="detail-list">
+      ${board.notes.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+    </ul>
+    ${
+      board.warnings?.length
+        ? `<div class="meta">${chips(board.warnings.map((warning) => `warning: ${warning}`))}</div>`
+        : ""
+    }
+  `;
+
+  const squaresByKey = new Map(board.squares.map((square) => [`${square.row_id}:${square.column_id}`, square]));
+  const headerMarkup = board.column_axes
+    .map(
+      (column) => `
+        <div class="hybrid-axis hybrid-axis-column" title="${escapeHtml(column.description)}">
+          <strong>${escapeHtml(column.label)}</strong>
+        </div>
+      `,
+    )
+    .join("");
+
+  const rowMarkup = board.row_axes
+    .map((row) => {
+      const cells = board.column_axes
+        .map((column) => {
+          const square = squaresByKey.get(`${row.id}:${column.id}`);
+          if (!square) {
+            return '<div class="hybrid-board-cell hybrid-board-cell-empty">n/a</div>';
+          }
+          return `
+            <div
+              class="hybrid-board-cell hybrid-${escapeHtml(square.dominant_polarity)}"
+              style="--hybrid-intensity:${Math.max(0.08, square.intensity)};"
+              title="${escapeHtml(square.title)} | markers: ${escapeHtml(square.top_markers.join(", ") || "none")}"
+            >
+              <div class="hybrid-cell-title">${escapeHtml(square.dominant_polarity)}</div>
+              <div class="hybrid-cell-metric">${square.activity_score.toFixed(2)}</div>
+              <div class="hybrid-cell-subtitle">e${square.event_count} / ep${square.episode_count} / a${square.audit_count}</div>
+              <div class="hybrid-cell-subtitle">scar ${square.scar_score.toFixed(2)}</div>
+            </div>
+          `;
+        })
+        .join("");
+
+      return `
+        <div class="hybrid-axis hybrid-axis-row" title="${escapeHtml(row.description)}">
+          <strong>${escapeHtml(row.label)}</strong>
+        </div>
+        ${cells}
+      `;
+    })
+    .join("");
+
+  boardRoot.className = "detail-card";
+  boardRoot.innerHTML = `
+    <div class="hybrid-board-scroll">
+      <div class="hybrid-board-grid">
+        <div class="hybrid-axis hybrid-axis-corner">Board</div>
+        ${headerMarkup}
+        ${rowMarkup}
+      </div>
+    </div>
   `;
 }
 
@@ -1671,17 +1762,19 @@ async function refreshMemoryExplorer(event) {
 }
 
 async function refreshMissionControl() {
-  const [blueprint, status, rooms, guards, datasets, audit, ingestStatus, ingestQueue, constitution] = await Promise.all([
-    fetchJson("/api/blueprint"),
-    fetchJson("/api/status"),
-    fetchJson("/api/rooms"),
-    fetchJson("/api/governance/guards"),
-    fetchJson("/api/datasets"),
-    fetchJson("/api/audit"),
-    fetchJson("/api/ingest/status"),
-    fetchJson("/api/ingest/queue"),
-    fetchJson("/api/constitution"),
-  ]);
+  const [blueprint, status, rooms, guards, datasets, audit, ingestStatus, ingestQueue, constitution, hybridBoard] =
+    await Promise.all([
+      fetchJson("/api/blueprint"),
+      fetchJson("/api/status"),
+      fetchJson("/api/rooms"),
+      fetchJson("/api/governance/guards"),
+      fetchJson("/api/datasets"),
+      fetchJson("/api/audit"),
+      fetchJson("/api/ingest/status"),
+      fetchJson("/api/ingest/queue"),
+      fetchJson("/api/constitution"),
+      fetchJson("/api/simulation/hybrid-board"),
+    ]);
 
   state.blueprint = blueprint;
   state.status = status;
@@ -1692,6 +1785,7 @@ async function refreshMissionControl() {
   state.ingestStatus = ingestStatus;
   state.ingestQueue = ingestQueue;
   state.constitution = constitution;
+  state.simulation.board = hybridBoard;
 
   renderMission(blueprint);
   renderStatusCards(status);
@@ -1701,6 +1795,7 @@ async function refreshMissionControl() {
   renderAudit(audit);
   renderDialogueCorpus(state.dialogueCorpus);
   renderConstitution(constitution);
+  renderHybridBoard(hybridBoard);
   renderModules(blueprint.modules);
   renderAgents(blueprint.agents);
   renderPhases(blueprint.build_phases);

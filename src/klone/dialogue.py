@@ -11,6 +11,8 @@ from typing import Any
 from .schemas import (
     DialogueCorpusActivityBucketRecord,
     DialogueCorpusAnalysisRecord,
+    DialogueCorpusAnswerRecord,
+    DialogueCorpusAnswerSourceRecord,
     DialogueCorpusCounterpartRecord,
     DialogueCorpusGroupThreadRecord,
     DialogueCorpusSourceRecord,
@@ -23,6 +25,7 @@ from .schemas import (
 
 
 DIALOGUE_CORPUS_ANALYSIS_VERSION = "2b.6.read_only_dialogue_corpus_shell"
+DIALOGUE_CORPUS_ANSWER_VERSION = "2b.7.bounded_dialogue_query_shell"
 FACEBOOK_SOURCE_KIND = "facebook_messenger_export"
 CHATGPT_SOURCE_KIND = "chatgpt_conversations_export"
 FACEBOOK_MESSAGE_SECTIONS = (
@@ -35,6 +38,91 @@ FACEBOOK_MESSAGE_SECTIONS = (
 ATTACHMENT_LIST_FIELDS = ("photos", "videos", "audio_files", "files", "gifs")
 ATTACHMENT_SINGLE_FIELDS = ("sticker", "share")
 TOKEN_PATTERN = re.compile(r"[^\W\d_]{4,}", flags=re.UNICODE)
+QUESTION_NORMALIZE_PATTERN = re.compile(r"[^\w\s\-]+", flags=re.UNICODE)
+QUOTED_NAME_PATTERN = re.compile(r"[\"'“”]([^\"'“”]{2,80})[\"'“”]")
+CAPITALIZED_NAME_PATTERN = re.compile(
+    r"\b[A-ZÅÄÖ][A-Za-zÅÄÖåäö\-]+(?:\s+[A-ZÅÄÖ][A-Za-zÅÄÖåäö\-]+){1,3}\b"
+)
+TOP_TIES_HINTS = (
+    "strongest ties",
+    "talk to most",
+    "top contacts",
+    "top counterparts",
+    "closest ties",
+    "eniten",
+    "vahvimmat siteet",
+    "vahvimmat suhteet",
+    "kenen kanssa puhun",
+    "keiden kanssa puhun",
+)
+GROUP_HINTS = (
+    "group",
+    "groups",
+    "group thread",
+    "group threads",
+    "ryhmä",
+    "ryhmät",
+    "ryhmäkeskustelu",
+    "ryhmäkeskustelut",
+)
+NETWORK_HINTS = (
+    "network",
+    "verkosto",
+    "counterparts",
+    "contacts",
+    "how many people",
+    "kuinka monta ihmistä",
+    "kuinka laaja verkosto",
+    "direct threads",
+    "group threads",
+)
+TIMELINE_HINTS = (
+    "timeline",
+    "history",
+    "years",
+    "aikajana",
+    "aktiivisin vuosi",
+    "most active year",
+    "milloin",
+    "ajallinen",
+)
+STYLE_HINTS = (
+    "style",
+    "communication style",
+    "message style",
+    "writing style",
+    "viestityyli",
+    "kirjoitan",
+    "kommunikointi",
+    "how do i write",
+)
+TOPIC_HINTS = (
+    "topics",
+    "topic",
+    "themes",
+    "theme",
+    "top terms",
+    "mistä puhun",
+    "aiheet",
+    "teemat",
+)
+SUMMARY_HINTS = (
+    "summary",
+    "summarize",
+    "what does this say",
+    "what kind of clone",
+    "tiivistä",
+    "yhteenveto",
+    "mitä tästä voi päätellä",
+    "mitä tämä kertoo",
+)
+SUGGESTED_DIALOGUE_QUERIES = [
+    "Keiden kanssa olen puhunut eniten?",
+    "Mitkä ovat suurimmat ryhmäkeskusteluni?",
+    "Miltä viestityylini näyttää tässä korpuksessa?",
+    "Mikä on aikajanan laajuus ja aktiivisin vuosi?",
+    "Mitä tiedät Katja Asumasta tämän korpuksen perusteella?",
+]
 STOPWORDS = {
     "about",
     "again",
@@ -160,16 +248,29 @@ class _DiscoveredFacebookSource:
     status: str
 
 
+@dataclass(frozen=True)
+class _CounterpartLookupResult:
+    matched_name: str
+    direct_thread_count: int
+    sent_message_count: int
+    received_message_count: int
+    first_message_at: str | None
+    last_message_at: str | None
+    group_thread_count: int
+    group_titles: tuple[str, ...]
+
+
 class DialogueCorpusService:
     def seam_descriptor(self) -> ServiceSeamRecord:
         return ServiceSeamRecord(
             id="dialogue-corpus-service",
             name="DialogueCorpusService",
             implementation="in_process_local_file_shell",
-            status="read_only_source_analysis",
+            status="read_only_analysis_and_query_shell",
             notes=[
                 "Analyzes local conversation exports without writing them into memory rows.",
                 "Current detectors support extracted Facebook/Messenger exports and ChatGPT conversation export JSON files.",
+                "Bounded question answering stays aggregate-only and does not expose raw semantic retrieval.",
             ],
         )
 
@@ -189,7 +290,22 @@ class DialogueCorpusService:
                     "without writing raw dialogue into memory."
                 ),
                 backed_by=["DialogueCorpusService"],
-            )
+            ),
+            PublicCapabilityRecord(
+                id="dialogue.corpus.answer",
+                name="Dialogue Corpus Answer",
+                category="dialogue_corpus",
+                path="/api/dialogue-corpus/answer",
+                methods=["POST"],
+                read_only=True,
+                room_scoped=False,
+                status="available",
+                description=(
+                    "Answer bounded relationship, network, style, and timeline questions from aggregate "
+                    "dialogue-corpus evidence without enabling memory writes or raw semantic search."
+                ),
+                backed_by=["DialogueCorpusService"],
+            ),
         ]
 
     def analyze(
@@ -225,6 +341,53 @@ class DialogueCorpusService:
             selected_source=selected_source,
             owner_name=owner_name,
         )
+
+    def answer(
+        self,
+        *,
+        source_path: str,
+        question: str,
+        owner_name: str | None = None,
+    ) -> DialogueCorpusAnswerRecord:
+        normalized_question = self._normalize_question(question)
+        if not normalized_question:
+            raise ValueError("Dialogue corpus question is required.")
+
+        analysis = self.analyze(source_path=source_path, owner_name=owner_name)
+        query_kind = self._resolve_query_kind(
+            question=question,
+            normalized_question=normalized_question,
+        )
+
+        if query_kind == "top_counterparts":
+            return self._top_counterparts_answer(question=question, analysis=analysis)
+        if query_kind == "top_groups":
+            return self._top_groups_answer(question=question, analysis=analysis)
+        if query_kind == "network":
+            return self._network_answer(question=question, analysis=analysis)
+        if query_kind == "timeline":
+            return self._timeline_answer(question=question, analysis=analysis)
+        if query_kind == "style":
+            return self._style_answer(question=question, analysis=analysis)
+        if query_kind == "topics":
+            return self._topics_answer(question=question, analysis=analysis)
+        if query_kind == "summary":
+            return self._summary_answer(question=question, analysis=analysis)
+
+        name_query = self._extract_name_candidate(question=question, analysis=analysis)
+        if name_query and analysis.source_kind == FACEBOOK_SOURCE_KIND:
+            lookup = self._lookup_facebook_counterpart(
+                analysis=analysis,
+                query=name_query,
+            )
+            if lookup is not None:
+                return self._counterpart_lookup_answer(
+                    question=question,
+                    analysis=analysis,
+                    lookup=lookup,
+                )
+
+        return self._unsupported_answer(question=question, analysis=analysis)
 
     def _analyze_facebook_export(
         self,
@@ -759,6 +922,627 @@ class DialogueCorpusService:
                 "No human relationship graph is available from a ChatGPT export.",
                 "Model counts and prompt topics are heuristic priors, not stable identity or social facts.",
             ],
+        )
+
+    def _summary_answer(
+        self,
+        *,
+        question: str,
+        analysis: DialogueCorpusAnalysisRecord,
+    ) -> DialogueCorpusAnswerRecord:
+        top_counterparts = ", ".join(
+            f"{item.name} ({item.interaction_message_count})"
+            for item in analysis.top_counterparts[:3]
+        )
+        style_map = self._style_signal_map(analysis)
+        average_length = style_map.get("avg_sent_message_length")
+        question_ratio = style_map.get("question_ratio")
+        source_backed_content = [
+            DialogueCorpusAnswerSourceRecord(
+                content=(
+                    f"Observed corpus spans {analysis.counterpart_count} counterparts across "
+                    f"{analysis.direct_thread_count} direct threads and {analysis.group_thread_count} group threads."
+                ),
+                source_refs=["dialogue.relationship_priors", "dialogue.thread_counts"],
+            )
+        ]
+        if top_counterparts:
+            source_backed_content.append(
+                DialogueCorpusAnswerSourceRecord(
+                    content=f"Strongest direct ties currently surface as {top_counterparts}.",
+                    source_refs=["dialogue.top_counterparts"],
+                )
+            )
+        if analysis.first_message_at and analysis.last_message_at:
+            source_backed_content.append(
+                DialogueCorpusAnswerSourceRecord(
+                    content=(
+                        f"Observed timeline runs from {analysis.first_message_at} to {analysis.last_message_at}."
+                    ),
+                    source_refs=["dialogue.history_priors", "dialogue.activity_by_year"],
+                )
+            )
+        if average_length and question_ratio:
+            source_backed_content.append(
+                DialogueCorpusAnswerSourceRecord(
+                    content=(
+                        f"Owner-sent style signals include average message length {average_length.value} {average_length.unit} "
+                        f"and question ratio {question_ratio.value} {question_ratio.unit}."
+                    ),
+                    source_refs=["dialogue.style_signals"],
+                )
+            )
+        return self._finalize_answer(
+            question=question,
+            query_kind="summary",
+            analysis=analysis,
+            supported=True,
+            source_backed_content=source_backed_content,
+            derived_explanation=(
+                "This corpus is already useful for early clone priors around tie strength, recency, network shape, "
+                "and communication style, but it is still aggregate-only and not a full semantic memory layer."
+            ),
+            uncertainty=[
+                "Tie strength is still a bounded heuristic based on interaction volume, not a durable relationship truth label."
+            ],
+        )
+
+    def _top_counterparts_answer(
+        self,
+        *,
+        question: str,
+        analysis: DialogueCorpusAnalysisRecord,
+    ) -> DialogueCorpusAnswerRecord:
+        if not analysis.top_counterparts:
+            return self._unsupported_answer(
+                question=question,
+                analysis=analysis,
+                extra_limitations=[
+                    "This source does not currently expose direct human counterpart rankings."
+                ],
+            )
+        source_backed_content = [
+            DialogueCorpusAnswerSourceRecord(
+                content=(
+                    f"{item.name}: {item.interaction_message_count} direct-thread messages across "
+                    f"{item.thread_count} thread(s) from {item.first_message_at or 'unknown'} "
+                    f"to {item.last_message_at or 'unknown'}."
+                ),
+                source_refs=["dialogue.top_counterparts"],
+            )
+            for item in analysis.top_counterparts[:5]
+        ]
+        return self._finalize_answer(
+            question=question,
+            query_kind="top_counterparts",
+            analysis=analysis,
+            supported=True,
+            source_backed_content=source_backed_content,
+            derived_explanation=(
+                "This ranking is bounded to one-to-one thread interaction counts only. It does not yet score closeness, "
+                "sentiment, reciprocity quality, or topic depth."
+            ),
+            uncertainty=[
+                "Group-thread relationships and offline closeness are not folded into this direct-tie ranking."
+            ],
+        )
+
+    def _top_groups_answer(
+        self,
+        *,
+        question: str,
+        analysis: DialogueCorpusAnalysisRecord,
+    ) -> DialogueCorpusAnswerRecord:
+        if not analysis.top_group_threads:
+            return self._unsupported_answer(
+                question=question,
+                analysis=analysis,
+                extra_limitations=[
+                    "This source does not currently expose group-thread rankings."
+                ],
+            )
+        source_backed_content = [
+            DialogueCorpusAnswerSourceRecord(
+                content=(
+                    f"{item.title}: {item.message_count} messages, {item.participant_count} participants, "
+                    f"timeline {item.first_message_at or 'unknown'} to {item.last_message_at or 'unknown'}."
+                ),
+                source_refs=["dialogue.top_group_threads"],
+            )
+            for item in analysis.top_group_threads[:5]
+        ]
+        return self._finalize_answer(
+            question=question,
+            query_kind="top_groups",
+            analysis=analysis,
+            supported=True,
+            source_backed_content=source_backed_content,
+            derived_explanation=(
+                "This is a bounded ranking of the largest visible group threads by message volume. It helps seed social-cluster "
+                "priors without collapsing them into durable group identity claims."
+            ),
+            uncertainty=[],
+        )
+
+    def _network_answer(
+        self,
+        *,
+        question: str,
+        analysis: DialogueCorpusAnalysisRecord,
+    ) -> DialogueCorpusAnswerRecord:
+        section_map = {item.section: item for item in analysis.section_breakdown}
+        source_backed_content = [
+            DialogueCorpusAnswerSourceRecord(
+                content=(
+                    f"The visible network spans {analysis.counterpart_count} counterparts and "
+                    f"{analysis.unique_participant_count} unique participants across {analysis.thread_count} threads."
+                ),
+                source_refs=["dialogue.relationship_priors", "dialogue.thread_counts"],
+            ),
+            DialogueCorpusAnswerSourceRecord(
+                content=(
+                    f"Thread mix is {analysis.direct_thread_count} direct threads and {analysis.group_thread_count} group threads."
+                ),
+                source_refs=["dialogue.thread_counts"],
+            ),
+        ]
+        if "message_requests" in section_map:
+            source_backed_content.append(
+                DialogueCorpusAnswerSourceRecord(
+                    content=(
+                        f"Message requests are present in {section_map['message_requests'].thread_count} thread(s)."
+                    ),
+                    source_refs=["dialogue.section_breakdown"],
+                )
+            )
+        return self._finalize_answer(
+            question=question,
+            query_kind="network",
+            analysis=analysis,
+            supported=True,
+            source_backed_content=source_backed_content,
+            derived_explanation=(
+                "This answers the visible network shape from export structure only. It is a good first step for relationship "
+                "coverage, but not yet a reviewed social graph."
+            ),
+            uncertainty=[],
+        )
+
+    def _timeline_answer(
+        self,
+        *,
+        question: str,
+        analysis: DialogueCorpusAnalysisRecord,
+    ) -> DialogueCorpusAnswerRecord:
+        source_backed_content: list[DialogueCorpusAnswerSourceRecord] = []
+        if analysis.first_message_at and analysis.last_message_at:
+            source_backed_content.append(
+                DialogueCorpusAnswerSourceRecord(
+                    content=(
+                        f"Observed timeline runs from {analysis.first_message_at} to {analysis.last_message_at}."
+                    ),
+                    source_refs=["dialogue.history_priors"],
+                )
+            )
+        for item in sorted(
+            analysis.activity_by_year,
+            key=lambda bucket: (bucket.message_count, bucket.bucket),
+            reverse=True,
+        )[:3]:
+            source_backed_content.append(
+                DialogueCorpusAnswerSourceRecord(
+                    content=(
+                        f"{item.bucket}: {item.message_count} messages across {item.thread_count} threads "
+                        f"({item.sent_message_count} sent / {item.received_message_count} received)."
+                    ),
+                    source_refs=["dialogue.activity_by_year"],
+                )
+            )
+        return self._finalize_answer(
+            question=question,
+            query_kind="timeline",
+            analysis=analysis,
+            supported=bool(source_backed_content),
+            source_backed_content=source_backed_content,
+            derived_explanation=(
+                "Timeline answers are bounded to the timestamps present in this export and do not yet cross-link with calendar, "
+                "notes, or media evidence."
+                if source_backed_content
+                else None
+            ),
+            uncertainty=[],
+        )
+
+    def _style_answer(
+        self,
+        *,
+        question: str,
+        analysis: DialogueCorpusAnalysisRecord,
+    ) -> DialogueCorpusAnswerRecord:
+        if not analysis.style_signals:
+            return self._unsupported_answer(
+                question=question,
+                analysis=analysis,
+                extra_limitations=[
+                    "This source does not currently expose owner-side style signals."
+                ],
+            )
+        source_backed_content = [
+            DialogueCorpusAnswerSourceRecord(
+                content=f"{item.label}: {item.value} {item.unit}. {item.summary}",
+                source_refs=["dialogue.style_signals"],
+            )
+            for item in analysis.style_signals
+        ]
+        return self._finalize_answer(
+            question=question,
+            query_kind="style",
+            analysis=analysis,
+            supported=True,
+            source_backed_content=source_backed_content,
+            derived_explanation=(
+                "These style signals are aggregate heuristics from owner-sent text only. They are useful for clone voice priors, "
+                "but not yet a full stylistic imitation layer."
+            ),
+            uncertainty=[
+                "Attachment-heavy communication is counted structurally and not semantically interpreted."
+            ],
+        )
+
+    def _topics_answer(
+        self,
+        *,
+        question: str,
+        analysis: DialogueCorpusAnalysisRecord,
+    ) -> DialogueCorpusAnswerRecord:
+        if not analysis.top_terms:
+            return self._unsupported_answer(
+                question=question,
+                analysis=analysis,
+                extra_limitations=[
+                    "This source does not currently expose bounded top-term signals."
+                ],
+            )
+        source_backed_content = [
+            DialogueCorpusAnswerSourceRecord(
+                content=(
+                    "Top bounded terms currently surface as "
+                    + ", ".join(f"{item.token} ({item.count})" for item in analysis.top_terms[:8])
+                    + "."
+                ),
+                source_refs=["dialogue.top_terms"],
+            )
+        ]
+        return self._finalize_answer(
+            question=question,
+            query_kind="topics",
+            analysis=analysis,
+            supported=True,
+            source_backed_content=source_backed_content,
+            derived_explanation=(
+                "These topic hints come from token frequency only after stopword filtering. They are not semantic clustering and "
+                "should be treated as weak topical priors."
+            ),
+            uncertainty=[],
+        )
+
+    def _counterpart_lookup_answer(
+        self,
+        *,
+        question: str,
+        analysis: DialogueCorpusAnalysisRecord,
+        lookup: _CounterpartLookupResult,
+    ) -> DialogueCorpusAnswerRecord:
+        interaction_count = lookup.sent_message_count + lookup.received_message_count
+        source_backed_content = [
+            DialogueCorpusAnswerSourceRecord(
+                content=(
+                    f"{lookup.matched_name} appears in {lookup.direct_thread_count} direct thread(s) with "
+                    f"{interaction_count} bounded direct messages "
+                    f"({lookup.sent_message_count} sent / {lookup.received_message_count} received) "
+                    f"from {lookup.first_message_at or 'unknown'} to {lookup.last_message_at or 'unknown'}."
+                ),
+                source_refs=["facebook.direct_counterpart_lookup"],
+            )
+        ]
+        if lookup.group_thread_count:
+            titles = ", ".join(lookup.group_titles[:3])
+            source_backed_content.append(
+                DialogueCorpusAnswerSourceRecord(
+                    content=(
+                        f"The same name also appears in {lookup.group_thread_count} group thread(s), including {titles}."
+                    ),
+                    source_refs=["facebook.group_counterpart_lookup"],
+                )
+            )
+        return self._finalize_answer(
+            question=question,
+            query_kind="counterpart_lookup",
+            analysis=analysis,
+            supported=True,
+            source_backed_content=source_backed_content,
+            derived_explanation=(
+                "This is a bounded relationship lookup from thread membership and direct-thread counts only. It does not yet "
+                "summarize the meaning, sentiment, or story arc of the relationship."
+            ),
+            uncertainty=[
+                "If multiple people share similar names outside the matched result, they are not fused automatically."
+            ],
+        )
+
+    def _unsupported_answer(
+        self,
+        *,
+        question: str,
+        analysis: DialogueCorpusAnalysisRecord,
+        extra_limitations: list[str] | None = None,
+    ) -> DialogueCorpusAnswerRecord:
+        limitations = self._basic_limitations(analysis)
+        limitations.append(
+            "Supported bounded queries currently cover summary, top ties, top groups, network shape, timeline, style, topics, and named counterpart lookups."
+        )
+        if extra_limitations:
+            limitations.extend(extra_limitations)
+        return self._finalize_answer(
+            question=question,
+            query_kind="unsupported",
+            analysis=analysis,
+            supported=False,
+            source_backed_content=[],
+            derived_explanation=None,
+            uncertainty=[],
+            extra_limitations=limitations,
+        )
+
+    def _finalize_answer(
+        self,
+        *,
+        question: str,
+        query_kind: str,
+        analysis: DialogueCorpusAnalysisRecord,
+        supported: bool,
+        source_backed_content: list[DialogueCorpusAnswerSourceRecord],
+        derived_explanation: str | None,
+        uncertainty: list[str],
+        extra_limitations: list[str] | None = None,
+    ) -> DialogueCorpusAnswerRecord:
+        limitations = self._basic_limitations(analysis)
+        if extra_limitations:
+            limitations.extend(extra_limitations)
+        return DialogueCorpusAnswerRecord(
+            answer_version=DIALOGUE_CORPUS_ANSWER_VERSION,
+            analysis_version=analysis.analysis_version,
+            source_kind=analysis.source_kind,
+            requested_path=analysis.requested_path,
+            selected_source_path=analysis.selected_source_path,
+            owner_name=analysis.owner_name,
+            question=question.strip(),
+            query_kind=query_kind,
+            supported=supported,
+            read_only=True,
+            source_backed_content=source_backed_content,
+            derived_explanation=derived_explanation,
+            uncertainty=self._unique_strings(uncertainty),
+            limitations=self._unique_strings(limitations),
+            suggested_queries=list(SUGGESTED_DIALOGUE_QUERIES),
+        )
+
+    def _resolve_query_kind(self, *, question: str, normalized_question: str) -> str:
+        if self._contains_hint(normalized_question, TOP_TIES_HINTS):
+            return "top_counterparts"
+        if self._contains_hint(normalized_question, GROUP_HINTS):
+            return "top_groups"
+        if self._contains_hint(normalized_question, NETWORK_HINTS):
+            return "network"
+        if self._contains_hint(normalized_question, TIMELINE_HINTS):
+            return "timeline"
+        if self._contains_hint(normalized_question, STYLE_HINTS):
+            return "style"
+        if self._contains_hint(normalized_question, TOPIC_HINTS):
+            return "topics"
+        if self._contains_hint(normalized_question, SUMMARY_HINTS):
+            return "summary"
+        return "unclassified"
+
+    def _extract_name_candidate(
+        self,
+        *,
+        question: str,
+        analysis: DialogueCorpusAnalysisRecord,
+    ) -> str | None:
+        repaired_question = self._repair_text(question)
+        quoted_match = QUOTED_NAME_PATTERN.search(repaired_question)
+        if quoted_match:
+            return quoted_match.group(1).strip()
+
+        normalized_question = self._normalize_lookup_text(repaired_question)
+        for item in analysis.top_counterparts:
+            candidate = self._normalize_lookup_text(item.name)
+            if candidate and candidate in normalized_question:
+                return item.name
+
+        candidate_names = [
+            match.group(0).strip()
+            for match in CAPITALIZED_NAME_PATTERN.finditer(repaired_question)
+            if self._normalize_lookup_text(match.group(0)) != self._normalize_lookup_text(analysis.owner_name)
+        ]
+        if not candidate_names:
+            return None
+        candidate_names.sort(key=lambda item: (len(item.split()), len(item)), reverse=True)
+        return candidate_names[0]
+
+    def _lookup_facebook_counterpart(
+        self,
+        *,
+        analysis: DialogueCorpusAnalysisRecord,
+        query: str,
+    ) -> _CounterpartLookupResult | None:
+        source = self._facebook_source_from_path(Path(analysis.selected_source_path))
+        if source is None:
+            return None
+
+        normalized_query = self._normalize_lookup_text(query)
+        if not normalized_query:
+            return None
+
+        owner_normalized = self._normalize_lookup_text(analysis.owner_name)
+        direct_matches: dict[str, dict[str, Any]] = {}
+        direct_scores: dict[str, int] = {}
+        group_titles: Counter[str] = Counter()
+
+        for _, json_path in self._list_facebook_thread_files(source.message_root):
+            payload = self._load_json_file(json_path)
+            participants = self._extract_facebook_participants(payload)
+            counterpart_names = [
+                name
+                for name in participants
+                if self._normalize_lookup_text(name) != owner_normalized
+            ]
+            if not counterpart_names:
+                continue
+
+            matched_counterparts = [
+                name
+                for name in counterpart_names
+                if self._name_query_score(name, normalized_query) > 0
+            ]
+            title = self._repair_text(str(payload.get("title") or json_path.parent.name))
+            if len(counterpart_names) > 1 and matched_counterparts:
+                group_titles[title] += 1
+
+            if len(counterpart_names) != 1:
+                continue
+            counterpart_name = counterpart_names[0]
+            score = self._name_query_score(counterpart_name, normalized_query)
+            if score <= 0:
+                continue
+
+            messages = payload.get("messages", [])
+            if not isinstance(messages, list):
+                messages = []
+
+            first_timestamp_ms: int | None = None
+            last_timestamp_ms: int | None = None
+            sent_message_count = 0
+            received_message_count = 0
+            for message in messages:
+                if not isinstance(message, dict):
+                    continue
+                timestamp_ms = self._coerce_int(message.get("timestamp_ms"))
+                if timestamp_ms is not None:
+                    first_timestamp_ms = (
+                        timestamp_ms if first_timestamp_ms is None else min(first_timestamp_ms, timestamp_ms)
+                    )
+                    last_timestamp_ms = (
+                        timestamp_ms if last_timestamp_ms is None else max(last_timestamp_ms, timestamp_ms)
+                    )
+                sender_name = self._repair_text(str(message.get("sender_name") or ""))
+                if self._normalize_lookup_text(sender_name) == owner_normalized:
+                    sent_message_count += 1
+                else:
+                    received_message_count += 1
+
+            stats = direct_matches.setdefault(
+                counterpart_name,
+                {
+                    "direct_thread_count": 0,
+                    "sent_message_count": 0,
+                    "received_message_count": 0,
+                    "first_message_at": None,
+                    "last_message_at": None,
+                },
+            )
+            stats["direct_thread_count"] += 1
+            stats["sent_message_count"] += sent_message_count
+            stats["received_message_count"] += received_message_count
+            stats["first_message_at"] = self._min_iso(stats["first_message_at"], first_timestamp_ms)
+            stats["last_message_at"] = self._max_iso(stats["last_message_at"], last_timestamp_ms)
+            direct_scores[counterpart_name] = max(score, direct_scores.get(counterpart_name, 0))
+
+        if direct_scores:
+            top_score = max(direct_scores.values())
+            matched_names = sorted(
+                name for name, score in direct_scores.items() if score == top_score
+            )
+            if len(matched_names) == 1:
+                matched_name = matched_names[0]
+                stats = direct_matches[matched_name]
+                return _CounterpartLookupResult(
+                    matched_name=matched_name,
+                    direct_thread_count=stats["direct_thread_count"],
+                    sent_message_count=stats["sent_message_count"],
+                    received_message_count=stats["received_message_count"],
+                    first_message_at=stats["first_message_at"],
+                    last_message_at=stats["last_message_at"],
+                    group_thread_count=len(group_titles),
+                    group_titles=tuple(title for title, _ in group_titles.most_common(5)),
+                )
+        return None
+
+    @staticmethod
+    def _normalize_question(question: str) -> str:
+        repaired = DialogueCorpusService._repair_text(question)
+        normalized = QUESTION_NORMALIZE_PATTERN.sub(" ", repaired.casefold())
+        return " ".join(normalized.split())
+
+    @staticmethod
+    def _normalize_lookup_text(value: str) -> str:
+        normalized = QUESTION_NORMALIZE_PATTERN.sub(" ", DialogueCorpusService._repair_text(value).casefold())
+        return " ".join(normalized.split())
+
+    @staticmethod
+    def _contains_hint(normalized_question: str, hints: tuple[str, ...]) -> bool:
+        return any(DialogueCorpusService._normalize_question(hint) in normalized_question for hint in hints)
+
+    @staticmethod
+    def _name_query_score(candidate_name: str, normalized_query: str) -> int:
+        candidate = DialogueCorpusService._normalize_lookup_text(candidate_name)
+        if not candidate or not normalized_query:
+            return 0
+        if candidate == normalized_query:
+            return 3
+        candidate_tokens = candidate.split()
+        query_tokens = normalized_query.split()
+        if query_tokens and all(
+            any(
+                query_token == candidate_token
+                or query_token in candidate_token
+                or candidate_token in query_token
+                for candidate_token in candidate_tokens
+            )
+            for query_token in query_tokens
+        ):
+            return 2 if len(query_tokens) >= 2 else 1
+        if normalized_query in candidate or candidate in normalized_query:
+            return 1
+        return 0
+
+    @staticmethod
+    def _style_signal_map(
+        analysis: DialogueCorpusAnalysisRecord,
+    ) -> dict[str, DialogueCorpusStyleSignalRecord]:
+        return {item.key: item for item in analysis.style_signals}
+
+    @staticmethod
+    def _unique_strings(items: list[str]) -> list[str]:
+        ordered: list[str] = []
+        seen: set[str] = set()
+        for item in items:
+            normalized = item.strip()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            ordered.append(normalized)
+        return ordered
+
+    def _basic_limitations(self, analysis: DialogueCorpusAnalysisRecord) -> list[str]:
+        return self._unique_strings(
+            list(analysis.warnings)
+            + [
+                "This answer path is read-only and aggregate-only.",
+                "No raw message semantic retrieval, embeddings, sentiment scoring, or psychological inference is enabled in this phase.",
+                "Relationship conclusions still require human review before they become durable labels or training truth.",
+            ]
         )
 
     def _discover_facebook_sources(self, base_path: Path) -> list[_DiscoveredFacebookSource]:

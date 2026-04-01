@@ -48,4 +48,6 @@ tests/test_phase_g1_1.py
 tests/test_phase_g1_2.py
 tests/test_phase_g1_3.py
 tests/test_phase_g1_4.py
+tests/test_phase_g1_5.py
 tests/test_phase_v1_1.py
+tests/test_phase_v1_2.py

@@ -19,7 +19,7 @@ from .schemas import (
     PublicCapabilityRecord,
     ServiceSeamRecord,
 )
-from .simulation import HybridMemoryBoardService, WorldMemoryService
+from .simulation import HybridMemoryBoardService, WorldMemoryDepthService, WorldMemoryService
 
 
 def module_registry_payload() -> list[ModuleCapabilityRecord]:
@@ -199,6 +199,7 @@ class SimulationService:
     def __init__(self, repository: KloneRepository) -> None:
         self.hybrid_board = HybridMemoryBoardService(repository)
         self.world_memory = WorldMemoryService(repository)
+        self.world_memory_depth = WorldMemoryDepthService(repository)
 
     def seam_descriptor(self) -> ServiceSeamRecord:
         return ServiceSeamRecord(
@@ -273,6 +274,42 @@ class SimulationService:
                 room_scoped=True,
                 status="available",
                 description="Inspect one governed world-memory node with its place/depth candidate shell.",
+                backed_by=["SimulationService", "BlobService", "PolicyService"],
+            ),
+            PublicCapabilityRecord(
+                id="simulation.world_memory.depth_jobs.read",
+                name="World Memory Depth Jobs",
+                category="simulation",
+                path="/api/simulation/world-memory/depth/jobs",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=True,
+                status="available",
+                description="Inspect bounded local depth-shell jobs over selected world-memory image nodes.",
+                backed_by=["SimulationService", "BlobService", "PolicyService"],
+            ),
+            PublicCapabilityRecord(
+                id="simulation.world_memory.depth_jobs.run",
+                name="Run World Memory Depth Job",
+                category="simulation",
+                path="/api/simulation/world-memory/depth/jobs",
+                methods=["POST"],
+                read_only=False,
+                room_scoped=True,
+                status="available_local_only",
+                description="Run a bounded local depth-shell job for selected world-memory image nodes.",
+                backed_by=["SimulationService", "BlobService", "PolicyService"],
+            ),
+            PublicCapabilityRecord(
+                id="simulation.world_memory.place_view.read",
+                name="World Memory Place View",
+                category="simulation",
+                path="/api/simulation/world-memory/nodes/{node_id}/place-view",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=True,
+                status="available",
+                description="Read the local 2.5D place-view shell for one world-memory node.",
                 backed_by=["SimulationService", "BlobService", "PolicyService"],
             ),
         ]

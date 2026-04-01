@@ -142,6 +142,36 @@ class ArtAssetComparisonRecord(BaseModel):
     warnings: list[str]
 
 
+class ArtDepthMapRequest(BaseModel):
+    asset_id: int | None = None
+    image_data_url: str | None = None
+    file_name: str | None = Field(default=None, max_length=260)
+    mime_type: str | None = Field(default=None, max_length=120)
+
+
+class ArtDepthMapRecord(BaseModel):
+    depth_version: str
+    source_mode: Literal["asset", "upload"]
+    read_only: bool = True
+    asset_id: int | None = None
+    room_id: str | None = None
+    classification_level: ClassificationLevel | None = None
+    file_name: str
+    mime_type: str
+    width_px: int
+    height_px: int
+    preview_width_px: int
+    preview_height_px: int
+    depth_mean: float
+    near_ratio: float
+    far_ratio: float
+    original_data_url: str
+    depth_map_data_url: str
+    colorized_depth_data_url: str
+    notes: list[str]
+    warnings: list[str]
+
+
 class ConstitutionParameterRecord(BaseModel):
     key: str
     value: float

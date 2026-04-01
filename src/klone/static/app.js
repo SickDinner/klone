@@ -30,6 +30,12 @@ const state = {
   artComparisonSelectionIds: [],
   artComparison: null,
   artComparisonError: null,
+  depthMap: {
+    result: null,
+    error: null,
+    busy: false,
+    sourceLabel: null,
+  },
   memory: {
     roomId: "",
     events: [],
@@ -98,6 +104,15 @@ function formatTime(value) {
   }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Unable to read the selected file."));
+    reader.readAsDataURL(file);
+  });
 }
 
 function shortHash(value) {
@@ -1450,6 +1465,121 @@ function renderArtComparison() {
   `;
 }
 
+function renderDepthMap() {
+  const root = document.querySelector("#depth-map-detail");
+  if (!root) {
+    return;
+  }
+
+  const selectedAsset = state.selectedAsset;
+  const selectedAssetCanRun = selectedAsset?.asset_kind === "image";
+  const result = state.depthMap.result;
+  const sourceLabel = state.depthMap.sourceLabel;
+  const errorMarkup = state.depthMap.error
+    ? `<div class="empty-state">${escapeHtml(state.depthMap.error)}</div>`
+    : "";
+  const actionsMarkup = `
+    <div class="form-actions">
+      <button
+        class="button button-secondary"
+        data-depthmap-action="use-selected"
+        type="button"
+        ${selectedAssetCanRun && !state.depthMap.busy ? "" : "disabled"}
+      >
+        Use Selected Asset
+      </button>
+      <button
+        class="button button-secondary"
+        data-depthmap-action="browse"
+        type="button"
+        ${state.depthMap.busy ? "disabled" : ""}
+      >
+        Browse Image
+      </button>
+      <button
+        class="button button-secondary"
+        data-depthmap-action="clear"
+        type="button"
+        ${result || state.depthMap.error ? "" : "disabled"}
+      >
+        Clear
+      </button>
+    </div>
+  `;
+
+  if (state.depthMap.busy) {
+    root.className = "detail-card";
+    root.innerHTML = `
+      <h3>2.5D Depth Mapper</h3>
+      <p>Rendering a deterministic depth-map shell from the current image source...</p>
+      ${actionsMarkup}
+    `;
+    return;
+  }
+
+  if (!result) {
+    root.className = "detail-card";
+    root.innerHTML = `
+      <h3>2.5D Depth Mapper</h3>
+      <p>Drop an image here or reuse the selected indexed image asset. Klone renders a local deterministic depth approximation without writing a new asset row.</p>
+      <div class="meta">${chips([
+        selectedAssetCanRun ? `selected_asset: ${selectedAsset.file_name}` : "selected_asset: none",
+        "mode: read_only",
+      ])}</div>
+      <label class="depth-drop-zone" id="depth-map-drop-zone">
+        <input id="depth-map-file-input" type="file" accept="image/*" hidden />
+        <span class="depth-drop-title">Drop image here</span>
+        <span class="depth-drop-subtitle">PNG, JPG, WEBP or any browser-readable image. Click to browse if you prefer.</span>
+      </label>
+      ${actionsMarkup}
+      ${errorMarkup}
+    `;
+    return;
+  }
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>2.5D Depth Mapper</h3>
+    <p>${escapeHtml(sourceLabel || result.file_name)} rendered into a transient 2.5D depth shell.</p>
+    <div class="meta">${chips([
+      `depth_version: ${result.depth_version}`,
+      `source_mode: ${result.source_mode}`,
+      result.asset_id ? `asset_id: ${result.asset_id}` : null,
+      result.room_id ? `room: ${result.room_id}` : null,
+      `size: ${result.width_px}x${result.height_px}`,
+      `preview: ${result.preview_width_px}x${result.preview_height_px}`,
+      `depth_mean: ${result.depth_mean}`,
+      `near_ratio: ${result.near_ratio}`,
+      `far_ratio: ${result.far_ratio}`,
+    ])}</div>
+    <label class="depth-drop-zone depth-drop-zone-compact" id="depth-map-drop-zone">
+      <input id="depth-map-file-input" type="file" accept="image/*" hidden />
+      <span class="depth-drop-title">Drop a new image to rerender</span>
+      <span class="depth-drop-subtitle">You can replace the current result instantly from here.</span>
+    </label>
+    ${actionsMarkup}
+    ${errorMarkup}
+    <div class="depth-preview-grid">
+      <figure class="depth-preview-card">
+        <figcaption>Original Preview</figcaption>
+        <img src="${result.original_data_url}" alt="Original preview for depth mapping" />
+      </figure>
+      <figure class="depth-preview-card">
+        <figcaption>Depth Map</figcaption>
+        <img src="${result.depth_map_data_url}" alt="Generated grayscale depth map" />
+      </figure>
+      <figure class="depth-preview-card">
+        <figcaption>Colorized Relief</figcaption>
+        <img src="${result.colorized_depth_data_url}" alt="Colorized depth preview" />
+      </figure>
+    </div>
+    <ul class="detail-list">
+      <li><strong>notes</strong>: ${result.notes.map((item) => escapeHtml(item)).join(", ")}</li>
+      <li><strong>warnings</strong>: ${result.warnings.map((item) => escapeHtml(item)).join(", ") || "none"}</li>
+    </ul>
+  `;
+}
+
 function renderMission(blueprint) {
   document.querySelector("#mission").textContent = blueprint.mission;
   document.querySelector("#hypervisor-answer").textContent = blueprint.hypervisor_answer;
@@ -1803,6 +1933,7 @@ async function refreshAssetBrowser() {
   state.artComparisonError = null;
   renderAssets(assets);
   renderArtComparison();
+  renderDepthMap();
 }
 
 async function loadAssetDetail(assetId) {
@@ -1810,6 +1941,7 @@ async function loadAssetDetail(assetId) {
     const asset = await fetchJson(`/api/assets/${assetId}`);
     state.selectedAsset = asset;
     renderAssetDetail(asset);
+    renderDepthMap();
     if (asset.asset_kind !== "image") {
       state.artMetrics = null;
       renderArtMetrics(null, asset);
@@ -1830,6 +1962,7 @@ async function loadAssetDetail(assetId) {
     state.artMetrics = null;
     document.querySelector("#asset-detail").textContent = error.message;
     renderArtMetrics(null, null);
+    renderDepthMap();
   }
 }
 
@@ -1902,6 +2035,79 @@ async function runArtComparison() {
     state.artComparisonError = error.message;
     renderArtComparison();
   }
+}
+
+function clearDepthMap() {
+  state.depthMap.result = null;
+  state.depthMap.error = null;
+  state.depthMap.busy = false;
+  state.depthMap.sourceLabel = null;
+  renderDepthMap();
+}
+
+async function requestDepthMap(payload, sourceLabel) {
+  state.depthMap.busy = true;
+  state.depthMap.error = null;
+  state.depthMap.sourceLabel = sourceLabel;
+  renderDepthMap();
+  try {
+    const result = await fetchJson("/api/art/depth-map", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    state.depthMap.result = result;
+    state.depthMap.error = null;
+  } catch (error) {
+    state.depthMap.result = null;
+    state.depthMap.error = error.message;
+  } finally {
+    state.depthMap.busy = false;
+    renderDepthMap();
+  }
+}
+
+async function handleDepthMapFile(file) {
+  if (!file) {
+    return;
+  }
+  if (!(file.type || "").startsWith("image/")) {
+    state.depthMap.result = null;
+    state.depthMap.error = "Depth mapping expects an image file.";
+    renderDepthMap();
+    return;
+  }
+
+  try {
+    const imageDataUrl = await readFileAsDataUrl(file);
+    await requestDepthMap(
+      {
+        image_data_url: imageDataUrl,
+        file_name: file.name,
+        mime_type: file.type || "image/png",
+      },
+      `${file.name} (upload)`,
+    );
+  } catch (error) {
+    state.depthMap.result = null;
+    state.depthMap.error = error.message;
+    renderDepthMap();
+  }
+}
+
+async function runDepthMapFromSelectedAsset() {
+  if (!state.selectedAsset || state.selectedAsset.asset_kind !== "image") {
+    state.depthMap.result = null;
+    state.depthMap.error = "Select an indexed image asset first.";
+    renderDepthMap();
+    return;
+  }
+  await requestDepthMap(
+    {
+      asset_id: state.selectedAsset.id,
+    },
+    `${state.selectedAsset.file_name} (asset)`,
+  );
 }
 
 async function loadMemorySelection(kind, id, options = {}) {
@@ -2650,6 +2856,61 @@ function bindEvents() {
     }
     if (button.dataset.artCompareAction === "clear") {
       clearArtComparisonSelection();
+    }
+  });
+  document.querySelector("#depth-map-detail").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-depthmap-action]");
+    if (button && !button.disabled) {
+      if (button.dataset.depthmapAction === "use-selected") {
+        void runDepthMapFromSelectedAsset();
+        return;
+      }
+      if (button.dataset.depthmapAction === "browse") {
+        document.querySelector("#depth-map-file-input")?.click();
+        return;
+      }
+      if (button.dataset.depthmapAction === "clear") {
+        clearDepthMap();
+        return;
+      }
+    }
+
+    const dropZone = event.target.closest("#depth-map-drop-zone");
+    if (dropZone && !event.target.closest("[data-depthmap-action]")) {
+      document.querySelector("#depth-map-file-input")?.click();
+    }
+  });
+  document.querySelector("#depth-map-detail").addEventListener("change", (event) => {
+    const input = event.target.closest("#depth-map-file-input");
+    if (!input?.files?.length) {
+      return;
+    }
+    void handleDepthMapFile(input.files[0]);
+    input.value = "";
+  });
+  document.querySelector("#depth-map-detail").addEventListener("dragover", (event) => {
+    event.preventDefault();
+    const dropZone = event.target.closest("#depth-map-drop-zone");
+    if (dropZone) {
+      dropZone.classList.add("depth-drop-zone-active");
+    }
+  });
+  document.querySelector("#depth-map-detail").addEventListener("dragleave", (event) => {
+    const dropZone = event.target.closest("#depth-map-drop-zone");
+    if (dropZone && !dropZone.contains(event.relatedTarget)) {
+      dropZone.classList.remove("depth-drop-zone-active");
+    }
+  });
+  document.querySelector("#depth-map-detail").addEventListener("drop", (event) => {
+    event.preventDefault();
+    const dropZone = event.target.closest("#depth-map-drop-zone");
+    if (!dropZone) {
+      return;
+    }
+    dropZone.classList.remove("depth-drop-zone-active");
+    const file = event.dataTransfer?.files?.[0];
+    if (file) {
+      void handleDepthMapFile(file);
     }
   });
 

@@ -2,15 +2,18 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import json
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import FileResponse
 
 from .art import (
     ArtAssetNotFoundError,
     ArtAssetSourceMissingError,
     ArtDependencyError,
     ArtLabService,
+    InvalidArtDepthMapRequestError,
     InvalidArtComparisonRequestError,
     UnsupportedArtAssetError,
 )
@@ -24,6 +27,8 @@ from .repository import KloneRepository
 from .rooms import PERMISSION_LEVELS, room_registry
 from .schemas import (
     ArtAssetComparisonRecord,
+    ArtDepthMapRecord,
+    ArtDepthMapRequest,
     ArtAssetMetricsRecord,
     AssetRecord,
     AuditEventRecord,
@@ -81,7 +86,11 @@ from .schemas import (
     RoomRecord,
     RuntimeConfigRecord,
     WorldMemoryClusterDetailRecord,
+    WorldMemoryDepthJobListRecord,
+    WorldMemoryDepthJobRecord,
+    WorldMemoryDepthJobRequest,
     WorldMemoryNodeDetailRecord,
+    WorldMemoryPlaceViewRecord,
     WorldMemoryRecord,
 )
 from .services import ServiceContainer
@@ -696,6 +705,122 @@ def simulation_world_memory_node_detail(
         raise HTTPException(status_code=404, detail=str(error)) from error
 
 
+@router.get(
+    "/simulation/world-memory/depth/jobs",
+    response_model=WorldMemoryDepthJobListRecord,
+)
+def simulation_world_memory_depth_jobs(
+    room_id: str = Query(..., min_length=1),
+    services: ServiceContainer = Depends(get_service_container),
+) -> WorldMemoryDepthJobListRecord:
+    room = _resolve_rooms(
+        requested_room_id=room_id,
+        permission="read",
+        accept_requires_approval=False,
+    )[0]
+    return services.simulation.world_memory_depth.list_jobs(
+        room_id=room.id,
+        requested_room_id=room_id,
+    )
+
+
+@router.post(
+    "/simulation/world-memory/depth/jobs",
+    response_model=WorldMemoryDepthJobRecord,
+)
+def simulation_world_memory_depth_run_job(
+    request: WorldMemoryDepthJobRequest,
+    room_id: str = Query(..., min_length=1),
+    services: ServiceContainer = Depends(get_service_container),
+) -> WorldMemoryDepthJobRecord:
+    room = _resolve_rooms(
+        requested_room_id=room_id,
+        permission="read",
+        accept_requires_approval=False,
+    )[0]
+    try:
+        return services.simulation.world_memory_depth.run_job(
+            room_id=room.id,
+            requested_room_id=room_id,
+            request=request,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.get(
+    "/simulation/world-memory/depth/jobs/{job_id}",
+    response_model=WorldMemoryDepthJobRecord,
+)
+def simulation_world_memory_depth_job_detail(
+    job_id: int,
+    room_id: str = Query(..., min_length=1),
+    services: ServiceContainer = Depends(get_service_container),
+) -> WorldMemoryDepthJobRecord:
+    room = _resolve_rooms(
+        requested_room_id=room_id,
+        permission="read",
+        accept_requires_approval=False,
+    )[0]
+    try:
+        return services.simulation.world_memory_depth.get_job(
+            job_id=job_id,
+            room_id=room.id,
+            requested_room_id=room_id,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get("/simulation/world-memory/depth/jobs/{job_id}/nodes/{node_id}/{artifact_kind}")
+def simulation_world_memory_depth_artifact(
+    job_id: int,
+    node_id: str,
+    artifact_kind: str,
+    room_id: str = Query(..., min_length=1),
+    services: ServiceContainer = Depends(get_service_container),
+) -> FileResponse:
+    room = _resolve_rooms(
+        requested_room_id=room_id,
+        permission="read",
+        accept_requires_approval=False,
+    )[0]
+    try:
+        path = services.simulation.world_memory_depth.resolve_artifact_path(
+            room_id=room.id,
+            job_id=job_id,
+            node_id=node_id,
+            artifact_kind=artifact_kind,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return FileResponse(path, filename=path.name)
+
+
+@router.get(
+    "/simulation/world-memory/nodes/{node_id}/place-view",
+    response_model=WorldMemoryPlaceViewRecord,
+)
+def simulation_world_memory_place_view(
+    node_id: str,
+    room_id: str = Query(..., min_length=1),
+    services: ServiceContainer = Depends(get_service_container),
+) -> WorldMemoryPlaceViewRecord:
+    room = _resolve_rooms(
+        requested_room_id=room_id,
+        permission="read",
+        accept_requires_approval=False,
+    )[0]
+    try:
+        return services.simulation.world_memory_depth.build_place_view(
+            room_id=room.id,
+            requested_room_id=room_id,
+            node_id=node_id,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
 @router.get("/constitution", response_model=ConstitutionSnapshotRecord)
 def constitution_snapshot(
     services: ServiceContainer = Depends(get_service_container),
@@ -852,6 +977,20 @@ def asset_detail(asset_id: int, repository: KloneRepository = Depends(get_reposi
     raise HTTPException(status_code=404, detail=f"Asset {asset_id} was not found.")
 
 
+@router.get("/assets/{asset_id}/content")
+def asset_content(asset_id: int, repository: KloneRepository = Depends(get_repository)) -> FileResponse:
+    for room in _resolve_rooms(requested_room_id=None, permission="read"):
+        row = repository.get_asset(asset_id, room_id=room.id)
+        if row is None:
+            continue
+        path = Path(str(row["path"]))
+        if not path.exists():
+            raise HTTPException(status_code=404, detail=f"Asset file for {asset_id} is missing.")
+        media_type = str(row.get("mime_type") or "") or None
+        return FileResponse(path, media_type=media_type, filename=str(row.get("file_name") or path.name))
+    raise HTTPException(status_code=404, detail=f"Asset {asset_id} was not found.")
+
+
 @router.get("/art/assets/{asset_id}/metrics", response_model=ArtAssetMetricsRecord)
 def art_asset_metrics(
     asset_id: int,
@@ -893,6 +1032,45 @@ def art_asset_compare(
         raise HTTPException(status_code=409, detail=str(error)) from error
     except ArtDependencyError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@router.post("/art/depth-map", response_model=ArtDepthMapRecord)
+def art_depth_map(
+    request: ArtDepthMapRequest,
+    repository: KloneRepository = Depends(get_repository),
+) -> ArtDepthMapRecord:
+    art_service = ArtLabService(repository)
+    if request.asset_id is not None:
+        for room in _resolve_rooms(requested_room_id=None, permission="read"):
+            row = repository.get_asset(request.asset_id, room_id=room.id)
+            if row is None:
+                continue
+            try:
+                return art_service.depth_map_from_asset_row(row)
+            except UnsupportedArtAssetError as error:
+                raise HTTPException(status_code=400, detail=str(error)) from error
+            except ArtAssetSourceMissingError as error:
+                raise HTTPException(status_code=409, detail=str(error)) from error
+            except ArtDependencyError as error:
+                raise HTTPException(status_code=503, detail=str(error)) from error
+        raise HTTPException(status_code=404, detail=f"Asset {request.asset_id} was not found.")
+
+    if request.image_data_url:
+        try:
+            return art_service.depth_map_from_upload(
+                image_data_url=request.image_data_url,
+                file_name=request.file_name,
+                mime_type=request.mime_type,
+            )
+        except InvalidArtDepthMapRequestError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except ArtDependencyError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+
+    raise HTTPException(
+        status_code=400,
+        detail="Depth mapping requires either asset_id or image_data_url.",
+    )
 
 
 @router.get("/ingest/status", response_model=IngestStatusResponse)

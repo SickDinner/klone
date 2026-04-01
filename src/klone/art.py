@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+from io import BytesIO
 from math import sqrt
 from pathlib import Path
 from typing import Any, Mapping
@@ -21,6 +23,7 @@ from .repository import KloneRepository
 from .schemas import (
     ArtAssetComparisonItemRecord,
     ArtAssetComparisonRecord,
+    ArtDepthMapRecord,
     ArtAssetMetricDeltaRecord,
     ArtAssetMetricsRecord,
     PublicCapabilityRecord,
@@ -30,13 +33,16 @@ from .schemas import (
 
 ART_ANALYSIS_VERSION = "v1.1.formal_image_metrics"
 ART_COMPARISON_VERSION = "v1.2.formal_image_metrics_comparison"
+ART_DEPTH_MAP_VERSION = "v1.3.read_only_2_5d_depth_map_shell"
 MAX_ANALYSIS_SIZE = 128
+MAX_DEPTHMAP_SIZE = 1024
 SYMMETRY_SAMPLE_SIZE = 64
 EDGE_THRESHOLD = 32
 DARK_PIXEL_THRESHOLD = 64
 LIGHT_PIXEL_THRESHOLD = 192
 INK_PIXEL_THRESHOLD = 224
 MAX_COMPARISON_ASSET_COUNT = 8
+MAX_DEPTH_UPLOAD_BYTES = 12 * 1024 * 1024
 COMPARISON_METRIC_FIELDS = (
     "aspect_ratio",
     "brightness_mean",
@@ -78,6 +84,10 @@ class InvalidArtComparisonRequestError(ArtLabError):
     pass
 
 
+class InvalidArtDepthMapRequestError(ArtLabError):
+    pass
+
+
 def _require_pillow() -> None:
     if PIL_IMPORT_ERROR is not None:
         raise ArtDependencyError(
@@ -107,6 +117,12 @@ def _orientation_for_dimensions(width: int, height: int) -> str:
 def _downscale_for_analysis(image) -> Any:
     sampled = image.copy()
     sampled.thumbnail((MAX_ANALYSIS_SIZE, MAX_ANALYSIS_SIZE), _resampling_lanczos())
+    return sampled
+
+
+def _downscale_for_depth_map(image) -> Any:
+    sampled = image.copy()
+    sampled.thumbnail((MAX_DEPTHMAP_SIZE, MAX_DEPTHMAP_SIZE), _resampling_lanczos())
     return sampled
 
 
@@ -226,6 +242,138 @@ def _analyze_image_file(path: Path) -> dict[str, Any]:
     }
 
 
+def _decode_image_data_url(image_data_url: str) -> tuple[str, bytes]:
+    _require_pillow()
+    if not image_data_url.startswith("data:") or "," not in image_data_url:
+        raise InvalidArtDepthMapRequestError(
+            "Depth mapping expects a data URL with base64-encoded image content."
+        )
+    header, encoded = image_data_url.split(",", 1)
+    if ";base64" not in header:
+        raise InvalidArtDepthMapRequestError(
+            "Depth mapping expects a base64-encoded image data URL."
+        )
+    mime_type = header[5:].split(";", 1)[0] or "image/png"
+    try:
+        raw_bytes = base64.b64decode(encoded, validate=True)
+    except ValueError as error:
+        raise InvalidArtDepthMapRequestError("Depth mapping image payload was not valid base64.") from error
+    if not raw_bytes:
+        raise InvalidArtDepthMapRequestError("Depth mapping image payload was empty.")
+    if len(raw_bytes) > MAX_DEPTH_UPLOAD_BYTES:
+        raise InvalidArtDepthMapRequestError(
+            f"Depth mapping supports uploads up to {MAX_DEPTH_UPLOAD_BYTES // (1024 * 1024)} MB."
+        )
+    return mime_type, raw_bytes
+
+
+def _png_data_url_from_image(image) -> str:
+    _require_pillow()
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
+def _normalized_depth_statistics(depth_pixels: list[int]) -> tuple[float, float, float]:
+    total_pixels = max(len(depth_pixels), 1)
+    mean_value = sum(depth_pixels) / total_pixels / 255.0
+    near_ratio = sum(1 for value in depth_pixels if value >= 170) / total_pixels
+    far_ratio = sum(1 for value in depth_pixels if value <= 85) / total_pixels
+    return (
+        _round_metric(mean_value),
+        _round_metric(near_ratio),
+        _round_metric(far_ratio),
+    )
+
+
+def _render_depth_map_from_image(image, *, source_name: str) -> dict[str, Any]:
+    _require_pillow()
+    warnings: list[str] = []
+
+    rgb = image.convert("RGB")
+    width_px, height_px = rgb.size
+    if width_px < 32 or height_px < 32:
+        warnings.append("small_source_image")
+
+    preview = _downscale_for_depth_map(rgb)
+    preview_width_px, preview_height_px = preview.size
+    if preview_width_px != width_px or preview_height_px != height_px:
+        warnings.append("downscaled_for_depth_map")
+
+    grayscale = preview.convert("L")
+    blurred_luma = grayscale.filter(ImageFilter.GaussianBlur(radius=2.4))
+    edge_map = ImageOps.autocontrast(
+        grayscale.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(radius=1.1))
+    )
+    saturation_map = preview.convert("HSV").getchannel("S").filter(ImageFilter.GaussianBlur(radius=1.2))
+
+    blurred_pixels = list(blurred_luma.getdata())
+    edge_pixels = list(edge_map.getdata())
+    saturation_pixels = list(saturation_map.getdata())
+
+    depth_pixels: list[int] = []
+    width_denominator = max(preview_width_px - 1, 1)
+    height_denominator = max(preview_height_px - 1, 1)
+    diagonal_denominator = sqrt(0.5**2 + 0.5**2)
+
+    for index, (luma_value, edge_value, saturation_value) in enumerate(
+        zip(blurred_pixels, edge_pixels, saturation_pixels)
+    ):
+        x = index % preview_width_px
+        y = index // preview_width_px
+        x_norm = x / width_denominator
+        y_norm = y / height_denominator
+        center_distance = sqrt((x_norm - 0.5) ** 2 + (y_norm - 0.5) ** 2)
+        center_bias = 1.0 - min(center_distance / diagonal_denominator, 1.0)
+        lower_frame_bias = y_norm
+        inverted_luma = 1.0 - (luma_value / 255.0)
+        edge_strength = edge_value / 255.0
+        saturation_strength = saturation_value / 255.0
+        depth_value = (
+            (0.34 * inverted_luma)
+            + (0.24 * edge_strength)
+            + (0.14 * saturation_strength)
+            + (0.16 * center_bias)
+            + (0.12 * lower_frame_bias)
+        )
+        depth_pixels.append(max(0, min(255, round(depth_value * 255.0))))
+
+    raw_depth = Image.new("L", (preview_width_px, preview_height_px))
+    raw_depth.putdata(depth_pixels)
+    softened_depth = raw_depth.filter(ImageFilter.GaussianBlur(radius=1.6))
+    reinforced_edges = Image.blend(
+        softened_depth,
+        ImageOps.autocontrast(ImageChops.add(softened_depth, edge_map, scale=1.35)),
+        alpha=0.24,
+    )
+    depth_map = ImageOps.autocontrast(reinforced_edges)
+    colorized_depth = ImageOps.colorize(
+        depth_map,
+        black="#081218",
+        mid="#557ea4",
+        white="#f1f0da",
+    )
+
+    normalized_depth_pixels = list(depth_map.getdata())
+    depth_mean, near_ratio, far_ratio = _normalized_depth_statistics(normalized_depth_pixels)
+
+    return {
+        "source_name": source_name,
+        "width_px": width_px,
+        "height_px": height_px,
+        "preview_width_px": preview_width_px,
+        "preview_height_px": preview_height_px,
+        "depth_mean": depth_mean,
+        "near_ratio": near_ratio,
+        "far_ratio": far_ratio,
+        "original_data_url": _png_data_url_from_image(preview),
+        "depth_map_data_url": _png_data_url_from_image(depth_map),
+        "colorized_depth_data_url": _png_data_url_from_image(colorized_depth),
+        "warnings": warnings,
+    }
+
+
 class ArtLabService:
     def __init__(self, repository: KloneRepository) -> None:
         self.repository = repository
@@ -235,10 +383,11 @@ class ArtLabService:
             id="art-lab-service",
             name="ArtLabService",
             implementation="in_process_read_only_shell",
-            status="bounded_comparison_shell",
+            status="bounded_comparison_and_depth_map_shell",
             notes=[
                 "Computes deterministic formal image metrics over existing governed image assets.",
                 "Supports bounded room-scoped comparison over existing image assets only.",
+                "Can render a transient 2.5D-style depth map from an uploaded image or an existing image asset without persisting derived files.",
                 "Blocks psychological or clinical inference and does not mutate ingest or asset rows.",
             ],
         )
@@ -269,6 +418,21 @@ class ArtLabService:
                 description=(
                     "Compare a bounded set of room-scoped image assets using deterministic formal "
                     "metrics only."
+                ),
+                backed_by=["ArtLabService", "PolicyService"],
+            ),
+            PublicCapabilityRecord(
+                id="art.depth_map.render",
+                name="2.5D Depth Map Render",
+                category="art",
+                path="/api/art/depth-map",
+                methods=["POST"],
+                read_only=True,
+                room_scoped=False,
+                status="available",
+                description=(
+                    "Render a transient deterministic 2.5D-style depth map from an uploaded image "
+                    "or an existing image asset without writing derived files."
                 ),
                 backed_by=["ArtLabService", "PolicyService"],
             ),
@@ -335,6 +499,87 @@ class ArtLabService:
                 "Metrics are computed deterministically from the current asset file.",
             ],
             warnings=list(analysis["warnings"]),
+        )
+
+    def depth_map_from_asset_row(self, row: Mapping[str, Any]) -> ArtDepthMapRecord:
+        if str(row["asset_kind"]) != "image":
+            raise UnsupportedArtAssetError("2.5D depth mapping currently supports image assets only.")
+
+        file_path = Path(str(row["path"]))
+        if not file_path.exists():
+            raise ArtAssetSourceMissingError(
+                f"Source file for depth mapping no longer exists: {file_path}"
+            )
+
+        with Image.open(file_path) as opened:
+            rendered = _render_depth_map_from_image(opened, source_name=str(row["file_name"]))
+
+        decision = output_guard.evaluate(classification_level=str(row["classification_level"]))
+        file_name = str(row["file_name"])
+        if decision.decision == "summary_only":
+            file_name = "[summary-only]"
+
+        return ArtDepthMapRecord(
+            depth_version=ART_DEPTH_MAP_VERSION,
+            source_mode="asset",
+            asset_id=int(row["id"]),
+            room_id=str(row["room_id"]),
+            classification_level=str(row["classification_level"]),
+            file_name=file_name,
+            mime_type=str(row.get("mime_type") or "image/png"),
+            width_px=int(rendered["width_px"]),
+            height_px=int(rendered["height_px"]),
+            preview_width_px=int(rendered["preview_width_px"]),
+            preview_height_px=int(rendered["preview_height_px"]),
+            depth_mean=float(rendered["depth_mean"]),
+            near_ratio=float(rendered["near_ratio"]),
+            far_ratio=float(rendered["far_ratio"]),
+            original_data_url=str(rendered["original_data_url"]),
+            depth_map_data_url=str(rendered["depth_map_data_url"]),
+            colorized_depth_data_url=str(rendered["colorized_depth_data_url"]),
+            notes=[
+                "Depth map is a deterministic local 2.5D approximation, not a learned monocular depth model.",
+                "No derived image is written back into the asset index or memory layers.",
+            ],
+            warnings=list(rendered["warnings"]),
+        )
+
+    def depth_map_from_upload(
+        self,
+        *,
+        image_data_url: str,
+        file_name: str | None = None,
+        mime_type: str | None = None,
+    ) -> ArtDepthMapRecord:
+        decoded_mime_type, raw_bytes = _decode_image_data_url(image_data_url)
+        resolved_mime_type = mime_type or decoded_mime_type
+        resolved_file_name = file_name or "upload.png"
+        try:
+            with Image.open(BytesIO(raw_bytes)) as opened:
+                rendered = _render_depth_map_from_image(opened, source_name=resolved_file_name)
+        except OSError as error:
+            raise InvalidArtDepthMapRequestError("Depth mapping expects a decodable image file.") from error
+
+        return ArtDepthMapRecord(
+            depth_version=ART_DEPTH_MAP_VERSION,
+            source_mode="upload",
+            file_name=resolved_file_name,
+            mime_type=resolved_mime_type,
+            width_px=int(rendered["width_px"]),
+            height_px=int(rendered["height_px"]),
+            preview_width_px=int(rendered["preview_width_px"]),
+            preview_height_px=int(rendered["preview_height_px"]),
+            depth_mean=float(rendered["depth_mean"]),
+            near_ratio=float(rendered["near_ratio"]),
+            far_ratio=float(rendered["far_ratio"]),
+            original_data_url=str(rendered["original_data_url"]),
+            depth_map_data_url=str(rendered["depth_map_data_url"]),
+            colorized_depth_data_url=str(rendered["colorized_depth_data_url"]),
+            notes=[
+                "Depth map is a deterministic local 2.5D approximation, not a learned monocular depth model.",
+                "Transient uploads stay read-only and are not persisted into datasets, assets, or memory rows.",
+            ],
+            warnings=list(rendered["warnings"]),
         )
 
     def compare_assets(

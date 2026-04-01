@@ -1106,3 +1106,313 @@ class WorldMemoryService:
         if anchor_prefix == ".":
             return f"{dataset_label} / root / {anchor_type}"
         return f"{dataset_label} / {anchor_prefix} / {anchor_type}"
+
+
+class WorldMemoryDepthService:
+    PROJECTION_VERSION = "world_memory_depth.v1"
+    DEFAULT_JOB_LIMIT = 12
+    DEFAULT_RENDERER = "local_luma_shell"
+
+    def __init__(self, repository: KloneRepository) -> None:
+        self.repository = repository
+        self.world_memory = WorldMemoryService(repository)
+        self.artifact_root = repository.db_path.parent / "world_memory_depth"
+
+    def list_jobs(
+        self,
+        *,
+        room_id: str,
+        requested_room_id: str | None,
+        limit: int = DEFAULT_JOB_LIMIT,
+    ) -> WorldMemoryDepthJobListRecord:
+        jobs = [self._job_record_from_row(row) for row in self.repository.list_world_memory_depth_jobs(room_id=room_id, limit=limit)]
+        warnings: list[str] = []
+        if not jobs:
+            warnings.append("No world-memory depth jobs have been executed for this room yet.")
+        return WorldMemoryDepthJobListRecord(
+            projection_version=self.PROJECTION_VERSION,
+            read_only=True,
+            requested_room_id=requested_room_id,
+            resolved_room_ids=[room_id],
+            job_count=len(jobs),
+            jobs=jobs,
+            notes=[
+                "Depth jobs are bounded local shells over selected world-memory nodes only.",
+                "The default renderer is a deterministic local luma shell; optional remote renderers remain explicitly selected.",
+            ],
+            warnings=warnings,
+        )
+
+    def run_job(
+        self,
+        *,
+        room_id: str,
+        requested_room_id: str | None,
+        request: WorldMemoryDepthJobRequest,
+    ) -> WorldMemoryDepthJobRecord:
+        resolved_room_ids, node_projections, _ = self.world_memory._project_world_memory(
+            room_ids=[room_id],
+            per_room_limit=WorldMemoryService.DEFAULT_PER_ROOM_LIMIT,
+        )
+        node_map = {node.node_id: node for node in node_projections}
+        selected_nodes = [node_map[node_id] for node_id in request.node_ids if node_id in node_map]
+        if len(selected_nodes) != len(request.node_ids):
+            missing = sorted(set(request.node_ids) - set(node_map.keys()))
+            raise ValueError(f"Unknown world-memory nodes: {', '.join(missing)}")
+        if not all(node.place_shell.depth_candidate and node.asset_kind == "image" for node in selected_nodes):
+            raise ValueError("Only image-based world-memory nodes with depth candidates can be rendered in the depth shell.")
+
+        initial_notes = [
+            "Depth job execution is bounded to explicitly selected world-memory nodes.",
+            "Artifacts are stored locally under the governed repository data root.",
+        ]
+        renderer = request.renderer or self.DEFAULT_RENDERER
+        job_row = self.repository.create_world_memory_depth_job(
+            room_id=room_id,
+            renderer=renderer,
+            requested_node_ids=request.node_ids,
+            notes=initial_notes,
+            warnings=[],
+        )
+        job_id = int(job_row["id"])
+        self.repository.mark_world_memory_depth_job_running(job_id=job_id, room_id=room_id)
+
+        try:
+            results, warnings = self._render_job(job_id=job_id, room_id=room_id, nodes=selected_nodes, renderer=renderer)
+            self.repository.replace_world_memory_depth_results(job_id=job_id, room_id=room_id, results=results)
+            completed = self.repository.complete_world_memory_depth_job(
+                job_id=job_id,
+                room_id=room_id,
+                result_count=len(results),
+                notes=[
+                    "Depth artifacts are read-only derivatives of existing local image assets.",
+                    "No source asset bytes are modified during place-shell generation.",
+                ],
+                warnings=warnings,
+            )
+            if completed is None:
+                raise ValueError(f"Depth job {job_id} could not be completed.")
+        except Exception as error:
+            failed = self.repository.fail_world_memory_depth_job(
+                job_id=job_id,
+                room_id=room_id,
+                error_text=str(error),
+                notes=["Depth job failed before all selected nodes could be rendered."],
+                warnings=[],
+            )
+            if failed is None:
+                raise
+        return self.get_job(job_id=job_id, room_id=room_id, requested_room_id=requested_room_id)
+
+    def get_job(
+        self,
+        *,
+        job_id: int,
+        room_id: str,
+        requested_room_id: str | None,
+    ) -> WorldMemoryDepthJobRecord:
+        row = self.repository.get_world_memory_depth_job(job_id, room_id=room_id)
+        if row is None:
+            raise ValueError(f"World-memory depth job {job_id} was not found.")
+        return self._job_record_from_row(row)
+
+    def build_place_view(
+        self,
+        *,
+        room_id: str,
+        requested_room_id: str | None,
+        node_id: str,
+    ) -> WorldMemoryPlaceViewRecord:
+        resolved_room_ids, node_projections, _ = self.world_memory._project_world_memory(
+            room_ids=[room_id],
+            per_room_limit=WorldMemoryService.DEFAULT_PER_ROOM_LIMIT,
+        )
+        node = next((item for item in node_projections if item.node_id == node_id), None)
+        if node is None:
+            raise ValueError(f"World-memory node {node_id} was not found.")
+        latest = self.repository.latest_world_memory_depth_result(node_id=node_id, room_id=room_id)
+        warnings: list[str] = []
+        if latest is None:
+            warnings.append("No local depth artifact exists for this node yet. Run a bounded depth job first.")
+        return WorldMemoryPlaceViewRecord(
+            projection_version="world_memory_place_view.v1",
+            read_only=True,
+            requested_room_id=requested_room_id,
+            resolved_room_ids=resolved_room_ids,
+            node_id=node.node_id,
+            cluster_id=node.cluster_id,
+            room_id=node.room_id,
+            asset_id=node.asset_id,
+            label=node.label,
+            relative_path=node.relative_path,
+            viewer_kind="parallax_2_5d",
+            source_image_route=_asset_content_route(node.asset_id),
+            depth_preview_route=(_depth_preview_route(int(latest["job_id"]), node.node_id) if latest else None),
+            depth_raw_route=(_depth_raw_route(int(latest["job_id"]), node.node_id) if latest else None),
+            latest_job_id=(int(latest["job_id"]) if latest else None),
+            renderer=(str(latest["renderer"]) if latest else None),
+            available=latest is not None,
+            notes=[
+                "Place view is a local 2.5D parallax shell over one governed image anchor.",
+                "It is a viewer surface, not a full 3D reconstruction or navigation graph yet.",
+            ],
+            warnings=warnings,
+        )
+
+    def resolve_artifact_path(self, *, room_id: str, job_id: int, node_id: str, artifact_kind: str) -> Path:
+        result = next(
+            (
+                item
+                for item in self.repository.list_world_memory_depth_results(job_id=job_id, room_id=room_id)
+                if str(item["node_id"]) == node_id
+            ),
+            None,
+        )
+        if result is None:
+            raise ValueError(f"Depth artifact for node {node_id} was not found in job {job_id}.")
+        if artifact_kind == "preview":
+            path = Path(str(result["depth_preview_path"]))
+        elif artifact_kind == "raw":
+            path = Path(str(result["depth_raw_path"]))
+        else:
+            raise ValueError(f"Unsupported depth artifact kind {artifact_kind}.")
+        if not path.exists():
+            raise ValueError(f"Depth artifact file is missing for node {node_id}.")
+        return path
+
+    def _render_job(
+        self,
+        *,
+        job_id: int,
+        room_id: str,
+        nodes: list[_WorldMemoryNodeProjection],
+        renderer: str,
+    ) -> tuple[list[dict[str, object]], list[str]]:
+        warnings: list[str] = []
+        results: list[dict[str, object]] = []
+        for node in nodes:
+            source_path = Path(str(self.repository.get_asset(node.asset_id, room_id=room_id)["path"]))
+            job_dir = self.artifact_root / f"job_{job_id}"
+            job_dir.mkdir(parents=True, exist_ok=True)
+            preview_path = job_dir / f"{node.asset_id}_{node.file_name}.depth.preview.png"
+            raw_path = job_dir / f"{node.asset_id}_{node.file_name}.depth.raw.png"
+            effective_renderer = renderer
+            renderer_warnings: list[str] = []
+
+            if renderer == "depth_anything_v2_remote":
+                try:
+                    width_px, height_px = self._render_depth_anything_remote(
+                        source_path=source_path,
+                        preview_path=preview_path,
+                        raw_path=raw_path,
+                    )
+                except Exception as error:
+                    effective_renderer = self.DEFAULT_RENDERER
+                    renderer_warnings.append(f"Remote depth renderer unavailable, fell back to local shell: {error}")
+                    width_px, height_px = self._render_local_luma_shell(
+                        source_path=source_path,
+                        preview_path=preview_path,
+                        raw_path=raw_path,
+                    )
+            else:
+                width_px, height_px = self._render_local_luma_shell(
+                    source_path=source_path,
+                    preview_path=preview_path,
+                    raw_path=raw_path,
+                )
+
+            warnings.extend(renderer_warnings)
+            results.append(
+                {
+                    "node_id": node.node_id,
+                    "cluster_id": node.cluster_id,
+                    "asset_id": node.asset_id,
+                    "label": node.label,
+                    "relative_path": node.relative_path,
+                    "asset_kind": node.asset_kind,
+                    "renderer": effective_renderer,
+                    "status": "completed",
+                    "source_image_path": str(source_path),
+                    "depth_preview_path": str(preview_path),
+                    "depth_raw_path": str(raw_path),
+                    "width_px": width_px,
+                    "height_px": height_px,
+                    "notes": [
+                        "Depth shell artifacts were generated from one existing local image asset.",
+                    ],
+                    "warnings": renderer_warnings,
+                }
+            )
+        return results, warnings
+
+    def _render_local_luma_shell(self, *, source_path: Path, preview_path: Path, raw_path: Path) -> tuple[int, int]:
+        from PIL import Image, ImageFilter, ImageOps
+
+        with Image.open(source_path) as image:
+            rgb = image.convert("RGB")
+            grayscale = ImageOps.grayscale(rgb)
+            preview = ImageOps.autocontrast(grayscale).filter(ImageFilter.GaussianBlur(radius=1.2))
+            preview.save(preview_path)
+
+            raw16 = Image.new("I;16", preview.size)
+            raw_values = array("H", (int(pixel) * 257 for pixel in preview.getdata()))
+            raw16.frombytes(raw_values.tobytes())
+            raw16.save(raw_path)
+            return rgb.width, rgb.height
+
+    def _render_depth_anything_remote(self, *, source_path: Path, preview_path: Path, raw_path: Path) -> tuple[int, int]:
+        from gradio_client import Client, handle_file
+        from PIL import Image
+
+        client = Client("depth-anything/Depth-Anything-V2")
+        result = client.predict(
+            image=handle_file(str(source_path)),
+            api_name="/on_submit",
+        )
+        preview_src = Path(str(result[1]))
+        raw_src = Path(str(result[2]))
+        preview_path.write_bytes(preview_src.read_bytes())
+        raw_path.write_bytes(raw_src.read_bytes())
+        with Image.open(source_path) as image:
+            return image.width, image.height
+
+    def _job_record_from_row(self, row: dict[str, object]) -> WorldMemoryDepthJobRecord:
+        job_id = int(row["id"])
+        room_id = str(row["room_id"])
+        result_rows = self.repository.list_world_memory_depth_results(job_id=job_id, room_id=room_id)
+        return WorldMemoryDepthJobRecord(
+            job_id=job_id,
+            room_id=room_id,
+            renderer=str(row["renderer"]),
+            status=str(row["status"]),
+            node_count=len(_decode_string_list(row.get("requested_node_ids_json"))),
+            result_count=int(row.get("result_count") or 0),
+            created_at=str(row["created_at"]),
+            started_at=(str(row["started_at"]) if row.get("started_at") else None),
+            completed_at=(str(row["completed_at"]) if row.get("completed_at") else None),
+            requested_node_ids=_decode_string_list(row.get("requested_node_ids_json")),
+            results=[self._job_node_record_from_row(job_id=job_id, row=result_row) for result_row in result_rows],
+            notes=_decode_string_list(row.get("notes_json")),
+            warnings=_decode_string_list(row.get("warnings_json")),
+            error_text=(str(row["error_text"]) if row.get("error_text") else None),
+        )
+
+    def _job_node_record_from_row(self, *, job_id: int, row: dict[str, object]) -> WorldMemoryDepthJobNodeRecord:
+        return WorldMemoryDepthJobNodeRecord(
+            node_id=str(row["node_id"]),
+            cluster_id=str(row["cluster_id"]),
+            asset_id=int(row["asset_id"]),
+            label=str(row["label"]),
+            relative_path=str(row["relative_path"]),
+            asset_kind=str(row["asset_kind"]),
+            renderer=str(row["renderer"]),
+            status=str(row["status"]),
+            source_image_route=_asset_content_route(int(row["asset_id"])),
+            depth_preview_route=_depth_preview_route(job_id, str(row["node_id"])),
+            depth_raw_route=_depth_raw_route(job_id, str(row["node_id"])),
+            width_px=int(row["width_px"]),
+            height_px=int(row["height_px"]),
+            generated_at=str(row["updated_at"]),
+            notes=_decode_string_list(row.get("notes_json")),
+            warnings=_decode_string_list(row.get("warnings_json")),
+        )

@@ -337,10 +337,30 @@
             <h2>World Memory Shell</h2>
             <p>First governed place-memory layer projected from indexed local assets, datasets, and path anchors.</p>
           </div>
+          <div class="toolbar">
+            <label class="field field-inline">
+              <span>Search</span>
+              <input id="world-memory-search-filter" type="text" placeholder="scene, corridor, room" />
+            </label>
+            <label class="field field-inline">
+              <span>Asset Kind</span>
+              <select id="world-memory-asset-kind-filter"></select>
+            </label>
+            <label class="field field-inline">
+              <span>Anchor Type</span>
+              <select id="world-memory-anchor-type-filter"></select>
+            </label>
+            <label class="checkbox-field">
+              <input id="world-memory-depth-only-filter" type="checkbox" />
+              <span>Depth candidates only</span>
+            </label>
+          </div>
           <div id="world-memory-summary" class="detail-card empty-state">Loading world-memory shell...</div>
           <div id="world-memory-shell" class="detail-card empty-state">No world-memory shell loaded yet.</div>
           <div id="world-memory-cluster-detail" class="detail-card empty-state">Select a world-memory cluster.</div>
           <div id="world-memory-node-detail" class="detail-card empty-state">Select a world-memory node.</div>
+          <div id="world-memory-depth-jobs" class="detail-card empty-state">No world-memory depth jobs loaded yet.</div>
+          <div id="world-memory-place-view" class="detail-card empty-state">Select a world-memory node to inspect the local place viewer.</div>
         </article>
       </section>
 

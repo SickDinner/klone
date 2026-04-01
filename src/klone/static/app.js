@@ -703,6 +703,7 @@ function renderWorldMemory(worldMemory) {
     return;
   }
 
+  populateWorldMemoryFilterControls(worldMemory);
   const filtered = filterWorldMemoryProjection(worldMemory);
   const filters = state.simulation.worldMemoryFilters;
 
@@ -2041,6 +2042,45 @@ function populateSimulationRoomFilter(rooms) {
   state.simulation.selectedRoomId = select.value;
 }
 
+function populateWorldMemoryFilterControls(worldMemory) {
+  const assetKindSelect = document.querySelector("#world-memory-asset-kind-filter");
+  const anchorTypeSelect = document.querySelector("#world-memory-anchor-type-filter");
+  if (!assetKindSelect || !anchorTypeSelect) {
+    return;
+  }
+
+  const assetKinds = Array.from(new Set((worldMemory?.nodes || []).map((node) => node.asset_kind))).sort();
+  const anchorTypes = Array.from(new Set(worldMemory?.anchor_types || [])).sort();
+
+  assetKindSelect.innerHTML = [
+    '<option value="">all kinds</option>',
+    ...assetKinds.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`),
+  ].join("");
+  anchorTypeSelect.innerHTML = [
+    '<option value="">all anchors</option>',
+    ...anchorTypes.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`),
+  ].join("");
+
+  assetKindSelect.value = assetKinds.includes(state.simulation.worldMemoryFilters.assetKind)
+    ? state.simulation.worldMemoryFilters.assetKind
+    : "";
+  anchorTypeSelect.value = anchorTypes.includes(state.simulation.worldMemoryFilters.anchorType)
+    ? state.simulation.worldMemoryFilters.anchorType
+    : "";
+}
+
+function applyWorldMemoryFiltersFromControls() {
+  state.simulation.worldMemoryFilters.search =
+    document.querySelector("#world-memory-search-filter")?.value.trim() || "";
+  state.simulation.worldMemoryFilters.assetKind =
+    document.querySelector("#world-memory-asset-kind-filter")?.value || "";
+  state.simulation.worldMemoryFilters.anchorType =
+    document.querySelector("#world-memory-anchor-type-filter")?.value || "";
+  state.simulation.worldMemoryFilters.depthOnly =
+    document.querySelector("#world-memory-depth-only-filter")?.checked || false;
+  renderWorldMemory(state.simulation.worldMemory);
+}
+
 function renderMemoryEvents(events) {
   const root = document.querySelector("#memory-events");
   if (!events.length) {
@@ -2761,6 +2801,7 @@ async function loadWorldMemoryClusterDetail(clusterId, options = {}) {
     );
     state.simulation.clusterDetail = detail;
     renderWorldMemoryClusterDetail(detail);
+    await refreshWorldMemoryDepthJobs({ preserveSelection: true });
   } catch (error) {
     state.simulation.clusterDetail = null;
     const root = document.querySelector("#world-memory-cluster-detail");
@@ -2798,6 +2839,10 @@ async function loadWorldMemoryNodeDetail(nodeId, options = {}) {
       renderWorldMemory(state.simulation.worldMemory);
       renderHybridBoardDetail(state.simulation.squareDetail);
     }
+    await Promise.all([
+      refreshWorldMemoryDepthJobs({ preserveSelection: true }),
+      loadWorldMemoryPlaceView(nodeId),
+    ]);
   } catch (error) {
     state.simulation.nodeDetail = null;
     const root = document.querySelector("#world-memory-node-detail");
@@ -2806,7 +2851,170 @@ async function loadWorldMemoryNodeDetail(nodeId, options = {}) {
   }
 }
 
+function currentWorldMemoryRunnableNodeIds() {
+  const nodeDetail = state.simulation.nodeDetail;
+  if (nodeDetail?.place_shell?.depth_candidate && nodeDetail.node?.room_id === currentWorldMemoryActionRoomId()) {
+    return [nodeDetail.node.node_id];
+  }
+
+  const clusterNodes = (state.simulation.clusterDetail?.nodes || []).filter((node) => node.depth_candidate);
+  if (clusterNodes.length) {
+    return clusterNodes.slice(0, 6).map((node) => node.node_id);
+  }
+
+  const filtered = filterWorldMemoryProjection(state.simulation.worldMemory);
+  return filtered.nodes
+    .filter((node) => node.depth_candidate && node.room_id === currentWorldMemoryActionRoomId())
+    .slice(0, 6)
+    .map((node) => node.node_id);
+}
+
+async function refreshWorldMemoryDepthJobs(options = {}) {
+  const { preserveSelection = true } = options;
+  const roomId = currentWorldMemoryActionRoomId();
+  if (!roomId) {
+    state.simulation.depthJobs = null;
+    state.simulation.selectedDepthJobId = null;
+    state.simulation.depthJobDetail = null;
+    renderWorldMemoryDepthJobs(null);
+    return;
+  }
+
+  try {
+    const jobList = await fetchJson(
+      `/api/simulation/world-memory/depth/jobs?room_id=${encodeURIComponent(roomId)}`,
+    );
+    state.simulation.depthJobs = jobList;
+    renderWorldMemoryDepthJobs(jobList);
+
+    const canPreserve =
+      preserveSelection &&
+      state.simulation.selectedDepthJobId &&
+      jobList.jobs.some((job) => Number(job.job_id) === Number(state.simulation.selectedDepthJobId));
+
+    if (canPreserve) {
+      await loadWorldMemoryDepthJobDetail(state.simulation.selectedDepthJobId, { roomId });
+    } else if (jobList.jobs.length) {
+      await loadWorldMemoryDepthJobDetail(jobList.jobs[0].job_id, { roomId });
+    } else {
+      state.simulation.selectedDepthJobId = null;
+      state.simulation.depthJobDetail = null;
+      renderWorldMemoryDepthJobs(jobList);
+    }
+  } catch (error) {
+    state.simulation.depthJobs = null;
+    state.simulation.selectedDepthJobId = null;
+    state.simulation.depthJobDetail = null;
+    const root = document.querySelector("#world-memory-depth-jobs");
+    root.className = "detail-card";
+    root.textContent = error.message;
+  }
+}
+
+async function loadWorldMemoryDepthJobDetail(jobId, options = {}) {
+  const roomId = options.roomId || currentWorldMemoryActionRoomId();
+  if (!roomId) {
+    return;
+  }
+  state.simulation.selectedDepthJobId = Number(jobId);
+  renderWorldMemoryDepthJobs(state.simulation.depthJobs);
+  try {
+    const detail = await fetchJson(
+      `/api/simulation/world-memory/depth/jobs/${encodeURIComponent(jobId)}?room_id=${encodeURIComponent(roomId)}`,
+    );
+    state.simulation.depthJobDetail = detail;
+    renderWorldMemoryDepthJobs(state.simulation.depthJobs || { jobs: [detail], job_count: 1, notes: [], warnings: [] });
+  } catch (error) {
+    state.simulation.depthJobDetail = null;
+    const root = document.querySelector("#world-memory-depth-jobs");
+    root.className = "detail-card";
+    root.textContent = error.message;
+  }
+}
+
+async function runWorldMemoryDepthJob(renderer) {
+  const roomId = currentWorldMemoryActionRoomId();
+  const nodeIds = currentWorldMemoryRunnableNodeIds();
+  if (!roomId || !nodeIds.length) {
+    const root = document.querySelector("#world-memory-depth-jobs");
+    root.className = "detail-card";
+    root.textContent = "Select a depth-candidate world-memory node or cluster in a single room first.";
+    return;
+  }
+
+  const root = document.querySelector("#world-memory-depth-jobs");
+  root.className = "detail-card";
+  root.innerHTML = `<h3>World Memory Depth Jobs</h3><p>Running ${escapeHtml(renderer)} over ${nodeIds.length} node(s) in ${escapeHtml(roomId)}...</p>`;
+
+  try {
+    const detail = await fetchJson(
+      `/api/simulation/world-memory/depth/jobs?room_id=${encodeURIComponent(roomId)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ node_ids: nodeIds, renderer }),
+      },
+    );
+    state.simulation.selectedDepthJobId = detail.job_id;
+    state.simulation.depthJobDetail = detail;
+    await refreshWorldMemoryDepthJobs({ preserveSelection: true });
+    if (state.simulation.selectedNodeId) {
+      await loadWorldMemoryPlaceView(state.simulation.selectedNodeId);
+    }
+  } catch (error) {
+    root.className = "detail-card";
+    root.textContent = error.message;
+  }
+}
+
+async function loadWorldMemoryPlaceView(nodeId) {
+  const roomId = state.simulation.nodeDetail?.node?.room_id || currentWorldMemoryActionRoomId();
+  if (!roomId || !nodeId) {
+    state.simulation.placeView = null;
+    renderWorldMemoryPlaceView(null);
+    return;
+  }
+  try {
+    const placeView = await fetchJson(
+      `/api/simulation/world-memory/nodes/${encodeURIComponent(nodeId)}/place-view?room_id=${encodeURIComponent(roomId)}`,
+    );
+    state.simulation.placeView = placeView;
+    renderWorldMemoryPlaceView(placeView);
+  } catch (error) {
+    state.simulation.placeView = null;
+    const root = document.querySelector("#world-memory-place-view");
+    root.className = "detail-card";
+    root.textContent = error.message;
+  }
+}
+
 async function handleSimulationLinkClick(event) {
+  const runButton = event.target.closest("[data-depth-run]");
+  if (runButton && !runButton.disabled) {
+    await runWorldMemoryDepthJob(runButton.dataset.depthRun);
+    return true;
+  }
+
+  const refreshButton = event.target.closest("[data-depth-refresh]");
+  if (refreshButton && !refreshButton.disabled) {
+    await refreshWorldMemoryDepthJobs({ preserveSelection: true });
+    return true;
+  }
+
+  const placeRefreshButton = event.target.closest("[data-world-place-refresh]");
+  if (placeRefreshButton && !placeRefreshButton.disabled) {
+    if (state.simulation.selectedNodeId) {
+      await loadWorldMemoryPlaceView(state.simulation.selectedNodeId);
+    }
+    return true;
+  }
+
+  const depthJobCard = event.target.closest("[data-depth-job-id]");
+  if (depthJobCard) {
+    await loadWorldMemoryDepthJobDetail(depthJobCard.dataset.depthJobId);
+    return true;
+  }
+
   const nodeCard = event.target.closest("[data-world-node-id]");
   if (nodeCard) {
     await loadWorldMemoryNodeDetail(nodeCard.dataset.worldNodeId);
@@ -2917,11 +3125,17 @@ async function refreshSimulationProjection(options = {}) {
     state.simulation.selectedNodeId = null;
     state.simulation.clusterDetail = null;
     state.simulation.nodeDetail = null;
+    state.simulation.depthJobs = null;
+    state.simulation.selectedDepthJobId = null;
+    state.simulation.depthJobDetail = null;
+    state.simulation.placeView = null;
     renderHybridBoard(null);
     renderHybridBoardDetail(null);
     renderWorldMemory(null);
     renderWorldMemoryClusterDetail(null);
     renderWorldMemoryNodeDetail(null);
+    renderWorldMemoryDepthJobs(null);
+    renderWorldMemoryPlaceView(null);
     document.querySelector("#simulation-board-summary").textContent = error.message;
     document.querySelector("#simulation-board-summary").className = "detail-card";
   }
@@ -3213,6 +3427,16 @@ function bindEvents() {
   document.querySelector("#world-memory-node-detail").addEventListener("click", (event) => {
     void handleSimulationLinkClick(event);
   });
+  document.querySelector("#world-memory-depth-jobs").addEventListener("click", (event) => {
+    void handleSimulationLinkClick(event);
+  });
+  document.querySelector("#world-memory-place-view").addEventListener("click", (event) => {
+    void handleSimulationLinkClick(event);
+  });
+  document.querySelector("#world-memory-search-filter").addEventListener("input", applyWorldMemoryFiltersFromControls);
+  document.querySelector("#world-memory-asset-kind-filter").addEventListener("change", applyWorldMemoryFiltersFromControls);
+  document.querySelector("#world-memory-anchor-type-filter").addEventListener("change", applyWorldMemoryFiltersFromControls);
+  document.querySelector("#world-memory-depth-only-filter").addEventListener("change", applyWorldMemoryFiltersFromControls);
   document.querySelector("#ingest-queue-jobs").addEventListener("click", (event) => {
     const button = event.target.closest("[data-queue-job-id]");
     if (!button || button.disabled) {

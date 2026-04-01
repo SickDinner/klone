@@ -502,6 +502,7 @@ class ArtLabService:
         )
 
     def depth_map_from_asset_row(self, row: Mapping[str, Any]) -> ArtDepthMapRecord:
+        _require_pillow()
         if str(row["asset_kind"]) != "image":
             raise UnsupportedArtAssetError("2.5D depth mapping currently supports image assets only.")
 
@@ -551,6 +552,7 @@ class ArtLabService:
         file_name: str | None = None,
         mime_type: str | None = None,
     ) -> ArtDepthMapRecord:
+        _require_pillow()
         decoded_mime_type, raw_bytes = _decode_image_data_url(image_data_url)
         resolved_mime_type = mime_type or decoded_mime_type
         resolved_file_name = file_name or "upload.png"

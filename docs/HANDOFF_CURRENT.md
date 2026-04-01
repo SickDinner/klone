@@ -3,7 +3,7 @@
 Last updated: 2026-04-01
 
 ## Current approved phase
-Phase A1.9, G1.5, and V1.2 closeout complete / awaiting next approved phase
+Phase 2E.1 closeout complete / awaiting next approved phase
 
 ## Baseline
 - 2B.1 through 2B.5 complete
@@ -26,14 +26,15 @@ Phase A1.9, G1.5, and V1.2 closeout complete / awaiting next approved phase
 - G1.5 bounded ingest queue history/detail seam exists in repo reality
 - V1.1 read-only asset formal metrics exists in repo reality
 - V1.2 bounded room-scoped art comparison seam exists in repo reality
+- 2E.1 read-only constitution shell exists in repo reality
 
 ## Immediate goal
-Phase A1.9, G1.5, and V1.2 are complete. No further approved A1, G1, or V1 substep is enumerated in canonical repo evidence.
-Await explicit roadmap extension or approval before widening the public control-plane seam, the ingest spine, or the art-lab. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local ingest queue shell work, G1.4 local resumable queue work, G1.5 queue history work, V1.1 asset formal metrics work, or V1.2 bounded comparison work.
+Phase 2E.1 is complete. No further approved 2E, A1, G1, or V1 substep is enumerated in canonical repo evidence.
+Await explicit roadmap extension or approval before widening the constitution layer, the public control-plane seam, the ingest spine, or the art-lab. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local ingest queue shell work, G1.4 local resumable queue work, G1.5 queue history work, V1.1 asset formal metrics work, V1.2 bounded comparison work, or 2E.1 constitution shell work.
 
 ## Approved scope
-- canonical docs closeout after completed Phase V1.2
-- verified confirmation that no further post-A1.9, post-G1.5, or post-V1.2 approved substep is currently defined
+- canonical docs closeout after completed Phase 2E.1
+- verified confirmation that no further post-2E.1, post-A1.9, post-G1.5, or post-V1.2 approved substep is currently defined
 - duplicate-work prevention
 - no unrelated runtime behavior
 - no unrelated API widening
@@ -53,8 +54,10 @@ Await explicit roadmap extension or approval before widening the public control-
 - do not regress the completed read-only art metrics seam at `/api/art/assets/{asset_id}/metrics`
 - do not regress explicit non-image rejection for art metrics
 - do not regress the completed bounded art comparison seam at `/api/art/assets/compare`
+- do not regress the completed read-only constitution shell at `/api/constitution`
 - do not widen art metrics into personality inference, clinical interpretation, OCR, embeddings, or batch profiling without a new approved phase
 - do not widen art comparison into embeddings, semantic similarity, clustering, batch writeback, or `/v1` expansion without a new approved phase
+- do not widen constitution into write routes, live routing influence, self-modification, or agentic self-editing without a new approved phase
 - do not modify evidence_text
 - do not add public write endpoints
 - do not add semantic search
@@ -83,8 +86,10 @@ Await explicit roadmap extension or approval before widening the public control-
 - do not widen ingest preview into writes, audit side effects, or background workers without a new approved phase
 - do not widen the local resumable queue shell into async interruption, background auto-retry, or startup auto-execute without a new approved phase
 - do not widen the art-lab beyond the completed single-asset formal metrics shell without a new approved phase
+- do not widen the constitution shell beyond read-only parameter visibility and append-only change notes without a new approved phase
 
 ## Required verification
+- focused 2E.1 tests green
 - compile pass
 - focused A1.9 tests green
 - regression slice for A1.2, A1.6, and A1.8 green

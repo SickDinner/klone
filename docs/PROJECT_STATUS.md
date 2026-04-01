@@ -3,7 +3,7 @@
 Last updated: 2026-04-01
 
 ## Current phase
-Phase A1.9, G1.5, and V1.2 complete; no further approved A1, G1, or V1 substep is defined yet
+Phase 2E.1 complete; no further approved 2E, A1, G1, or V1 substep is defined yet
 
 ## Phase state
 - Phase 2B.1 complete
@@ -33,6 +33,7 @@ Phase A1.9, G1.5, and V1.2 complete; no further approved A1, G1, or V1 substep i
 - Phase G1.3 complete
 - Phase G1.4 complete
 - Phase G1.5 complete
+- Phase 2E.1 complete
 - Phase V1 approved
 - Phase V1.1 complete
 - Phase V1.2 complete
@@ -262,8 +263,19 @@ Phase A1.9, G1.5, and V1.2 complete; no further approved A1, G1, or V1 substep i
 - full unittest suite green
 - compile pass green
 
+## Completed in 2E.1
+- first read-only Constitution Layer shell over slow-cycle model defaults
+- GET `/api/constitution` returns a visible constitution snapshot with parameter defaults, approval state, and append-only recent change notes
+- constitution state is explicitly separated from memory rows, ingest evidence, and room-scoped query results
+- `/v1/capabilities` now exposes the constitution service seam and constitution snapshot capability
+- Mission Control now includes a Constitution Layer panel for inspecting the current read-only shell
+- the phase remains read-only and explicitly avoids write routes, self-modification, and live routing influence
+- focused 2E.1 tests green
+- full unittest suite green
+- compile pass green
+
 ## Next approved substep
-- no further approved A1, G1, or V1 substep is enumerated in canonical repo evidence
-- require explicit roadmap extension or approval before widening the public control-plane seam beyond the completed A1.9 change preview route, the ingest spine beyond the completed G1.5 bounded queue history seam, or the art-lab beyond the completed V1.2 bounded comparison seam
-- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, G1.4 local resumable queue work, G1.5 queue history work, V1.1 asset formal metrics work, or V1.2 bounded comparison work
+- no further approved 2E, A1, G1, or V1 substep is enumerated in canonical repo evidence
+- require explicit roadmap extension or approval before widening the constitution layer beyond the completed 2E.1 read-only shell, the public control-plane seam beyond the completed A1.9 change preview route, the ingest spine beyond the completed G1.5 bounded queue history seam, or the art-lab beyond the completed V1.2 bounded comparison seam
+- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, G1.4 local resumable queue work, G1.5 queue history work, V1.1 asset formal metrics work, V1.2 bounded comparison work, or 2E.1 constitution shell work
 

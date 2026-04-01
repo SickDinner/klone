@@ -27,6 +27,7 @@ from .schemas import (
     ArtAssetMetricsRecord,
     AssetRecord,
     AuditEventRecord,
+    ConstitutionSnapshotRecord,
     DatasetIngestRequest,
     DatasetRecord,
     GovernanceGuardRecord,
@@ -69,6 +70,7 @@ from .schemas import (
     RoomRecord,
     RuntimeConfigRecord,
 )
+from .services import ServiceContainer
 
 
 router = APIRouter(prefix="/api")
@@ -76,6 +78,10 @@ router = APIRouter(prefix="/api")
 
 def get_repository(request: Request) -> KloneRepository:
     return request.app.state.repository
+
+
+def get_service_container(request: Request) -> ServiceContainer:
+    return request.app.state.services
 
 
 def get_runtime_settings(request: Request) -> Settings:
@@ -568,6 +574,13 @@ def status(request: Request, repository: KloneRepository = Depends(get_repositor
 @router.get("/blueprint")
 def blueprint() -> dict:
     return SYSTEM_BLUEPRINT.to_dict()
+
+
+@router.get("/constitution", response_model=ConstitutionSnapshotRecord)
+def constitution_snapshot(
+    services: ServiceContainer = Depends(get_service_container),
+) -> ConstitutionSnapshotRecord:
+    return services.constitution.snapshot()
 
 
 @router.get("/modules")

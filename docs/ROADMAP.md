@@ -230,7 +230,17 @@ Bounded Batch Art Metrics and Longitudinal Comparison:
 - expose ordered side-by-side metric values plus simple first-to-last metric deltas only
 - no OCR, no embeddings, no semantic similarity, no clustering, no profiling, no batch writeback, and no /v1 expansion
 
+## Phase 2E.1
+Read-Only Constitution Layer Shell:
+- GET /api/constitution
+- read-only constitution snapshot only
+- expose slow-cycle parameter defaults, approval state, and append-only change notes
+- keep constitution state separate from memory rows, ingest evidence, and room-scoped query results
+- surface constitution seam visibility through Mission Control and /v1/capabilities
+- no write route, no live routing influence, no self-modification loop, and no agent authority expansion in this phase
+
 ## Not approved yet
+- post-2E.1 constitution expansion
 - post-V1.2 art-lab expansion
 - semantic search
 - embeddings

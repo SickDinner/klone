@@ -6,6 +6,7 @@ import json
 from .art import ArtLabService
 from .audit import AuditService
 from .blueprint import SYSTEM_BLUEPRINT
+from .constitution import ConstitutionService
 from .guards import governance_guard_catalog, output_guard
 from .memory import MemoryService
 from .repository import KloneRepository
@@ -681,6 +682,7 @@ class ServiceContainer:
     audit: AuditService
     blob: BlobService
     art: ArtLabService
+    constitution: ConstitutionService
     object_envelope: _ObjectEnvelopeProjector
 
     @classmethod
@@ -691,6 +693,7 @@ class ServiceContainer:
             audit=AuditService(repository),
             blob=BlobService(repository),
             art=ArtLabService(repository),
+            constitution=ConstitutionService(),
             object_envelope=_ObjectEnvelopeProjector(repository),
         )
 
@@ -710,6 +713,7 @@ class ServiceContainer:
             ),
             self.blob.seam_descriptor(),
             self.art.seam_descriptor(),
+            self.constitution.seam_descriptor(),
             self.object_envelope.seam_descriptor(),
         ]
 
@@ -731,6 +735,7 @@ class ServiceContainer:
             *self.memory.public_capabilities(),
             *self.blob.public_capabilities(),
             *self.art.public_capabilities(),
+            *self.constitution.public_capabilities(),
             *self.object_envelope.public_capabilities(),
             PublicCapabilityRecord(
                 id="audit.preview.read",

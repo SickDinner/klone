@@ -19,6 +19,7 @@
 
 Nykyinen kanoninen tila on:
 
+- `Phase 2E.1 read-only constitution shell complete`
 - `Phase A1 approved`
 - `A1.1 public control-plane seam kickoff complete`
 - `A1.2 append-only audit chain foundation complete`
@@ -88,6 +89,8 @@ Uutta tässä versiossa:
   `GET /api/art/assets/compare` vertailee rajatun saman huoneen image-asset-joukon samoilla deterministisillä formaalimittareilla ja näyttää ajan mukaan järjestetyt mittarit sekä ensimmäisestä viimeiseen lasketut delta-arvot
 - `mission control art metrics`
   Asset Detail -paneelin alla näkyy nyt Art Metrics -kortti, joka analysoi valitun image-assetin read-only-tilassa ja kertoo selvästi, jos asset ei ole kuva
+- `constitution layer shell`
+  `GET /api/constitution` näyttää nyt hitaasti muuttuvat malliparametrit, approval-tilan ja append-only muutosmuistiinpanot erillään memorystä
 
 Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, joka näkyy käyttöliittymässä asti:
 
@@ -107,6 +110,8 @@ Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, j
   asset-backed formal metrics for selected image assets without pseudo-clinical interpretation
 - `memory explorer UI`
   room-scoped events, episodes, detail-paneeli, provenance lens, context payload ja bounded read-only answer preview
+- `constitution UI`
+  read-only constitution snapshot näkyy Mission Controlissa omana kerroksenaan ennen write- tai routing-vaikutuksia
 - `memory context APIs`
   read-only context package, LLM context payload ja source-linked answer route
 
@@ -199,6 +204,7 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 - `GET /api/rooms`
 - `GET /api/permission-levels`
 - `GET /api/governance/guards`
+- `GET /api/constitution`
 - `GET /api/datasets`
 - `GET /api/assets`
 - `GET /api/assets/{asset_id}`
@@ -233,9 +239,9 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ## Seuraavat järkevät rakennusvaiheet
 
-1. Seuraava post-A1/G1/V1-vaihe vasta erillisellä hyväksynnällä kanonisissa docs-tiedostoissa.
-2. Art and Drawing Labin seuraava askel vasta erillisellä hyväksynnällä V1.2:n jälkeen: laajempi comparison-UX, batch-profiling, OCR, embeddings tai piirroskohtainen klusterointi.
-3. Memory Explorerin jatko A1.9:n jälkeen: provenance-UX, change-preview-linkitys, kontekstin parempi visualisointi ja selaintason smoke-testit.
-4. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
-5. Constitution Layer: hitaasti muuttuvat parametrit, provenance ja change logit.
+1. Seuraava post-2E.1/A1/G1/V1-vaihe vasta erillisellä hyväksynnällä kanonisissa docs-tiedostoissa.
+2. Constitution Layerin seuraava askel vasta erillisellä hyväksynnällä 2E.1:n jälkeen: write-surface, live routing influence tai approval workflow.
+3. Art and Drawing Labin seuraava askel vasta erillisellä hyväksynnällä V1.2:n jälkeen: laajempi comparison-UX, batch-profiling, OCR, embeddings tai piirroskohtainen klusterointi.
+4. Memory Explorerin jatko A1.9:n jälkeen: provenance-UX, change-preview-linkitys, kontekstin parempi visualisointi ja selaintason smoke-testit.
+5. Genomics Lab: raw intake, normalisointi, annotation sandbox ja supervisor-gated summaries.
 6. Syvempi ingest: OCR, transkriptio, extraction pipeline -tilat ja parempi dedup, mutta ei ennen seuraavan ingest-vaiheen erillistä hyväksyntää.

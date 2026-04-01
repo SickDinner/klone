@@ -11,6 +11,7 @@ const state = {
   ingestQueueHistory: null,
   ingestPreview: null,
   ingestManifest: null,
+  constitution: null,
   assets: [],
   selectedAsset: null,
   artMetrics: null,
@@ -307,6 +308,71 @@ function renderModules(modules) {
       `,
     )
     .join("");
+}
+
+function renderConstitution(constitution) {
+  const root = document.querySelector("#constitution-detail");
+  if (!constitution) {
+    root.className = "detail-card empty-state";
+    root.textContent = "No constitution shell loaded yet.";
+    return;
+  }
+
+  const parameterMarkup = constitution.parameters?.length
+    ? `<ul class="manifest-list">${constitution.parameters
+        .map(
+          (item) =>
+            `<li><strong>${escapeHtml(item.key)}</strong>: ${escapeHtml(item.value)} <span class="table-subtitle">${escapeHtml(
+              item.category,
+            )} | range ${escapeHtml(item.min_value)}-${escapeHtml(item.max_value)}</span><div>${escapeHtml(
+              item.description,
+            )}</div></li>`,
+        )
+        .join("")}</ul>`
+    : '<div class="empty-state">No constitution parameters are visible yet.</div>';
+
+  const changeMarkup = constitution.recent_changes?.length
+    ? `<ul class="manifest-list">${constitution.recent_changes
+        .map(
+          (item) =>
+            `<li><strong>${escapeHtml(item.version)}</strong>: ${escapeHtml(item.summary)} <span class="table-subtitle">${escapeHtml(
+              formatTime(item.changed_at),
+            )} by ${escapeHtml(item.actor)}</span><div>${escapeHtml(item.effect_scope)}</div></li>`,
+        )
+        .join("")}</ul>`
+    : '<div class="empty-state">No constitution change log is visible yet.</div>';
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>Constitution Snapshot</h3>
+    <p>${escapeHtml(constitution.summary)}</p>
+    <div class="meta">${chips([
+      `profile_id: ${constitution.profile_id}`,
+      `layer_version: ${constitution.layer_version}`,
+      `approval_state: ${constitution.approval_state}`,
+      `read_only: ${constitution.read_only}`,
+      `routing_influence_enabled: ${constitution.routing_influence_enabled}`,
+      `parameters: ${constitution.parameter_count}`,
+      `changes: ${constitution.change_count}`,
+    ])}</div>
+    <div class="preview-grid">
+      <section class="preview-block">
+        <h4>Parameters</h4>
+        ${parameterMarkup}
+      </section>
+      <section class="preview-block">
+        <h4>Recent Changes</h4>
+        ${changeMarkup}
+      </section>
+    </div>
+    <section class="preview-block warning-list">
+      <h4>Notes and Warnings</h4>
+      <ul class="manifest-list">
+        ${constitution.notes.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+        ${constitution.warnings.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+      </ul>
+    </section>
+  `;
 }
 
 function renderAgents(agents) {
@@ -1453,7 +1519,7 @@ async function refreshMemoryExplorer(event) {
 }
 
 async function refreshMissionControl() {
-  const [blueprint, status, rooms, guards, datasets, audit, ingestStatus, ingestQueue] = await Promise.all([
+  const [blueprint, status, rooms, guards, datasets, audit, ingestStatus, ingestQueue, constitution] = await Promise.all([
     fetchJson("/api/blueprint"),
     fetchJson("/api/status"),
     fetchJson("/api/rooms"),
@@ -1462,6 +1528,7 @@ async function refreshMissionControl() {
     fetchJson("/api/audit"),
     fetchJson("/api/ingest/status"),
     fetchJson("/api/ingest/queue"),
+    fetchJson("/api/constitution"),
   ]);
 
   state.blueprint = blueprint;
@@ -1472,6 +1539,7 @@ async function refreshMissionControl() {
   state.audit = audit;
   state.ingestStatus = ingestStatus;
   state.ingestQueue = ingestQueue;
+  state.constitution = constitution;
 
   renderMission(blueprint);
   renderStatusCards(status);
@@ -1479,6 +1547,7 @@ async function refreshMissionControl() {
   renderRooms(rooms);
   renderGuards(guards);
   renderAudit(audit);
+  renderConstitution(constitution);
   renderModules(blueprint.modules);
   renderAgents(blueprint.agents);
   renderPhases(blueprint.build_phases);

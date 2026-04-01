@@ -183,7 +183,7 @@ class DialogueCorpusAnalysisRequest(BaseModel):
 class DialogueCorpusSourceRecord(BaseModel):
     label: str
     path: str
-    thread_json_count: int
+    record_count: int
     status: str
     selected: bool
 

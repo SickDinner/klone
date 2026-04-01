@@ -1,0 +1,887 @@
+# KLONE-kokonaisarvio
+
+Päiväys: 2026-04-01
+Tarkastettu hakemisto: C:\klone
+Raportin tarkoitus: antaa mahdollisimman tarkka, kokonaisvaltainen ja arvioitava kuva siitä, mitä Klone-projektissa on oikeasti tehty, miten ehjää koodi on, mikä on kanoninen tila, mikä on repo reality, mitä puuttuu, missä on driftia ja mihin projekti on menossa.
+
+Tarkeä rehellisyysraja:
+Tämä raportti kattaa kaiken tarkastettavissa olleen aineiston tässä koneessa ja tässä repossa:
+- lähdekoodi
+- testit
+- docs-kansio
+- git-historia
+- SQLite-tietokanta
+- live-HTTP-pinta paikallisessa palvelussa
+- clone chatin paikallinen bounded ajo
+
+Se ei voi väittää tietävänsä mitään sellaista, mitä reposta, datasta tai ajosta ei oikeasti löytynyt. Mutta kaiken tarkastettavissa olevan perusteella tämä on erittäin kattava repo reality -selonteko.
+
+
+## 1. Yhden kappaleen tuomio
+
+Klone ei ole enää pelkkä idea, slideshow tai puolivillainen "AI-agentti"-demo, vaan oikea paikallinen FastAPI-sovellus, jolla on oma SQLite-pohjainen persistence-kerros, käyttöliittymä, vaiheistettu arkkitehtuuri, eksplisiittiset governance-rajat, room-scope, audit trail, read-only memory/context/answer -pinta, bounded dialogue corpus -analyysi, toimiva clone chat, art-metrics-seam, constitution shell, /v1 control-plane seam ja jopa varhainen simulation/board/world-memory -projection layer. Koodi on kokonaisuutena yllättävän ehjää tutkimusprototyypiksi. Suurin ongelma ei ole rikkinäisyys vaan se, että projekti on kasvanut isoksi in-process-monoliitiksi, dokumentaatio ei ole joka kohdassa täysin ajan tasalla repo realityyn nähden, ja osa toteutetuista ominaisuuksista on paikallisessa tietokannassa vasta "rakennettu ja testattu", ei vielä oikealla datalla pitkälle asutettu.
+
+
+## 2. Mitä tämä projekti oikeasti on
+
+Klone on local-first, governance-first, supervisor/hypervisor-ajatteluun rakennettu "personal synthetic cognition stack". Sen ydinidea ei ole yksi kaikkitietävä botti, vaan kerroksellinen järjestelmä:
+- ingest/index spine
+- rooms ja permissions
+- deterministic guards
+- audit trail
+- memory spine
+- bounded read-only context/answer surfaces
+- dialogue corpus analysis
+- clone chat
+- art and drawing metrics
+- constitution shell
+- public /v1 control plane
+- simulation projections
+
+Arkkitehtuurin todellinen selkäranka on tämä:
+- evidence immutability
+- room scoping
+- replay on sisäinen
+- correction without deletion
+- governance before intelligence
+- read-only public memory API
+- provenance first
+
+Nämä eivät ole vain docs-puhetta. Ne näkyvät koodissa, skeemoissa, testeissä ja route-rajoissa.
+
+
+## 3. Kovat faktat reposta
+
+Git-tila auditin aikana:
+- branch: `main`
+- HEAD: `2b99dd4 chore(repository): capture clone chat startup logs`
+- `origin/main`: `55ce550 fix(chat): keep clone room usable without zooming`
+- local branch oli auditin aikana 1 commit edellä remotea
+- auditin lopussa worktree ei ollut puhdas
+- muokattuna näkyivat:
+  - `chat_server.out.log`
+  - `src/klone/api.py`
+  - `src/klone/dialogue.py`
+  - `src/klone/schemas.py`
+  - `src/klone/simulation.py`
+  - `src/klone/static/chat.css`
+  - `src/klone/static/chat.html`
+  - `src/klone/static/chat.js`
+- taman raportin lisaksi uusi tiedosto on `haaste.txt`
+- en revertannut naita muutoksia; raportti perustuu siihen worktree-tilaan, joka oli luettavissa auditin aikana
+
+Git-historia:
+- committeja yhteensä: 127
+- git shortlogissa näkyi käytännössä yksi tekijä: `SickDinner`
+- käytännössä bus factor on tällä hetkellä 1
+
+Versiot:
+- app version: `0.2.0`
+- bootstrap version: `b00.1`
+- schema version string: `phase_2b_4_memory_correction`
+- huomio: schema version ei kuvaa koko nykyistä feature-pintaa, vaan lähinnä viimeisintä merkittävää skeemavaihetta; tämä voi hämätä ulkopuolista lukijaa
+
+Koodimäärä:
+- source Python files: 22
+- source Python lines: 14199
+- static frontend files: 6
+- static frontend lines: 4112
+- test files: 32
+- test lines: 8942
+- docs files: 20
+- docs lines: 4247
+
+Suurimmat Python-tiedostot:
+- `repository.py`: 2830 riviä
+- `memory.py`: 2379 riviä
+- `dialogue.py`: 2211 riviä
+- `api.py`: 1257 riviä
+- `schemas.py`: 1184 riviä
+- `services.py`: 833 riviä
+- `ingest.py`: 735 riviä
+- `simulation.py`: 689 riviä
+
+Tämä kertoo kaksi asiaa samaan aikaan:
+- projektissa on paljon oikeaa toteutusta
+- maintainability-riski kasvaa, koska kriittinen logiikka on jo keskittynyt isoihin tiedostoihin
+
+Riippuvuudet ovat pienet:
+- fastapi
+- starlette
+- uvicorn
+- pillow
+
+Tämä on hyvä merkki: projekti ei nojaa valtavaan framework-viidakkoon.
+
+
+## 4. Mitä on rakennettu vaiheittain
+
+### Bedrock / bootstrap
+
+Testit `test_bedrock_b00_1.py` ja `test_bedrock_b00_2.py` osoittavat, että:
+- startup bootstrap näkyy ulospain
+- bootstrap-run tallennetaan
+- repeated startup näkyy järjestetyn run-historyn kautta
+- runtime-tila, schema-tila ja module registry surface on eksplisiittinen
+
+Toisin sanoen projekti ei ala "sovellus vain käynnistyy jotenkin", vaan jo bootstrap näkyy hallitusti.
+
+
+### Phase 2A: ingest/index/governance spine
+
+Tästä on rakennettu oikea toimiva runko:
+- dataset ingest
+- recursive file scan
+- asset classification
+- sha256 hashing
+- dataset- ja asset-persistenssi SQLiteen
+- ingest_runs
+- audit_events
+- room registry
+- deterministic guards
+- mission control UI
+
+Rakenteet:
+- `contracts.py`
+- `schemas.py`
+- `rooms.py`
+- `guards.py`
+- `ingest.py`
+- `repository.py`
+- `api.py`
+- `static/`
+
+Tämä vaihe on selvästi toteutettu eikä enää teoreettinen.
+
+
+### Phase 2B.1 - 2B.5: memory spine, provenance, correction, replay, stress
+
+Memory-kerros ei ole enää pelkkä taulunimi. Repoon on rakennettu:
+- memory_events
+- memory_entities
+- memory_episodes
+- memory_provenance
+- replay / reseed
+- correction state
+- supersession
+- correction-aware detail/list reads
+- invarianssit stressitestein
+
+Testit:
+- `test_memory_phase_2b2.py`
+- `test_memory_phase_2b3.py`
+- `test_memory_phase_2b5.py`
+
+Näiden perusteella memory-runko on teknisesti yksi projektin vahvimmista osista.
+
+
+### Phase 2C.1 - 2C.5: retrieval, context, provenance detail, bounded answer, public read-only delivery
+
+Tämä linja on oikeasti valmis ja testattu:
+- room-scoped memory event query
+- room-scoped episode query
+- deterministic ordering and pagination
+- provenance summary
+- provenance detail
+- context package assembly
+- deterministic LLM context payload
+- bounded read-only answer generation
+- public context routes
+- Memory Explorer UI
+
+Testit:
+- `test_memory_phase_2c1.py`
+- `test_memory_phase_2c1_provenance.py`
+- `test_memory_phase_2c2.py`
+- `test_memory_phase_2c3.py`
+- `test_memory_phase_2c4.py`
+- `test_memory_phase_2c5.py`
+
+Tässä kohtaa Klone ylittää selvästi "muistidemo"-tason ja muuttuu governed retrieval/context -järjestelmäksi.
+
+
+### Phase 2B.6 - 2B.8: dialogue corpus, bounded Q&A, clone chat
+
+Rakennettu:
+- `POST /api/dialogue-corpus/analyze`
+- `POST /api/dialogue-corpus/answer`
+- paikallinen `klone` CLI
+- `GET /chat`
+- `GET /api/clone-chat/status`
+- `POST /api/clone-chat/respond`
+
+Tärkeä pointti:
+- tämä ei ole raw semantic search
+- tämä ei kirjoita muistia
+- tämä ei tee embeddings/OCR/transcriptio/psykologisointia
+- tämä vastaa bounded aggregate evidence -tasolla
+
+Lisäksi clone chat toimii kahdessa tilassa:
+- bounded local
+- optional GPT-5.4 rendering OpenAI Responses API:n kautta, jos `OPENAI_API_KEY` on asetettu
+
+Tällä koneella:
+- `OPENAI_API_KEY` ei ollut asetettu
+- bounded local mode toimi oikeasti
+- `C:\META` löytyi
+- corpus analysoitiin onnistuneesti
+- clone chat vastasi oikeasta paikallisesta Messenger-exportista
+
+Tämä on iso osoitus siitä, että kyse ei ole UI-shellistä vaan toimivasta local dialogue layerista.
+
+
+### Phase A1.1 - A1.9: versioned public control-plane seam
+
+Tämä on yksi projektin kypsimmistä osista.
+
+Rakennettu:
+- request context middleware
+- `request_id`, `trace_id`, `principal`, `actor_role`
+- explicit service seams
+- `GET /v1/capabilities`
+- append-only control-plane audit chain
+- local blob metadata shell
+- object envelope shell
+- `POST /v1/rooms/{room_id}/objects/get`
+- `POST /v1/rooms/{room_id}/query`
+- `GET /v1/rooms/{room_id}/blobs/{blob_id}/meta`
+- `GET /v1/rooms/{room_id}/changes`
+- stable contract shells: object, query, change, blob
+
+Tämä on tärkeää, koska projekti ei vain kasaa ominaisuuksia, vaan rakentaa samalla versionoidun, dokumentoidun julkisen seam-kerroksen.
+
+
+### Phase G1.1 - G1.5: governed ingest spine extension
+
+Rakennettu:
+- ingest preflight manifest
+- ingest run manifest history
+- local ingest queue
+- explicit execute
+- explicit cancel
+- resumable interrupted-job behavior
+- queue history surface
+
+Tämä on hyvin kurinalainen toteutus:
+- ei background worker -sirkusta
+- ei automaattista resumea
+- ei hypeä
+- vain bounded local control
+
+Mutta tärkeä nykytila-huomio:
+- paikallinen DB ei tällä hetkellä sisällä yhtään queue-jobia
+- ingest run manifest -taulu on tällä hetkellä tyhjä
+- eli feature on olemassa koodissa ja testeissä, mutta nykyinen live-data ei vielä näytä sitä käytössä
+
+
+### Phase V1.1 - V1.2: art metrics ja bounded comparison
+
+Rakennettu:
+- `GET /api/art/assets/{asset_id}/metrics`
+- `GET /api/art/assets/compare`
+- formal deterministic metrics
+- same-room comparison
+- explicit non-image rejection
+- UI-paneelit Mission Controlissa
+
+Tärkeä nykytila-huomio:
+- nykyisessä DB:ssä ei ole yhtään image-assetia
+- kaikki 5 assetia ovat tekstifilejä
+- art-metrics route vastaa oikein virheellä: "Formal art metrics currently support image assets only."
+
+Johtopäätös:
+- art-linja ei ole rikki
+- se on rakennettu ja testattu
+- mutta nykyinen live-data ei vielä demonstroi sitä täysillä
+
+
+### Phase 2E.1: constitution layer shell
+
+Rakennettu:
+- `GET /api/constitution`
+- read-only slow-cycle parameter snapshot
+- append-only change notes
+- approval state
+- selkeä erotus memoryyn ja ingestiin
+
+Tällä koneella constitution palautti:
+- 7 parametria
+- 1 change recordin
+- `read_only = true`
+- `routing_influence_enabled = false`
+
+Tämä on hyvä ja kurinalainen ratkaisu: constitution on näkyvissä, mutta sillä ei vielä ole live authoritya.
+
+
+### Repo realityn lisähaara: simulation / S1.1
+
+Tämä on erittäin tärkeä havainto.
+
+Repo sisältää oikeaa simulation-koodia:
+- `GET /api/simulation/hybrid-board`
+- `GET /api/simulation/hybrid-board/squares/{row_id}/{column_id}`
+- `GET /api/simulation/world-memory`
+- `SimulationService`
+- `HybridMemoryBoardService`
+- `WorldMemoryService`
+- UI-paneelit boardille ja world-memorylle
+- testi `test_phase_s1_1.py`
+
+Testi varmistaa:
+- board on 64 ruutua
+- read-only
+- deterministic
+- käyttää audit + memory event + episode -lähteitä
+- world-memory shell on deterministic
+
+Mutta:
+- simulation-linja ei näy samalla tavoin kanonisessa `PROJECT_STATUS` / `ROADMAP` / `HANDOFF_CURRENT` -kolmikossa kuin 2B/A1/G1/V1/2E-linjat
+- README ei listaa simulation-routeja nykyisessä API-listassa
+
+Tämä tarkoittaa:
+- simulation on repo realitya
+- se ei ole pelkkä ajatus
+- mutta sen kanoninen vaiheistus on dokumentaatiotasolla driftissä
+
+
+## 5. Arkkitehtuuri käytännössä
+
+### Trust zones
+
+4 trust zonea:
+- public
+- personal
+- intimate
+- restricted_bio
+
+### Rooms
+
+5 huonetta:
+- `public-room`
+- `restricted-room`
+- `sealed-room`
+- `sandbox-room`
+- `debug-room`
+
+Nämä eivät ole vain koristeita. Permissionit, roolit ja audit visibility on määritelty eksplisiittisesti.
+
+### Guards
+
+4 guardia:
+- `AccessGuard`
+- `ClassificationGuard`
+- `AuditGuard`
+- `OutputGuard`
+
+### Service seams
+
+`/v1/capabilities` ja `ServiceContainer` paljastavat nämä seamit:
+- MemoryFacade
+- PolicyService
+- SimulationService
+- AuditService
+- BlobService
+- ArtLabService
+- ConstitutionService
+- DialogueCorpusService
+- ObjectEnvelopeService
+
+### Blueprint / module registry
+
+Moduleja näkyy 15:
+- mission-control
+- hypervisor
+- rooms-layer
+- memory-core
+- dialogue-corpus
+- media-lake
+- art-lab
+- genomics-lab
+- constitution-layer
+- simulation-lab
+- circadian-layer
+- sensory-layer
+- instinct-router
+- knowledge-graph
+- structural-bio
+
+Agentteja näkyy 8:
+- hypervisor
+- teacher
+- media-supervisor
+- memory-supervisor
+- art-supervisor
+- genomics-supervisor
+- simulation-supervisor
+- ingest-worker
+
+Tästä näkee, että repo on jo paljon enemmän kuin yksi CRUD-palvelin.
+
+
+## 6. API:n oikea laajuus
+
+Lähdekoodissa on 51 HTTP-endpointia:
+- `api.py`: 44
+- `v1_api.py`: 5
+- `main.py`: 2 (`/` ja `/chat`)
+
+README:n API-lista sisältää 44 entryä.
+
+Se tarkoittaa, että README ei kerro koko totuutta nykyisestä source surfacesta.
+
+Olennaiset README:stä puuttuvat tai vajaasti näkyvät asiat:
+- `/api/art/assets/compare`
+- `/api/simulation/hybrid-board`
+- `/api/simulation/hybrid-board/squares/{row_id}/{column_id}`
+- `/api/simulation/world-memory`
+- käytännössä myös root/dashboard ja `/chat` ovat osa tuotepintaa, vaikka eivät ole schema-listassa
+
+Tämä on dokumentaatiodriftia, ei välttämättä koodivirhe.
+
+
+## 7. Frontendin todellinen tila
+
+Mission Control ei ole mockup.
+
+`index.html` sisältää 11 pääsectionia ja 21 article-paneelia.
+UI:ssa näkyvät oikeasti:
+- Mission Control Summary
+- Dataset Intake
+- Dataset List
+- Dialogue Corpus
+- Indexed Asset Browser
+- Asset Detail
+- Art Metrics
+- Art Comparison
+- Room Registry
+- Governance Guards
+- Audit Preview
+- Memory Explorer
+- Episodes
+- Memory Detail
+- Provenance Lens
+- Context and Read-Only Answer
+- Constitution Layer
+- Modules
+- Hybrid Memory Board
+- World Memory Shell
+- Ingest Queue and Runs
+- Agents
+- Build Phases
+
+Lisäksi erillinen chat-UI:
+- `chat.html`
+- `chat.js`
+- `chat.css`
+
+`app.js` on 2363 riviä pitkä. Se on paljon, mutta se myös kertoo että UI on oikeasti integroitunut backendin kanssa eikä ole vain "placeholder shell".
+
+
+## 8. SQLite / nykyinen paikallinen datatila
+
+Taulut ja nykyiset rivimäärät auditin hetkellä:
+- `datasets`: 2
+- `assets`: 5
+- `ingest_runs`: 3
+- `audit_events`: 12
+- `control_plane_audit_chain`: 2
+- `internal_runs`: 13
+- `ingest_queue_jobs`: 0
+- `ingest_run_manifests`: 0
+- `memory_events`: 0
+- `memory_entities`: 0
+- `memory_episodes`: 0
+- `memory_provenance`: 0
+- `memory_event_entities`: 0
+- `memory_episode_events`: 0
+- `memory_event_supersessions`: 0
+
+Nykyiset datasetit:
+- `Docs Intake`
+- `Static Intake`
+
+Nykyiset assetit ovat kaikki tekstifilejä:
+- `docs/ARCHITECTURE.md`
+- `docs/DATA_GOVERNANCE.md`
+- `src/klone/static/app.js`
+- `src/klone/static/index.html`
+- `src/klone/static/styles.css`
+
+Johtopäätös:
+- ingest spine on oikeasti käytetty
+- audit spine on oikeasti käytetty
+- control-plane audit on oikeasti käytetty
+- mutta memory-kerros ei ole tällä nykyisellä DB:llä vielä "asunut sisään"
+- queue/manifests eivät näy nykyisessä datassa
+- art-metrics ei näy nykyisessä datassa kuvilla
+
+
+## 9. Live-ajon havainnot
+
+Paikallinen palvelu vastasi:
+- `/api/health`
+- `/api/status`
+- `/api/constitution`
+- `/api/clone-chat/status`
+- `/v1/capabilities`
+- `/api/rooms`
+- `/api/datasets`
+- `/api/assets`
+- `/api/simulation/hybrid-board`
+- `/api/simulation/world-memory`
+
+Tärkeä positiivinen havainto:
+- request context -headerit olivat oikeasti mukana vastauksissa:
+  - `x-request-id`
+  - `x-trace-id`
+  - `x-klone-principal`
+  - `x-klone-role`
+
+Eli A1.1-request-context ei ole vain paperilla.
+
+Chat-lokit:
+- `chat_server.err.log` näytti puhtaan käynnistyksen
+- `chat_server.out.log` sisälsi onnistuneita `/chat`- ja clone-chat-kutsuja
+- virhelogi ei sisältänyt näkyviä runtime-crasheja
+
+
+## 10. Dialogue corpus ja clone chat oikeassa käytössä
+
+Tämä on yksi vahvimmista todisteista siitä, että repo tekee jotain oikeasti hyödyllistä.
+
+`C:\META` löytyi.
+
+`POST /api/dialogue-corpus/analyze` palautti onnistuneen analyysin:
+- selected source path: yksi rikkain Messenger-export juuri
+- discovered roots: 5, joista 1 valittiin ja useat muut tunnistettiin partial-media-only-juuriksi
+- thread_count: 830
+- direct_thread_count: 769
+- group_thread_count: 51
+- unique_participant_count: 4206
+- message_count: 27733
+- timeline: 2020-02-12 -> 2024-09-29
+- recommended_room_id: `intimate`
+- recommended_classification_level: `intimate`
+- read_only: true
+
+`POST /api/clone-chat/respond` toimi ilman OpenAI-avainta bounded local -tilassa ja palautti oikean aggregate-evidence-vastauksen.
+
+Tämä kertoo:
+- dialogue-linja ei ole vain fake shell
+- corpus-discovery toimii
+- bounded-answer gating toimii
+- live local dataset on oikeasti hyodynnetty
+
+Mutta samalla rajoitukset pitavat:
+- ei memory writea
+- ei raw semantic retrievalia
+- ei embeddings
+- ei OCR/transcriptio
+- ei psykologista "totuutta"
+
+
+## 11. Testi- ja build-kunto
+
+Suoritettu auditissa:
+- `python -m compileall src tests`
+- `pytest -q`
+
+Tulokset:
+- compileall: onnistui
+- pytest: `119 passed in 35.71s`
+
+Tämä on erittäin vahva signaali.
+
+Lisäksi testien nimet osoittavat, että suite ei ole geneerinen "kaksi unit testia", vaan vaihekohtainen:
+- bedrock / bootstrap
+- memory b2/b3/b5
+- 2C.1 - 2C.5
+- 2B.6 - 2B.8
+- 2E.1
+- A1.1 - A1.9
+- G1.1 - G1.5
+- V1.1 - V1.2
+- S1.1 simulation
+
+Tämä on tavallista prototyyppiä vahvempi verify-kulttuuri.
+
+
+## 12. "Miten ehjää koodi on?" suora arvio
+
+### Kokonaisarvio
+
+Jos tätä arvioi rehellisesti tutkimus-/tuoteprototyyppina, koodi on selvästi ehjempaa kuin keskimääräinen ideaprojekti.
+
+Arvio:
+- arkkitehtuurinen kurinalaisuus: vahva
+- testattu read-only/governed ydin: vahva
+- tuotepinnan koherenssi: melko vahva
+- maintainability pitkalla aikavalilla: keskitaso
+- dokumentaation ja kanonisen tilan synkka: keskitaso
+- production hardening / deployment / scale posture: keskitaso tai alle
+
+Yhden lauseen muoto:
+Klone ei ole romukasa. Se on kunnianhimoinen, jo toimiva, hyvin vaiheistettu local-first cognition/control-plane -järjestelmä, jonka suurimmat riskit ovat laajuus, drift ja kasvava monoliittisuus, ei välitön rikkonaisuus.
+
+
+### Vahvuudet
+
+1. Invariant discipline on oikea.
+- evidence immutability
+- room scope
+- correction without deletion
+- provenance first
+- read-only public surfaces
+
+2. Testikate kertoo oikeasta vakaudesta.
+- 119 vihreää testiä
+- vaihekohtainen nimeaminen
+- UI-copy tests
+- API contract tests
+- deterministic behavior tests
+
+3. UI on oikea.
+- ei pelkka schema
+- oikea static frontend
+- Mission Control ja chat ovat aidosti kytkettyjä routeihin
+
+4. OpenAI-integraatio on varovainen.
+- optional
+- bounded fallback
+- ei suoraa memory authoritya
+
+5. Dependency footprint on pieni.
+- tämä on helpompi hallita kuin jos mukana olisi 20 ulkoista infraa
+
+6. Docs-kulttuuri on poikkeuksellisen kurinalainen.
+- `PROJECT_STATUS.md`
+- `HANDOFF_CURRENT.md`
+- `ROADMAP.md`
+- `DECISIONS.md`
+- agent playbook
+
+
+### Heikkoudet ja riskit
+
+1. Isoja tiedostoja on paljon.
+- `repository.py`
+- `memory.py`
+- `dialogue.py`
+- `api.py`
+- `app.js`
+
+Tama on ylläpidettavyysriski.
+
+2. Repo on edelleen in-process monolith.
+- service seams ovat olemassa
+- mutta toteutus on käytännössä vielä yksi paikallinen sovellus
+
+3. Dokumentaatio laahaa joissain kohdissa perässä.
+- README ei listaa simulation-routeja
+- README API-lista ei kata koko source surfacea
+- canonical docs eivät kuvaa simulation-linjaa yhtä eksplisiittisesti kuin muut vaiheet
+
+4. Module registry / blueprint sisältää vaihe-driftia.
+- `memory-core` stage näkyy `phase-2c4`, vaikka 2C.5 on valmis
+- `art-lab` stage näkyy `phase-2c`, vaikka kanoninen art-linja kulkee V1.1/V1.2 kautta
+- `simulation-lab` stage on `phase-3`, vaikka read-only projection routes ovat jo olemassa nyt
+
+Tämä ei riko runtimea, mutta hämää arvioijaa.
+
+5. Nykyinen live-data ei aktivoi kaikkia valmiita ominaisuuksia.
+- memory rows 0
+- queue jobs 0
+- run manifests 0
+- image assets 0
+
+Eli osa repo realitysta on tällä koneella enemmän "rakennettu ja testattu" kuin "käytössä täysillä".
+
+6. Repo hygiene -ongelma: runtime-logit ovat gitissä.
+- `chat_server.out.log`
+- `chat_server.err.log`
+
+Seuraukset:
+- työpuu likaantuu helposti
+- logien takia syntyy turhia committeja
+- HEAD:n uusin paikallinen commit on juuri log capture -tyyppinen commit
+
+7. `httpx` puuttuu testiympäristöstä.
+- Starlette/FastAPI `TestClient` ei toimi ilman asennusta
+- tämä ei riko sovellusta
+- mutta se on testausergonomian heikkous
+
+8. Repojuuressa on irrallinen apuskripti `apply_2c1_query_provenance_fix.py`.
+- se editoi tiedostoja
+- ajaa testin
+- tekee git add/commit/push
+
+Tämä on historiallisena artifactina ymmarrettava, mutta ei kuulu siistiin ydintuotteeseen.
+
+9. Git-historia on käytännössä yhden tekijän varassa.
+- iso osa tiedosta on yhden ihmisen päässä + docsissa
+
+
+## 13. Mitä ei ole vielä valmista
+
+Ei vielä valmista, vaikka monesta on shell tai blueprint:
+- genomics raw intake
+- structural biology layer
+- knowledge graph
+- circadian layer
+- sensory layer
+- instinct router
+- constitution write path
+- live routing influence constitutionista
+- autonomous agent layer
+- memory write path clone chatista
+- OCR / transcription / embeddings
+- production-grade distributed architecture
+- valmis "digital human"
+
+Lisäksi vaikka simulation-linja on jo todellinen, se on edelleen read-only projection eikä oma source-of-truth-kerros.
+
+
+## 14. Missä projekti on juuri nyt
+
+Jos tämä pitäisi nimetä yhdellä totuudenmukaisella lauseella:
+
+Klone on tällä hetkellä governed, local-first, vaiheistettu henkilökohtaisen AI-käyttöjärjestelmän runko, jossa ingest, audit, room governance, read-only memory/context surfaces, dialogue corpus, clone chat, art metrics, constitution shell, public /v1 control plane ja varhaiset simulation projections ovat oikeasti olemassa ja testatut, mutta varsinainen syvä memory-populaatio, genomics, structural-bio ja laajempi embodied/simulation-maailma ovat vielä seuraavien hyväksyttyjen vaiheiden takana.
+
+
+## 15. Mihin tämä on menossa
+
+Tästä on kaksi rinnakkaista totuutta:
+
+### Kanoninen totuus
+
+Canonical docs sanovat:
+- 2B.8 valmis
+- 2E.1 valmis
+- A1.9 valmis
+- G1.5 valmis
+- V1.2 valmis
+- ei seuraavaa hyväksyttyä laajennusaskelta ilman uutta approvalia
+
+Eli muodollisesti seuraava oikea liike ei ole "koodaa lisää mita vain", vaan seuraavan vaiheen hyväksyminen tai kanoninen ratifiointi.
+
+### Repo reality -totuus
+
+Repo reality sanoo:
+- simulation/board/world-memory on jo olemassa
+- clone chat toimii oikealla datalla
+- UI on laajempi kuin README antaa ymmärtää
+- projekti on jo selvästi matkalla kohti governed personal AI OS + multimodal + simulation -suuntaa
+
+### Pitkän linjan suunta
+
+`docs/KLONE_EXPANDED_VISION_ASSESSMENT_2026-04-01.md` osoittaa, että pidempi suunta on:
+- governed personal AI operating system
+- persistent memory and provenance machine
+- multimodal embodied clone stack
+- spatial world-memory layer
+- symbolic/cosmology/simulation layer
+
+Tärkeä arvio:
+Tämä visio ei ole irrallinen hulluus verrattuna koodiin. Sille on yllättävän paljon jo oikeaa perustaa:
+- rooms
+- audit
+- provenance
+- simulation supervisor -slotti
+- world-memory shell
+- hybrid board projection
+
+Mutta tämä suunta pysyy terveenä vain jos:
+- governance pysyy pohjalla
+- simulation pysyy evidencen paalla
+- myth ei korvaa causal logia
+- uusi phase hyväksytään ennen laajennusta
+
+
+## 16. Mitä suosittelen seuraavaksi
+
+Jos arvioijan pitää ymmärtää, mikä olisi järkevin seuraava siirto, suosittelen tätä prioriteettia:
+
+1. Kanonisoi tai jäädytä simulation-linja.
+- Nyt se on repo realityssa, testeissä ja UI:ssa
+- mutta ei täysin kanonisessa vaihekolmikossa
+
+2. Synkkaa docs source realityyn.
+- README:n API-lista ajan tasalle
+- module stage/status -driftit korjattava
+- selkeä ero kanonisen lane-ohjauksen ja historiallisten assessment-docsien välille
+
+3. Korjaa repo hygiene.
+- logit pois gitistä
+- `chat_server*.log` `.gitignore`en
+- irto-scriptit pois juuresta tai erilliseen maintenance-kansioon
+
+4. Lisää HTTP-smoke-ergonomia.
+- `httpx` dev-riippuvuuksiin
+- enemmän oikeita endpoint smoke -testejä
+
+5. Asuta nykyiset valmiit seamit oikealla datalla.
+- memory-tauluihin oikeaa sisältöä
+- yksi oikea image dataset
+- yksi oikea ingest manifest history
+- queue-lifecycle käytössä
+
+6. Vasta sen jälkeen uutta hyväksyttyä vaihetta:
+- genomics sandbox
+- deeper ingest
+- constitution write flow
+- simulation supervisor
+- clone interaction layerin laajennus
+
+
+## 17. Lopullinen kokonaisarvio
+
+Jos joku ulkopuolinen arvioi tätä repoa, tärkein oikea johtopäätös on tämä:
+
+Klone on jo nyt huomattavasti vakavampi ja teknisesti todellisempi projekti kuin tyypillinen "AI clone" -ajatus. Tämän vahvuus ei ole vain ominaisuuksien määrä, vaan se että ominaisuudet on rakennettu governance-first ja room-scoped -kurilla. Tämä näkyy kaikkialla: skeemoissa, routeissa, testeissä, docsissa ja jopa siinä, mitä järjestelmä tarkoituksella EI vielä tee.
+
+Tämä ei silti ole valmis digitaalinen ihminen.
+
+Se on tällä hetkellä:
+- vahva local-first research platform
+- governed control plane
+- read-only memory/context/answer system
+- bounded dialogue clone shell
+- art-metrics shell
+- constitution shell
+- early simulation projection system
+
+Suurin uhka ei ole tekninen romahtaminen, vaan hallitsematon scope creep, dokumentaation drift ja monoliitin kasvava ylläpitokuorma.
+
+Suurin vahvuus ei ole "älykkyys", vaan rakenteellinen kuri.
+
+Siksi paras rehellinen loppulause on:
+
+Klone on jo rakennettu oikeaksi järjestelmäksi. Se ei ole vielä valmis olento, mutta se on erittäin vakavasti otettava, toimiva, testattu ja poikkeuksellisen kurinalainen pohja sellaisen suuntaan.
+
+
+## 18. Auditin pohjana käytetty konkreettinen evidence
+
+Tämän raportin takana tarkastettiin:
+- `README.md`
+- `pyproject.toml`
+- `docs/PROJECT_STATUS.md`
+- `docs/ROADMAP.md`
+- `docs/HANDOFF_CURRENT.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DATA_GOVERNANCE.md`
+- `docs/DECISIONS.md`
+- `docs/REPO_REALITY_DEEP_DIVE_2026-03-28.md`
+- `docs/NEXT_STEPS_ASSESSMENT_2026-03-28.md`
+- `docs/KLONE_EXPANDED_VISION_ASSESSMENT_2026-04-01.md`
+- `docs/PHASE_2A_HANDOFF.md`
+- `docs/AGENT_PLAYBOOK.md`
+- `docs/SUPERVISOR_CLOSEOUT_2C1.md`
+- koko `src/klone/`
+- koko `tests/`
+- SQLite DB `data/klone_mission_control.db`
+- live route-ajot paikalliselle palvelulle
+- `pytest -q`
+- `python -m compileall src tests`
+- git status / git log / git show / git shortlog
+
+Tama raportti on siis kirjoitettu repo realityn, ei toiveajattelun, perusteella.

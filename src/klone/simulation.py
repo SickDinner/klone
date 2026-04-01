@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+from collections import Counter
 from dataclasses import dataclass, field
 import hashlib
+import json
 import math
 
 from .memory import MemoryService
@@ -13,10 +14,16 @@ from .schemas import (
     HybridBoardSourceTotalsRecord,
     HybridBoardSquareDetailRecord,
     HybridBoardSquareRecord,
+    HybridBoardWorldMemoryClusterRefRecord,
+    HybridBoardWorldMemoryNodeRefRecord,
     HybridMemoryBoardRecord,
+    WorldMemoryClusterDetailRecord,
     WorldMemoryClusterRecord,
+    WorldMemoryNodeDetailRecord,
     WorldMemoryNodeRecord,
+    WorldMemoryPlaceShellRecord,
     WorldMemoryRecord,
+    WorldMemorySquareLinkRecord,
 )
 
 
@@ -80,6 +87,102 @@ class _SquareAccumulator:
             self.last_touched_at = value
 
 
+@dataclass(frozen=True)
+class _WorldMemorySquareRef:
+    square_id: str
+    row_id: str
+    column_id: str
+    title: str
+    weight: float
+
+
+@dataclass(frozen=True)
+class _WorldMemoryPlaceShell:
+    stage: str
+    eligible: bool
+    depth_candidate: bool
+    place_score: float
+    rationale: str
+    cues: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _WorldMemoryNodeProjection:
+    node_id: str
+    cluster_id: str
+    room_id: str
+    dataset_id: int
+    dataset_label: str
+    asset_id: int
+    asset_kind: str
+    anchor_type: str
+    label: str
+    relative_path: str
+    file_name: str
+    size_bytes: int
+    intensity: float
+    indexed_at: str
+    fs_modified_at: str
+    metadata: dict[str, object] | None
+    linked_square: _WorldMemorySquareRef
+    place_shell: _WorldMemoryPlaceShell
+
+
+@dataclass
+class _WorldMemoryClusterAccumulator:
+    cluster_id: str
+    room_id: str
+    dataset_id: int
+    dataset_label: str
+    anchor_prefix: str
+    label: str
+    nodes: list[_WorldMemoryNodeProjection] = field(default_factory=list)
+    asset_kind_counter: Counter[str] = field(default_factory=Counter)
+    linked_square_weights: dict[str, float] = field(default_factory=dict)
+    linked_square_refs: dict[str, _WorldMemorySquareRef] = field(default_factory=dict)
+    recent_indexed_at: str | None = None
+
+    def add_node(self, node: _WorldMemoryNodeProjection) -> None:
+        self.nodes.append(node)
+        self.asset_kind_counter[node.asset_kind] += 1
+        self.linked_square_weights[node.linked_square.square_id] = (
+            self.linked_square_weights.get(node.linked_square.square_id, 0.0) + node.linked_square.weight
+        )
+        self.linked_square_refs[node.linked_square.square_id] = node.linked_square
+        if self.recent_indexed_at is None or node.indexed_at > self.recent_indexed_at:
+            self.recent_indexed_at = node.indexed_at
+
+    @property
+    def node_count(self) -> int:
+        return len(self.nodes)
+
+    @property
+    def dominant_asset_kind(self) -> str:
+        if not self.asset_kind_counter:
+            return "generic"
+        return self.asset_kind_counter.most_common(1)[0][0]
+
+    @property
+    def place_score(self) -> float:
+        if not self.nodes:
+            return 0.0
+        return round(sum(node.place_shell.place_score for node in self.nodes) / len(self.nodes), 4)
+
+    @property
+    def image_candidate_count(self) -> int:
+        return sum(1 for node in self.nodes if node.place_shell.eligible)
+
+    @property
+    def depth_candidate_count(self) -> int:
+        return sum(1 for node in self.nodes if node.place_shell.depth_candidate)
+
+    def primary_square(self) -> _WorldMemorySquareRef | None:
+        if not self.linked_square_weights:
+            return None
+        square_id = max(self.linked_square_weights.items(), key=lambda item: (item[1], item[0]))[0]
+        return self.linked_square_refs.get(square_id)
+
+
 BOARD_ROWS: tuple[_AxisDefinition, ...] = (
     _AxisDefinition("limbo", "Limbo", "Threshold states, staging, ingress, and unresolved intake."),
     _AxisDefinition("lust", "Lust", "Attraction, contact, interaction, and sensory pull."),
@@ -103,49 +206,103 @@ BOARD_COLUMNS: tuple[_AxisDefinition, ...] = (
 )
 
 ROW_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "limbo": ("ingest", "scan", "bootstrap", "discover", "preflight", "manifest", "seed"),
-    "lust": ("dialogue", "message", "conversation", "voice", "audio", "visual", "sensory"),
-    "gluttony": ("dataset", "corpus", "media", "image", "video", "archive", "asset"),
-    "greed": ("duplicate", "dedup", "retention", "ownership", "collection", "blob", "object"),
+    "limbo": ("ingest", "scan", "bootstrap", "discover", "preflight", "manifest", "seed", "threshold"),
+    "lust": ("dialogue", "message", "conversation", "voice", "audio", "visual", "sensory", "contact"),
+    "gluttony": ("dataset", "corpus", "media", "image", "video", "archive", "asset", "scene"),
+    "greed": ("duplicate", "dedup", "retention", "ownership", "collection", "blob", "object", "holding"),
     "wrath": ("reject", "denied", "error", "fail", "cancel", "interrupt", "supersed", "conflict"),
     "envy": ("compare", "delta", "contrast", "diff", "relation", "ranking", "lineage"),
-    "sloth": ("queue", "queued", "pending", "defer", "idle", "paused", "waiting"),
+    "sloth": ("queue", "queued", "pending", "defer", "idle", "paused", "waiting", "staged"),
     "pride": ("constitution", "approval", "policy", "guard", "control", "hypervisor", "internal_run"),
 }
 
 COLUMN_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "ingress": ("ingest", "scan", "discover", "bootstrap", "input", "manifest"),
-    "temptation": ("preview", "recommend", "candidate", "selection", "sample", "compare"),
-    "possession": ("asset", "blob", "object", "dataset", "attachment", "file"),
+    "ingress": ("ingest", "scan", "discover", "bootstrap", "input", "manifest", "entry", "door", "gate"),
+    "temptation": ("preview", "recommend", "candidate", "selection", "sample", "compare", "teaser"),
+    "possession": ("asset", "blob", "object", "dataset", "attachment", "file", "archive"),
     "conflict": ("correct", "reject", "supersed", "error", "fail", "cancel", "interrupt"),
-    "doctrine": ("policy", "guard", "constitution", "approval", "compliance", "permission"),
-    "mask": ("summary", "sanitize", "public", "render", "output", "projection"),
-    "memory": ("memory", "event", "episode", "context", "provenance", "entity"),
+    "doctrine": ("policy", "guard", "constitution", "approval", "compliance", "permission", "governance"),
+    "mask": ("summary", "sanitize", "public", "render", "output", "projection", "appearance"),
+    "memory": ("memory", "event", "episode", "context", "provenance", "entity", "trace"),
     "sovereignty": ("hypervisor", "internal_run", "bootstrap", "status", "control", "runtime"),
 }
 
-POSITIVE_KEYWORDS = (
-    "active",
-    "approved",
-    "completed",
-    "available",
-    "provenance",
-    "context",
-    "governance",
-    "constitution",
-)
-NEGATIVE_KEYWORDS = (
-    "rejected",
-    "superseded",
-    "failed",
-    "cancelled",
-    "interrupted",
-    "denied",
-    "error",
-    "conflict",
-)
+POSITIVE_KEYWORDS = ("active", "approved", "completed", "available", "provenance", "context", "governance", "constitution")
+NEGATIVE_KEYWORDS = ("rejected", "superseded", "failed", "cancelled", "interrupted", "denied", "error", "conflict")
 NEUTRAL_KEYWORDS = ("queued", "pending", "preview", "sample", "staging", "idle")
 SCAR_KEYWORDS = ("correct", "supersed", "duplicate", "interrupt", "rejected", "error")
+
+SCENE_KEYWORDS: tuple[str, ...] = (
+    "door", "room", "hall", "corridor", "tunnel", "gate", "window", "stair", "stairs",
+    "chamber", "street", "house", "tower", "church", "station", "garden", "forest",
+    "city", "beach", "lake", "landscape", "scene", "bathroom", "kitchen", "bedroom",
+)
+
+
+def _row_axes() -> list[HybridBoardAxisRecord]:
+    return [
+        HybridBoardAxisRecord(id=row.id, index=index, label=row.label, description=row.description)
+        for index, row in enumerate(BOARD_ROWS)
+    ]
+
+
+def _column_axes() -> list[HybridBoardAxisRecord]:
+    return [
+        HybridBoardAxisRecord(id=column.id, index=index, label=column.label, description=column.description)
+        for index, column in enumerate(BOARD_COLUMNS)
+    ]
+
+
+def _normalize_text(values: list[object]) -> str:
+    return " ".join(str(value).strip().lower() for value in values if value is not None and str(value).strip())
+
+
+def _normalize_marker(value: object) -> str | None:
+    text = str(value).strip().lower() if value is not None else ""
+    return text or None
+
+
+def _contains_any(text: str, keywords: tuple[str, ...]) -> bool:
+    return any(keyword in text for keyword in keywords)
+
+
+def _truncate(value: str, limit: int) -> str:
+    text = value.strip()
+    if len(text) <= limit:
+        return text
+    return f"{text[: limit - 1].rstrip()}…"
+
+
+def _pick_axis(
+    *,
+    definitions: tuple[_AxisDefinition, ...],
+    keyword_map: dict[str, tuple[str, ...]],
+    text: str,
+    seed: str,
+) -> _AxisDefinition:
+    best_score = -1
+    best_definition: _AxisDefinition | None = None
+    for definition in definitions:
+        score = sum(text.count(keyword) for keyword in keyword_map[definition.id])
+        if score > best_score:
+            best_score = score
+            best_definition = definition
+    if best_definition is None:
+        return definitions[0]
+    if best_score > 0:
+        return best_definition
+    digest = hashlib.sha256(seed.encode("utf-8")).digest()
+    return definitions[digest[0] % len(definitions)]
+
+
+def _decode_metadata_json(raw: object) -> dict[str, object] | None:
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 class HybridMemoryBoardService:
@@ -176,8 +333,8 @@ class HybridMemoryBoardService:
             resolved_room_ids=resolved_room_ids,
             square_count=len(squares),
             source_totals=HybridBoardSourceTotalsRecord(**source_totals),
-            row_axes=self._row_axes(),
-            column_axes=self._column_axes(),
+            row_axes=_row_axes(),
+            column_axes=_column_axes(),
             squares=squares,
             notes=notes,
             warnings=warnings,
@@ -207,15 +364,71 @@ class HybridMemoryBoardService:
             key=lambda item: ((item.occurred_at or ""), item.source_id),
             reverse=True,
         )[:source_limit]
+
+        world_memory_service = WorldMemoryService(self.repository)
+        _, _, cluster_accumulators = world_memory_service._project_world_memory(
+            room_ids=room_ids,
+            per_room_limit=WorldMemoryService.DEFAULT_PER_ROOM_LIMIT,
+        )
+        linked_cluster_accumulators = [
+            cluster
+            for cluster in cluster_accumulators.values()
+            if any(node.linked_square.square_id == square.square_id for node in cluster.nodes)
+        ]
+        linked_cluster_accumulators.sort(
+            key=lambda cluster: (
+                -sum(1 for node in cluster.nodes if node.linked_square.square_id == square.square_id),
+                -cluster.place_score,
+                cluster.cluster_id,
+            )
+        )
+        linked_clusters = [
+            HybridBoardWorldMemoryClusterRefRecord(
+                cluster_id=cluster.cluster_id,
+                room_id=cluster.room_id,
+                dataset_label=cluster.dataset_label,
+                label=cluster.label,
+                node_count=cluster.node_count,
+                dominant_asset_kind=cluster.dominant_asset_kind,
+                primary_square_id=(cluster.primary_square().square_id if cluster.primary_square() else None),
+                primary_square_title=(cluster.primary_square().title if cluster.primary_square() else None),
+                place_score=cluster.place_score,
+            )
+            for cluster in linked_cluster_accumulators[:6]
+        ]
+
+        linked_nodes = [
+            HybridBoardWorldMemoryNodeRefRecord(
+                node_id=node.node_id,
+                cluster_id=node.cluster_id,
+                room_id=node.room_id,
+                label=node.label,
+                anchor_type=node.anchor_type,
+                asset_kind=node.asset_kind,
+                primary_square_id=node.linked_square.square_id,
+                primary_square_title=node.linked_square.title,
+                place_score=node.place_shell.place_score,
+                depth_candidate=node.place_shell.depth_candidate,
+            )
+            for cluster in linked_cluster_accumulators
+            for node in cluster.nodes
+            if node.linked_square.square_id == square.square_id
+        ]
+        linked_nodes.sort(key=lambda item: (-item.place_score, item.node_id))
+
         notes, warnings = self._projection_notes(source_totals)
-        notes = [*notes, "Square detail lists source slices that contributed pressure to this board position."]
+        notes = [
+            *notes,
+            "Square detail lists source slices that contributed pressure to this board position.",
+            "Linked world-memory anchors use the same square taxonomy so place-memory and board pressure stay readable together.",
+        ]
         return HybridBoardSquareDetailRecord(
             projection_version=self.PROJECTION_VERSION,
             read_only=True,
             requested_room_id=requested_room_id,
             resolved_room_ids=resolved_room_ids,
-            row_axes=self._row_axes(),
-            column_axes=self._column_axes(),
+            row_axes=_row_axes(),
+            column_axes=_column_axes(),
             square=square,
             source_count=len(accumulators[(row_id, column_id)].sources),
             sources=[
@@ -232,6 +445,10 @@ class HybridMemoryBoardService:
                 )
                 for item in sources
             ],
+            linked_cluster_count=len(linked_clusters),
+            linked_node_count=len(linked_nodes),
+            linked_clusters=linked_clusters,
+            linked_nodes=linked_nodes[:10],
             notes=notes,
             warnings=warnings,
         )
@@ -388,9 +605,9 @@ class HybridMemoryBoardService:
         summary: str,
         route_hint: str | None,
     ) -> None:
-        text = self._normalize_text(tokens)
-        row = self._pick_axis(definitions=BOARD_ROWS, keyword_map=ROW_KEYWORDS, text=text, seed=f"row:{source_kind}:{source_id}")
-        column = self._pick_axis(
+        text = _normalize_text(tokens)
+        row = _pick_axis(definitions=BOARD_ROWS, keyword_map=ROW_KEYWORDS, text=text, seed=f"row:{source_kind}:{source_id}")
+        column = _pick_axis(
             definitions=BOARD_COLUMNS,
             keyword_map=COLUMN_KEYWORDS,
             text=text,
@@ -406,7 +623,7 @@ class HybridMemoryBoardService:
         neutral = base_weight * 0.35
         scar = 0.0
 
-        if self._contains_any(text, NEGATIVE_KEYWORDS):
+        if _contains_any(text, NEGATIVE_KEYWORDS):
             infernal += base_weight * 1.1
             scar += base_weight * 0.55
         if normalized_status in {"rejected", "superseded"}:
@@ -414,11 +631,11 @@ class HybridMemoryBoardService:
             scar += base_weight * 0.9
         if normalized_status in {"active", "completed"}:
             celestial += base_weight * 0.95
-        if self._contains_any(text, POSITIVE_KEYWORDS):
+        if _contains_any(text, POSITIVE_KEYWORDS):
             celestial += base_weight * 0.85
-        if self._contains_any(text, NEUTRAL_KEYWORDS):
+        if _contains_any(text, NEUTRAL_KEYWORDS):
             neutral += base_weight * 0.65
-        if self._contains_any(text, SCAR_KEYWORDS):
+        if _contains_any(text, SCAR_KEYWORDS):
             scar += base_weight * 0.45
         if infernal == 0.0 and celestial == 0.0:
             neutral += base_weight * 0.45
@@ -437,7 +654,7 @@ class HybridMemoryBoardService:
         else:
             acc.episode_count += 1
 
-        normalized_markers = [normalized for marker in markers if (normalized := self._normalize_marker(marker))]
+        normalized_markers = [normalized for marker in markers if (normalized := _normalize_marker(marker))]
         for marker in normalized_markers:
             acc.markers[marker] += 1
         acc.sources.append(
@@ -446,7 +663,7 @@ class HybridMemoryBoardService:
                 source_id=source_id,
                 room_id=room_id,
                 title=title,
-                summary=self._truncate(summary, 220),
+                summary=_truncate(summary, 220),
                 status=normalized_status or None,
                 occurred_at=touched_at,
                 route_hint=route_hint,
@@ -465,60 +682,6 @@ class HybridMemoryBoardService:
             warnings.append("No audit or memory sources were available for this board projection yet.")
         return notes, warnings
 
-    def _row_axes(self) -> list[HybridBoardAxisRecord]:
-        return [
-            HybridBoardAxisRecord(id=row.id, index=index, label=row.label, description=row.description)
-            for index, row in enumerate(BOARD_ROWS)
-        ]
-
-    def _column_axes(self) -> list[HybridBoardAxisRecord]:
-        return [
-            HybridBoardAxisRecord(id=column.id, index=index, label=column.label, description=column.description)
-            for index, column in enumerate(BOARD_COLUMNS)
-        ]
-
-    def _pick_axis(
-        self,
-        *,
-        definitions: tuple[_AxisDefinition, ...],
-        keyword_map: dict[str, tuple[str, ...]],
-        text: str,
-        seed: str,
-    ) -> _AxisDefinition:
-        best_score = -1
-        best_definition: _AxisDefinition | None = None
-        for definition in definitions:
-            score = sum(text.count(keyword) for keyword in keyword_map[definition.id])
-            if score > best_score:
-                best_score = score
-                best_definition = definition
-        if best_definition is None:
-            return definitions[0]
-        if best_score > 0:
-            return best_definition
-        digest = hashlib.sha256(seed.encode("utf-8")).digest()
-        return definitions[digest[0] % len(definitions)]
-
-    @staticmethod
-    def _normalize_text(values: list[object]) -> str:
-        return " ".join(str(value).strip().lower() for value in values if value is not None and str(value).strip())
-
-    @staticmethod
-    def _normalize_marker(value: object) -> str | None:
-        text = str(value).strip().lower() if value is not None else ""
-        return text or None
-
-    @staticmethod
-    def _contains_any(text: str, keywords: tuple[str, ...]) -> bool:
-        return any(keyword in text for keyword in keywords)
-
-    @staticmethod
-    def _truncate(value: str, limit: int) -> str:
-        text = value.strip()
-        if len(text) <= limit:
-            return text
-        return f"{text[: limit - 1].rstrip()}…"
-
 
 class WorldMemoryService:
     PROJECTION_VERSION = "world_memory.v1"
@@ -534,6 +697,125 @@ class WorldMemoryService:
         requested_room_id: str | None = None,
         per_room_limit: int = DEFAULT_PER_ROOM_LIMIT,
     ) -> WorldMemoryRecord:
+        resolved_room_ids, node_projections, cluster_accumulators = self._project_world_memory(
+            room_ids=room_ids,
+            per_room_limit=per_room_limit,
+        )
+        node_records = [self._node_record_from_projection(node) for node in node_projections]
+        cluster_records = [self._cluster_record_from_accumulator(cluster) for cluster in cluster_accumulators.values()]
+        cluster_records.sort(key=lambda item: (-item.node_count, item.cluster_id))
+        notes, warnings = self._projection_notes(node_records)
+        return WorldMemoryRecord(
+            projection_version=self.PROJECTION_VERSION,
+            read_only=True,
+            requested_room_id=requested_room_id,
+            resolved_room_ids=resolved_room_ids,
+            node_count=len(node_records),
+            cluster_count=len(cluster_records),
+            place_candidate_count=sum(1 for node in node_records if node.place_score > 0),
+            depth_candidate_count=sum(1 for node in node_records if node.depth_candidate),
+            anchor_types=sorted({node.anchor_type for node in node_records}),
+            clusters=cluster_records,
+            nodes=node_records[:72],
+            notes=notes,
+            warnings=warnings,
+        )
+
+    def build_cluster_detail(
+        self,
+        *,
+        room_ids: list[str],
+        requested_room_id: str | None,
+        cluster_id: str,
+        per_room_limit: int = DEFAULT_PER_ROOM_LIMIT,
+    ) -> WorldMemoryClusterDetailRecord:
+        resolved_room_ids, _, cluster_accumulators = self._project_world_memory(
+            room_ids=room_ids,
+            per_room_limit=per_room_limit,
+        )
+        cluster = cluster_accumulators.get(cluster_id)
+        if cluster is None:
+            raise ValueError(f"World-memory cluster {cluster_id} was not found.")
+        linked_squares = sorted(
+            cluster.linked_square_refs.values(),
+            key=lambda ref: (-cluster.linked_square_weights.get(ref.square_id, 0.0), ref.square_id),
+        )
+        notes = [
+            "Cluster detail groups nearby asset anchors under one governed place shell.",
+            "Linked squares expose where this cluster currently touches the simulation board taxonomy.",
+        ]
+        return WorldMemoryClusterDetailRecord(
+            projection_version=self.PROJECTION_VERSION,
+            read_only=True,
+            requested_room_id=requested_room_id,
+            resolved_room_ids=resolved_room_ids,
+            cluster=self._cluster_record_from_accumulator(cluster),
+            linked_squares=[
+                WorldMemorySquareLinkRecord(
+                    square_id=ref.square_id,
+                    row_id=ref.row_id,
+                    column_id=ref.column_id,
+                    title=ref.title,
+                    weight=round(cluster.linked_square_weights.get(ref.square_id, ref.weight), 4),
+                )
+                for ref in linked_squares[:6]
+            ],
+            nodes=[self._node_record_from_projection(node) for node in cluster.nodes[:18]],
+            notes=notes,
+            warnings=[],
+        )
+
+    def build_node_detail(
+        self,
+        *,
+        room_ids: list[str],
+        requested_room_id: str | None,
+        node_id: str,
+        per_room_limit: int = DEFAULT_PER_ROOM_LIMIT,
+    ) -> WorldMemoryNodeDetailRecord:
+        resolved_room_ids, node_projections, _ = self._project_world_memory(
+            room_ids=room_ids,
+            per_room_limit=per_room_limit,
+        )
+        node = next((item for item in node_projections if item.node_id == node_id), None)
+        if node is None:
+            raise ValueError(f"World-memory node {node_id} was not found.")
+        notes = [
+            "Node detail is a governed shell for one indexed local asset anchor.",
+            "Place shell values are deterministic heuristics for later depth and spatial reconstruction, not a latent 3D model.",
+        ]
+        return WorldMemoryNodeDetailRecord(
+            projection_version=self.PROJECTION_VERSION,
+            read_only=True,
+            requested_room_id=requested_room_id,
+            resolved_room_ids=resolved_room_ids,
+            node=self._node_record_from_projection(node),
+            linked_square=WorldMemorySquareLinkRecord(
+                square_id=node.linked_square.square_id,
+                row_id=node.linked_square.row_id,
+                column_id=node.linked_square.column_id,
+                title=node.linked_square.title,
+                weight=node.linked_square.weight,
+            ),
+            place_shell=WorldMemoryPlaceShellRecord(
+                stage=node.place_shell.stage,
+                eligible=node.place_shell.eligible,
+                depth_candidate=node.place_shell.depth_candidate,
+                place_score=node.place_shell.place_score,
+                rationale=node.place_shell.rationale,
+                cues=list(node.place_shell.cues),
+            ),
+            metadata=node.metadata,
+            notes=notes,
+            warnings=[],
+        )
+
+    def _project_world_memory(
+        self,
+        *,
+        room_ids: list[str],
+        per_room_limit: int,
+    ) -> tuple[list[str], list[_WorldMemoryNodeProjection], dict[str, _WorldMemoryClusterAccumulator]]:
         resolved_room_ids = sorted(dict.fromkeys(room_ids))
         node_rows: list[dict[str, object]] = []
         max_size = 1
@@ -549,7 +831,8 @@ class WorldMemoryService:
                 normalized_path = relative_path.replace("\\", "/")
                 path_parts = [part for part in normalized_path.split("/") if part]
                 anchor_prefix = path_parts[0] if path_parts else "."
-                anchor_type = self._anchor_type_for_asset_kind(str(row.get("asset_kind") or "generic"))
+                asset_kind = str(row.get("asset_kind") or "generic")
+                anchor_type = self._anchor_type_for_asset_kind(asset_kind)
                 cluster_id = f"{room_id}:{row['dataset_id']}:{anchor_prefix}:{anchor_type}"
                 node_rows.append(
                     {
@@ -559,7 +842,7 @@ class WorldMemoryService:
                         "dataset_id": int(row["dataset_id"]),
                         "dataset_label": str(row.get("dataset_label") or dataset.get("label") or f"dataset {row['dataset_id']}"),
                         "asset_id": int(row["id"]),
-                        "asset_kind": str(row.get("asset_kind") or "generic"),
+                        "asset_kind": asset_kind,
                         "anchor_type": anchor_type,
                         "label": self._asset_label(row),
                         "relative_path": relative_path,
@@ -568,99 +851,204 @@ class WorldMemoryService:
                         "indexed_at": str(row.get("indexed_at") or ""),
                         "fs_modified_at": str(row.get("fs_modified_at") or ""),
                         "anchor_prefix": anchor_prefix,
+                        "metadata": _decode_metadata_json(row.get("metadata_json")),
                     }
                 )
 
-        clusters: dict[str, dict[str, object]] = defaultdict(
-            lambda: {
-                "room_id": "",
-                "dataset_id": 0,
-                "dataset_label": "",
-                "anchor_prefix": "",
-                "label": "",
-                "node_count": 0,
-                "asset_kind_counter": Counter(),
-                "recent_indexed_at": None,
-            }
+        projections: list[_WorldMemoryNodeProjection] = []
+        clusters: dict[str, _WorldMemoryClusterAccumulator] = {}
+
+        for index, row in enumerate(sorted(node_rows, key=lambda item: (str(item["indexed_at"]), str(item["node_id"])), reverse=True)):
+            intensity = self._node_intensity(size_bytes=int(row["size_bytes"]), max_size=max_size, index=index)
+            place_shell = self._build_place_shell(row)
+            linked_square = self._project_square_for_node(row=row, place_shell=place_shell, intensity=intensity)
+            projection = _WorldMemoryNodeProjection(
+                node_id=str(row["node_id"]),
+                cluster_id=str(row["cluster_id"]),
+                room_id=str(row["room_id"]),
+                dataset_id=int(row["dataset_id"]),
+                dataset_label=str(row["dataset_label"]),
+                asset_id=int(row["asset_id"]),
+                asset_kind=str(row["asset_kind"]),
+                anchor_type=str(row["anchor_type"]),
+                label=str(row["label"]),
+                relative_path=str(row["relative_path"]),
+                file_name=str(row["file_name"]),
+                size_bytes=int(row["size_bytes"]),
+                intensity=intensity,
+                indexed_at=str(row["indexed_at"]),
+                fs_modified_at=str(row["fs_modified_at"]),
+                metadata=row.get("metadata") if isinstance(row.get("metadata"), dict) else None,
+                linked_square=linked_square,
+                place_shell=place_shell,
+            )
+            projections.append(projection)
+
+            cluster = clusters.get(projection.cluster_id)
+            if cluster is None:
+                cluster = _WorldMemoryClusterAccumulator(
+                    cluster_id=projection.cluster_id,
+                    room_id=projection.room_id,
+                    dataset_id=projection.dataset_id,
+                    dataset_label=projection.dataset_label,
+                    anchor_prefix=str(row["anchor_prefix"]),
+                    label=self._cluster_label(projection.dataset_label, str(row["anchor_prefix"]), projection.anchor_type),
+                )
+                clusters[projection.cluster_id] = cluster
+            cluster.add_node(projection)
+
+        projections.sort(key=lambda item: (item.indexed_at, item.node_id), reverse=True)
+        return resolved_room_ids, projections, clusters
+
+    def _build_place_shell(self, row: dict[str, object]) -> _WorldMemoryPlaceShell:
+        asset_kind = str(row["asset_kind"])
+        text = " ".join(
+            [
+                asset_kind,
+                str(row["relative_path"]).lower(),
+                str(row["file_name"]).lower(),
+                str(row["dataset_label"]).lower(),
+                str(row["anchor_prefix"]).lower(),
+                str(row["anchor_type"]),
+            ]
+        )
+        detected_keywords = [keyword for keyword in SCENE_KEYWORDS if keyword in text]
+        hierarchical_bonus = 0.06 if str(row["anchor_prefix"]).lower() not in {"", "."} else 0.0
+        keyword_bonus = min(0.28, len(detected_keywords) * 0.07)
+
+        if asset_kind == "image":
+            base_score = 0.56
+            stage = "depth_anything_v2_candidate"
+            eligible = True
+            depth_candidate = True
+            rationale = "Indexed image asset can seed monocular depth and 2.5D place reconstruction later."
+        elif asset_kind == "video":
+            base_score = 0.48
+            stage = "multiframe_scene_candidate"
+            eligible = True
+            depth_candidate = False
+            rationale = "Indexed video asset can seed later multi-frame place shells, but no depth pass is run yet."
+        elif asset_kind in {"document", "audio"}:
+            base_score = 0.22
+            stage = "trace_only"
+            eligible = False
+            depth_candidate = False
+            rationale = "This asset stays as a trace anchor only; it does not yet seed a spatial depth shell."
+        else:
+            base_score = 0.18
+            stage = "trace_only"
+            eligible = False
+            depth_candidate = False
+            rationale = "This asset remains a governed trace without depth or place reconstruction."
+
+        metadata = row.get("metadata")
+        cues = [f"kind:{asset_kind}", f"anchor:{row['anchor_type']}", *(f"scene:{keyword}" for keyword in detected_keywords[:4])]
+        if isinstance(metadata, dict):
+            root_path = metadata.get("root_path")
+            if isinstance(root_path, str) and root_path:
+                cues.append("source:recursive_file_scan")
+
+        return _WorldMemoryPlaceShell(
+            stage=stage,
+            eligible=eligible,
+            depth_candidate=depth_candidate,
+            place_score=round(min(1.0, base_score + hierarchical_bonus + keyword_bonus), 4),
+            rationale=rationale,
+            cues=tuple(cues[:8]),
         )
 
-        nodes: list[WorldMemoryNodeRecord] = []
-        for index, row in enumerate(sorted(node_rows, key=lambda item: (str(item["indexed_at"]), str(item["node_id"])), reverse=True)):
-            cluster = clusters[str(row["cluster_id"])]
-            cluster["room_id"] = row["room_id"]
-            cluster["dataset_id"] = row["dataset_id"]
-            cluster["dataset_label"] = row["dataset_label"]
-            cluster["anchor_prefix"] = row["anchor_prefix"]
-            cluster["label"] = self._cluster_label(str(row["dataset_label"]), str(row["anchor_prefix"]), str(row["anchor_type"]))
-            cluster["node_count"] += 1
-            cluster["asset_kind_counter"][str(row["asset_kind"])] += 1
-            current_recent = cluster["recent_indexed_at"]
-            if current_recent is None or str(row["indexed_at"]) > str(current_recent):
-                cluster["recent_indexed_at"] = row["indexed_at"]
+    def _project_square_for_node(
+        self,
+        *,
+        row: dict[str, object],
+        place_shell: _WorldMemoryPlaceShell,
+        intensity: float,
+    ) -> _WorldMemorySquareRef:
+        text = _normalize_text(
+            [
+                row["asset_kind"],
+                row["anchor_type"],
+                row["relative_path"],
+                row["dataset_label"],
+                row["anchor_prefix"],
+                place_shell.stage,
+                *place_shell.cues,
+            ]
+        )
+        row_axis = _pick_axis(
+            definitions=BOARD_ROWS,
+            keyword_map=ROW_KEYWORDS,
+            text=text,
+            seed=f"world-row:{row['node_id']}",
+        )
+        column_axis = _pick_axis(
+            definitions=BOARD_COLUMNS,
+            keyword_map=COLUMN_KEYWORDS,
+            text=text,
+            seed=f"world-column:{row['node_id']}",
+        )
+        return _WorldMemorySquareRef(
+            square_id=f"{row_axis.id}:{column_axis.id}",
+            row_id=row_axis.id,
+            column_id=column_axis.id,
+            title=f"{row_axis.label} x {column_axis.label}",
+            weight=round(min(1.0, (place_shell.place_score * 0.7) + (intensity * 0.3)), 4),
+        )
 
-            intensity = self._node_intensity(size_bytes=int(row["size_bytes"]), max_size=max_size, index=index)
-            nodes.append(
-                WorldMemoryNodeRecord(
-                    node_id=str(row["node_id"]),
-                    cluster_id=str(row["cluster_id"]),
-                    room_id=str(row["room_id"]),
-                    dataset_id=int(row["dataset_id"]),
-                    dataset_label=str(row["dataset_label"]),
-                    asset_id=int(row["asset_id"]),
-                    asset_kind=str(row["asset_kind"]),
-                    anchor_type=str(row["anchor_type"]),
-                    label=str(row["label"]),
-                    relative_path=str(row["relative_path"]),
-                    file_name=str(row["file_name"]),
-                    size_bytes=int(row["size_bytes"]),
-                    intensity=intensity,
-                    indexed_at=str(row["indexed_at"]),
-                    fs_modified_at=str(row["fs_modified_at"]),
-                )
-            )
+    def _cluster_record_from_accumulator(self, cluster: _WorldMemoryClusterAccumulator) -> WorldMemoryClusterRecord:
+        primary_square = cluster.primary_square()
+        return WorldMemoryClusterRecord(
+            cluster_id=cluster.cluster_id,
+            room_id=cluster.room_id,
+            dataset_id=cluster.dataset_id,
+            dataset_label=cluster.dataset_label,
+            anchor_prefix=cluster.anchor_prefix,
+            label=cluster.label,
+            node_count=cluster.node_count,
+            dominant_asset_kind=cluster.dominant_asset_kind,
+            primary_square_id=primary_square.square_id if primary_square else None,
+            primary_square_title=primary_square.title if primary_square else None,
+            place_score=cluster.place_score,
+            image_candidate_count=cluster.image_candidate_count,
+            depth_candidate_count=cluster.depth_candidate_count,
+            recent_indexed_at=cluster.recent_indexed_at,
+        )
 
-        cluster_records = [
-            WorldMemoryClusterRecord(
-                cluster_id=cluster_id,
-                room_id=str(payload["room_id"]),
-                dataset_id=int(payload["dataset_id"]),
-                dataset_label=str(payload["dataset_label"]),
-                anchor_prefix=str(payload["anchor_prefix"]),
-                label=str(payload["label"]),
-                node_count=int(payload["node_count"]),
-                dominant_asset_kind=payload["asset_kind_counter"].most_common(1)[0][0]
-                if payload["asset_kind_counter"]
-                else "generic",
-                recent_indexed_at=str(payload["recent_indexed_at"]) if payload["recent_indexed_at"] else None,
-            )
-            for cluster_id, payload in sorted(
-                clusters.items(),
-                key=lambda item: (-(int(item[1]["node_count"])), str(item[0])),
-            )
-        ]
+    def _node_record_from_projection(self, node: _WorldMemoryNodeProjection) -> WorldMemoryNodeRecord:
+        return WorldMemoryNodeRecord(
+            node_id=node.node_id,
+            cluster_id=node.cluster_id,
+            room_id=node.room_id,
+            dataset_id=node.dataset_id,
+            dataset_label=node.dataset_label,
+            asset_id=node.asset_id,
+            asset_kind=node.asset_kind,
+            anchor_type=node.anchor_type,
+            label=node.label,
+            relative_path=node.relative_path,
+            file_name=node.file_name,
+            size_bytes=node.size_bytes,
+            intensity=node.intensity,
+            primary_square_id=node.linked_square.square_id,
+            primary_square_title=node.linked_square.title,
+            place_score=node.place_shell.place_score,
+            depth_candidate=node.place_shell.depth_candidate,
+            indexed_at=node.indexed_at,
+            fs_modified_at=node.fs_modified_at,
+        )
 
+    def _projection_notes(self, node_records: list[WorldMemoryNodeRecord]) -> tuple[list[str], list[str]]:
         notes = [
             "World Memory v1 is a governed asset-anchor shell, not a 3D reconstruction engine yet.",
             "Nodes are derived from indexed local assets and grouped into deterministic clusters by room, dataset, and path prefix.",
-            "This shell exists to give later place-memory, depth, and reconstruction layers a governed starting surface.",
+            "Image anchors expose a depth/place candidate shell so later monocular depth and 2.5D scene work has a governed starting surface.",
         ]
         warnings: list[str] = []
-        if not nodes:
+        if not node_records:
             warnings.append("No indexed assets were available to build the world-memory shell yet.")
-
-        return WorldMemoryRecord(
-            projection_version=self.PROJECTION_VERSION,
-            read_only=True,
-            requested_room_id=requested_room_id,
-            resolved_room_ids=resolved_room_ids,
-            node_count=len(nodes),
-            cluster_count=len(cluster_records),
-            anchor_types=sorted({node.anchor_type for node in nodes}),
-            clusters=cluster_records,
-            nodes=nodes[:72],
-            notes=notes,
-            warnings=warnings,
-        )
+        elif not any(node.depth_candidate for node in node_records):
+            warnings.append("No image anchors are available for depth/place candidates yet.")
+        return notes, warnings
 
     def _node_intensity(self, *, size_bytes: int, max_size: int, index: int) -> float:
         size_component = math.sqrt(size_bytes / max_size) if max_size > 0 else 0.0

@@ -19,6 +19,10 @@ const state = {
     selectedSquare: null,
     squareDetail: null,
     worldMemory: null,
+    selectedClusterId: null,
+    selectedNodeId: null,
+    clusterDetail: null,
+    nodeDetail: null,
   },
   assets: [],
   selectedAsset: null,
@@ -493,8 +497,57 @@ function renderHybridBoardDetail(detail) {
       `activity: ${detail.square.activity_score.toFixed(2)}`,
       `alignment: ${detail.square.alignment_score.toFixed(2)}`,
       `sources: ${detail.source_count}`,
+      `linked_clusters: ${detail.linked_cluster_count || 0}`,
+      `linked_nodes: ${detail.linked_node_count || 0}`,
       detail.requested_room_id ? `room: ${detail.requested_room_id}` : `rooms: ${detail.resolved_room_ids.length}`,
     ])}</div>
+    ${
+      detail.linked_clusters?.length
+        ? `<section class="preview-block">
+            <h4>Linked World-Memory Clusters</h4>
+            <div class="stack compact-stack">${detail.linked_clusters
+              .map(
+                (cluster) => `
+                  <article class="stack-item compact-item simulation-linked-item ${state.simulation.selectedClusterId === cluster.cluster_id ? "simulation-selected" : ""}" data-world-cluster-id="${escapeHtml(cluster.cluster_id)}">
+                    <small>${escapeHtml(cluster.room_id)}</small>
+                    <h3>${escapeHtml(cluster.label)}</h3>
+                    <div class="meta">${chips([
+                      `dataset: ${cluster.dataset_label}`,
+                      `nodes: ${cluster.node_count}`,
+                      `kind: ${cluster.dominant_asset_kind}`,
+                      `place: ${cluster.place_score.toFixed(2)}`,
+                      cluster.primary_square_title ? `square: ${cluster.primary_square_title}` : null,
+                    ])}</div>
+                  </article>
+                `,
+              )
+              .join("")}</div>
+          </section>`
+        : ""
+    }
+    ${
+      detail.linked_nodes?.length
+        ? `<section class="preview-block">
+            <h4>Linked World-Memory Nodes</h4>
+            <div class="stack compact-stack">${detail.linked_nodes
+              .map(
+                (node) => `
+                  <article class="stack-item compact-item simulation-linked-item ${state.simulation.selectedNodeId === node.node_id ? "simulation-selected" : ""}" data-world-node-id="${escapeHtml(node.node_id)}">
+                    <small>${escapeHtml(node.anchor_type)}</small>
+                    <h3>${escapeHtml(node.label)}</h3>
+                    <div class="meta">${chips([
+                      `room: ${node.room_id}`,
+                      `kind: ${node.asset_kind}`,
+                      `place: ${node.place_score.toFixed(2)}`,
+                      `depth_candidate: ${node.depth_candidate}`,
+                    ])}</div>
+                  </article>
+                `,
+              )
+              .join("")}</div>
+          </section>`
+        : ""
+    }
     ${
       detail.sources?.length
         ? `<div class="stack compact-stack">${detail.sources
@@ -532,6 +585,8 @@ function renderWorldMemory(worldMemory) {
     summaryRoot.textContent = "No world-memory shell loaded yet.";
     shellRoot.className = "detail-card empty-state";
     shellRoot.textContent = "No world-memory shell loaded yet.";
+    renderWorldMemoryClusterDetail(null);
+    renderWorldMemoryNodeDetail(null);
     return;
   }
 
@@ -545,6 +600,8 @@ function renderWorldMemory(worldMemory) {
       worldMemory.requested_room_id ? `room: ${worldMemory.requested_room_id}` : `rooms: ${worldMemory.resolved_room_ids.length}`,
       `nodes: ${worldMemory.node_count}`,
       `clusters: ${worldMemory.cluster_count}`,
+      `place_candidates: ${worldMemory.place_candidate_count}`,
+      `depth_candidates: ${worldMemory.depth_candidate_count}`,
       ...worldMemory.anchor_types.map((anchorType) => `type: ${anchorType}`),
     ])}</div>
     <ul class="detail-list">
@@ -562,13 +619,16 @@ function renderWorldMemory(worldMemory) {
         .slice(0, 8)
         .map(
           (cluster) => `
-            <article class="stack-item compact-item">
+            <article class="stack-item compact-item simulation-linked-item ${state.simulation.selectedClusterId === cluster.cluster_id ? "simulation-selected" : ""}" data-world-cluster-id="${escapeHtml(cluster.cluster_id)}">
               <small>${escapeHtml(cluster.room_id)}</small>
               <h3>${escapeHtml(cluster.label)}</h3>
               <div class="meta">${chips([
                 `nodes: ${cluster.node_count}`,
                 `dataset: ${cluster.dataset_label}`,
                 `kind: ${cluster.dominant_asset_kind}`,
+                `place: ${cluster.place_score.toFixed(2)}`,
+                `depth_candidates: ${cluster.depth_candidate_count}`,
+                cluster.primary_square_title ? `square: ${cluster.primary_square_title}` : null,
                 `recent: ${formatTime(cluster.recent_indexed_at)}`,
               ])}</div>
             </article>
@@ -582,13 +642,16 @@ function renderWorldMemory(worldMemory) {
         .slice(0, 16)
         .map(
           (node) => `
-            <article class="stack-item compact-item">
+            <article class="stack-item compact-item simulation-linked-item ${state.simulation.selectedNodeId === node.node_id ? "simulation-selected" : ""}" data-world-node-id="${escapeHtml(node.node_id)}">
               <small>${escapeHtml(node.anchor_type)}</small>
               <h3>${escapeHtml(node.label)}</h3>
               <div class="meta">${chips([
                 `room: ${node.room_id}`,
                 `dataset: ${node.dataset_label}`,
                 `kind: ${node.asset_kind}`,
+                `place: ${node.place_score.toFixed(2)}`,
+                `depth_candidate: ${node.depth_candidate}`,
+                `square: ${node.primary_square_title}`,
                 `intensity: ${node.intensity.toFixed(2)}`,
                 `indexed: ${formatTime(node.indexed_at)}`,
               ])}</div>
@@ -610,6 +673,120 @@ function renderWorldMemory(worldMemory) {
         ${nodeMarkup}
       </section>
     </div>
+  `;
+}
+
+function renderWorldMemoryClusterDetail(detail) {
+  const root = document.querySelector("#world-memory-cluster-detail");
+  if (!detail) {
+    root.className = "detail-card empty-state";
+    root.textContent = "Select a world-memory cluster.";
+    return;
+  }
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>${escapeHtml(detail.cluster.label)}</h3>
+    <p>Governed place cluster projected from indexed local anchors.</p>
+    <div class="meta">${chips([
+      `room: ${detail.cluster.room_id}`,
+      `dataset: ${detail.cluster.dataset_label}`,
+      `nodes: ${detail.cluster.node_count}`,
+      `kind: ${detail.cluster.dominant_asset_kind}`,
+      `place: ${detail.cluster.place_score.toFixed(2)}`,
+      `depth_candidates: ${detail.cluster.depth_candidate_count}`,
+    ])}</div>
+    ${
+      detail.linked_squares?.length
+        ? `<section class="preview-block">
+            <h4>Linked Board Squares</h4>
+            <div class="stack compact-stack">${detail.linked_squares
+              .map(
+                (square) => `
+                  <article class="stack-item compact-item simulation-linked-item" data-open-hybrid-row-id="${escapeHtml(square.row_id)}" data-open-hybrid-column-id="${escapeHtml(square.column_id)}">
+                    <small>${escapeHtml(square.square_id)}</small>
+                    <h3>${escapeHtml(square.title)}</h3>
+                    <div class="meta">${chips([`weight: ${square.weight.toFixed(2)}`])}</div>
+                  </article>
+                `,
+              )
+              .join("")}</div>
+          </section>`
+        : ""
+    }
+    ${
+      detail.nodes?.length
+        ? `<section class="preview-block">
+            <h4>Cluster Nodes</h4>
+            <div class="stack compact-stack">${detail.nodes
+              .map(
+                (node) => `
+                  <article class="stack-item compact-item simulation-linked-item ${state.simulation.selectedNodeId === node.node_id ? "simulation-selected" : ""}" data-world-node-id="${escapeHtml(node.node_id)}">
+                    <small>${escapeHtml(node.anchor_type)}</small>
+                    <h3>${escapeHtml(node.label)}</h3>
+                    <div class="meta">${chips([
+                      `kind: ${node.asset_kind}`,
+                      `place: ${node.place_score.toFixed(2)}`,
+                      `depth_candidate: ${node.depth_candidate}`,
+                    ])}</div>
+                  </article>
+                `,
+              )
+              .join("")}</div>
+          </section>`
+        : ""
+    }
+  `;
+}
+
+function renderWorldMemoryNodeDetail(detail) {
+  const root = document.querySelector("#world-memory-node-detail");
+  if (!detail) {
+    root.className = "detail-card empty-state";
+    root.textContent = "Select a world-memory node.";
+    return;
+  }
+
+  const metadataEntries = detail.metadata
+    ? Object.entries(detail.metadata)
+        .map(([key, value]) => `<li><strong>${escapeHtml(key)}</strong>: ${escapeHtml(JSON.stringify(value))}</li>`)
+        .join("")
+    : "<li>No metadata recorded.</li>";
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>${escapeHtml(detail.node.label)}</h3>
+    <p>One governed anchor with a deterministic place/depth shell.</p>
+    <div class="meta">${chips([
+      `room: ${detail.node.room_id}`,
+      `dataset: ${detail.node.dataset_label}`,
+      `kind: ${detail.node.asset_kind}`,
+      `anchor: ${detail.node.anchor_type}`,
+      `place: ${detail.place_shell.place_score.toFixed(2)}`,
+      `depth_candidate: ${detail.place_shell.depth_candidate}`,
+    ])}</div>
+    <section class="preview-block">
+      <h4>Linked Square</h4>
+      <article class="stack-item compact-item simulation-linked-item" data-open-hybrid-row-id="${escapeHtml(detail.linked_square.row_id)}" data-open-hybrid-column-id="${escapeHtml(detail.linked_square.column_id)}">
+        <small>${escapeHtml(detail.linked_square.square_id)}</small>
+        <h3>${escapeHtml(detail.linked_square.title)}</h3>
+        <div class="meta">${chips([`weight: ${detail.linked_square.weight.toFixed(2)}`])}</div>
+      </article>
+    </section>
+    <section class="preview-block">
+      <h4>Place / Depth Shell</h4>
+      <ul class="detail-list">
+        <li><strong>stage</strong>: ${escapeHtml(detail.place_shell.stage)}</li>
+        <li><strong>eligible</strong>: ${escapeHtml(detail.place_shell.eligible)}</li>
+        <li><strong>depth_candidate</strong>: ${escapeHtml(detail.place_shell.depth_candidate)}</li>
+        <li><strong>rationale</strong>: ${escapeHtml(detail.place_shell.rationale)}</li>
+      </ul>
+      <div class="meta">${chips(detail.place_shell.cues.map((cue) => `cue: ${cue}`))}</div>
+    </section>
+    <section class="preview-block">
+      <h4>Metadata</h4>
+      <ul class="detail-list">${metadataEntries}</ul>
+    </section>
   `;
 }
 
@@ -1941,6 +2118,99 @@ async function loadHybridBoardSquareDetail(rowId, columnId) {
   }
 }
 
+async function loadWorldMemoryClusterDetail(clusterId, options = {}) {
+  const { preserveNode = false } = options;
+  state.simulation.selectedClusterId = clusterId;
+  renderWorldMemory(state.simulation.worldMemory);
+  renderHybridBoardDetail(state.simulation.squareDetail);
+
+  if (!preserveNode) {
+    state.simulation.selectedNodeId = null;
+    state.simulation.nodeDetail = null;
+    renderWorldMemoryNodeDetail(null);
+  }
+
+  const params = new URLSearchParams();
+  if (state.simulation.selectedRoomId) {
+    params.set("room_id", state.simulation.selectedRoomId);
+  }
+
+  try {
+    const detail = await fetchJson(
+      `/api/simulation/world-memory/clusters/${encodeURIComponent(clusterId)}?${params.toString()}`,
+    );
+    state.simulation.clusterDetail = detail;
+    renderWorldMemoryClusterDetail(detail);
+  } catch (error) {
+    state.simulation.clusterDetail = null;
+    const root = document.querySelector("#world-memory-cluster-detail");
+    root.className = "detail-card";
+    root.textContent = error.message;
+  }
+}
+
+async function loadWorldMemoryNodeDetail(nodeId, options = {}) {
+  const { syncCluster = true } = options;
+  state.simulation.selectedNodeId = nodeId;
+  renderWorldMemory(state.simulation.worldMemory);
+  renderHybridBoardDetail(state.simulation.squareDetail);
+
+  const params = new URLSearchParams();
+  if (state.simulation.selectedRoomId) {
+    params.set("room_id", state.simulation.selectedRoomId);
+  }
+
+  try {
+    const detail = await fetchJson(
+      `/api/simulation/world-memory/nodes/${encodeURIComponent(nodeId)}?${params.toString()}`,
+    );
+    state.simulation.nodeDetail = detail;
+    renderWorldMemoryNodeDetail(detail);
+
+    if (
+      syncCluster &&
+      detail.node?.cluster_id &&
+      state.simulation.clusterDetail?.cluster?.cluster_id !== detail.node.cluster_id
+    ) {
+      await loadWorldMemoryClusterDetail(detail.node.cluster_id, { preserveNode: true });
+    } else if (detail.node?.cluster_id) {
+      state.simulation.selectedClusterId = detail.node.cluster_id;
+      renderWorldMemory(state.simulation.worldMemory);
+      renderHybridBoardDetail(state.simulation.squareDetail);
+    }
+  } catch (error) {
+    state.simulation.nodeDetail = null;
+    const root = document.querySelector("#world-memory-node-detail");
+    root.className = "detail-card";
+    root.textContent = error.message;
+  }
+}
+
+async function handleSimulationLinkClick(event) {
+  const nodeCard = event.target.closest("[data-world-node-id]");
+  if (nodeCard) {
+    await loadWorldMemoryNodeDetail(nodeCard.dataset.worldNodeId);
+    return true;
+  }
+
+  const clusterCard = event.target.closest("[data-world-cluster-id]");
+  if (clusterCard) {
+    await loadWorldMemoryClusterDetail(clusterCard.dataset.worldClusterId);
+    return true;
+  }
+
+  const squareCard = event.target.closest("[data-open-hybrid-row-id][data-open-hybrid-column-id]");
+  if (squareCard) {
+    await loadHybridBoardSquareDetail(
+      squareCard.dataset.openHybridRowId,
+      squareCard.dataset.openHybridColumnId,
+    );
+    return true;
+  }
+
+  return false;
+}
+
 async function refreshSimulationProjection(options = {}) {
   const { preserveSelection = true } = options;
   const params = new URLSearchParams();
@@ -1959,38 +2229,79 @@ async function refreshSimulationProjection(options = {}) {
     state.simulation.worldMemory = worldMemory;
     renderHybridBoard(board);
     renderWorldMemory(worldMemory);
-
-    if (
+    const canPreserveSquare =
       preserveSelection &&
       state.simulation.selectedSquare &&
       board.squares.some(
         (square) =>
           square.row_id === state.simulation.selectedSquare.rowId &&
           square.column_id === state.simulation.selectedSquare.columnId,
-      )
-    ) {
+      );
+    const canPreserveCluster =
+      preserveSelection &&
+      state.simulation.selectedClusterId &&
+      worldMemory.clusters.some((cluster) => cluster.cluster_id === state.simulation.selectedClusterId);
+    const canPreserveNode =
+      preserveSelection &&
+      state.simulation.selectedNodeId &&
+      worldMemory.nodes.some((node) => node.node_id === state.simulation.selectedNodeId);
+
+    if (canPreserveSquare) {
       await loadHybridBoardSquareDetail(
         state.simulation.selectedSquare.rowId,
         state.simulation.selectedSquare.columnId,
       );
-      return;
+    } else {
+      const nextSquare = board.squares.find((square) => square.activity_score > 0) || board.squares[0];
+      if (nextSquare) {
+        await loadHybridBoardSquareDetail(nextSquare.row_id, nextSquare.column_id);
+      } else {
+        state.simulation.selectedSquare = null;
+        state.simulation.squareDetail = null;
+        renderHybridBoardDetail(null);
+      }
     }
 
-    const nextSquare = board.squares.find((square) => square.activity_score > 0) || board.squares[0];
-    if (nextSquare) {
-      await loadHybridBoardSquareDetail(nextSquare.row_id, nextSquare.column_id);
+    if (canPreserveCluster) {
+      await loadWorldMemoryClusterDetail(state.simulation.selectedClusterId, {
+        preserveNode: canPreserveNode,
+      });
     } else {
-      state.simulation.selectedSquare = null;
-      state.simulation.squareDetail = null;
-      renderHybridBoardDetail(null);
+      const nextCluster = worldMemory.clusters[0];
+      if (nextCluster) {
+        await loadWorldMemoryClusterDetail(nextCluster.cluster_id, { preserveNode: false });
+      } else {
+        state.simulation.selectedClusterId = null;
+        state.simulation.clusterDetail = null;
+        renderWorldMemoryClusterDetail(null);
+      }
+    }
+
+    if (canPreserveNode) {
+      await loadWorldMemoryNodeDetail(state.simulation.selectedNodeId, { syncCluster: false });
+    } else {
+      const nextNode = worldMemory.nodes.find((node) => node.depth_candidate) || worldMemory.nodes[0];
+      if (nextNode) {
+        await loadWorldMemoryNodeDetail(nextNode.node_id, { syncCluster: true });
+      } else {
+        state.simulation.selectedNodeId = null;
+        state.simulation.nodeDetail = null;
+        renderWorldMemoryNodeDetail(null);
+      }
     }
   } catch (error) {
     state.simulation.board = null;
     state.simulation.worldMemory = null;
     state.simulation.squareDetail = null;
+    state.simulation.selectedClusterId = null;
+    state.simulation.selectedNodeId = null;
+    state.simulation.clusterDetail = null;
+    state.simulation.nodeDetail = null;
     renderHybridBoard(null);
     renderHybridBoardDetail(null);
     renderWorldMemory(null);
+    renderWorldMemoryClusterDetail(null);
+    renderWorldMemoryNodeDetail(null);
     document.querySelector("#simulation-board-summary").textContent = error.message;
     document.querySelector("#simulation-board-summary").className = "detail-card";
   }
@@ -2269,6 +2580,18 @@ function bindEvents() {
       return;
     }
     loadHybridBoardSquareDetail(cell.dataset.hybridRowId, cell.dataset.hybridColumnId);
+  });
+  document.querySelector("#simulation-board-detail").addEventListener("click", (event) => {
+    void handleSimulationLinkClick(event);
+  });
+  document.querySelector("#world-memory-shell").addEventListener("click", (event) => {
+    void handleSimulationLinkClick(event);
+  });
+  document.querySelector("#world-memory-cluster-detail").addEventListener("click", (event) => {
+    void handleSimulationLinkClick(event);
+  });
+  document.querySelector("#world-memory-node-detail").addEventListener("click", (event) => {
+    void handleSimulationLinkClick(event);
   });
   document.querySelector("#ingest-queue-jobs").addEventListener("click", (event) => {
     const button = event.target.closest("[data-queue-job-id]");

@@ -16,6 +16,8 @@ from klone.api import (  # noqa: E402
     simulation_hybrid_board,
     simulation_hybrid_board_square_detail,
     simulation_world_memory,
+    simulation_world_memory_cluster_detail,
+    simulation_world_memory_node_detail,
 )
 from klone.config import Settings  # noqa: E402
 from klone.ingest import ingest_dataset  # noqa: E402
@@ -38,7 +40,10 @@ class SimulationPhaseS11Tests(unittest.TestCase):
         aggregate_board = observed["aggregate"]
         restricted_board = observed["restricted"]
         square_detail = observed["square_detail"]
+        linked_square_detail = observed["linked_square_detail"]
         world_memory = observed["world_memory"]
+        cluster_detail = observed["cluster_detail"]
+        node_detail = observed["node_detail"]
         world_memory_repeat = observed["world_memory_repeat"]
 
         self.assertTrue(aggregate_board["read_only"])
@@ -71,16 +76,49 @@ class SimulationPhaseS11Tests(unittest.TestCase):
         self.assertTrue(
             all(source["room_id"] == "restricted-room" for source in square_detail["sources"])
         )
+        self.assertGreater(linked_square_detail["linked_cluster_count"], 0)
+        self.assertGreater(linked_square_detail["linked_node_count"], 0)
+        self.assertTrue(
+            any(
+                cluster["cluster_id"] == cluster_detail["cluster"]["cluster_id"]
+                for cluster in linked_square_detail["linked_clusters"]
+            )
+        )
+        self.assertTrue(
+            any(
+                node["node_id"] == node_detail["node"]["node_id"]
+                for node in linked_square_detail["linked_nodes"]
+            )
+        )
 
         self.assertTrue(world_memory["read_only"])
         self.assertEqual(world_memory["requested_room_id"], "restricted-room")
         self.assertEqual(world_memory["resolved_room_ids"], ["restricted-room"])
         self.assertGreater(world_memory["node_count"], 0)
         self.assertGreater(world_memory["cluster_count"], 0)
+        self.assertGreater(world_memory["place_candidate_count"], 0)
+        self.assertGreater(world_memory["depth_candidate_count"], 0)
         self.assertTrue(
             any(node["relative_path"].endswith("scene.jpg") for node in world_memory["nodes"])
         )
         self.assertIn("image_scene", world_memory["anchor_types"])
+        self.assertEqual(cluster_detail["requested_room_id"], "restricted-room")
+        self.assertEqual(cluster_detail["cluster"]["room_id"], "restricted-room")
+        self.assertGreater(cluster_detail["cluster"]["depth_candidate_count"], 0)
+        self.assertGreater(len(cluster_detail["linked_squares"]), 0)
+        self.assertTrue(
+            any(
+                square["square_id"] == node_detail["linked_square"]["square_id"]
+                for square in cluster_detail["linked_squares"]
+            )
+        )
+        self.assertTrue(cluster_detail["nodes"])
+        self.assertEqual(node_detail["requested_room_id"], "restricted-room")
+        self.assertEqual(node_detail["node"]["room_id"], "restricted-room")
+        self.assertTrue(node_detail["place_shell"]["eligible"])
+        self.assertTrue(node_detail["place_shell"]["depth_candidate"])
+        self.assertEqual(node_detail["place_shell"]["stage"], "depth_anything_v2_candidate")
+        self.assertEqual(node_detail["linked_square"]["square_id"], node_detail["node"]["primary_square_id"])
 
         self.assertEqual(aggregate_board, observed["aggregate_repeat"])
         self.assertEqual(world_memory, world_memory_repeat)
@@ -126,6 +164,23 @@ class SimulationPhaseS11Tests(unittest.TestCase):
                 room_id="restricted-room",
                 services=app.state.services,
             ).model_dump(mode="json")
+            depth_node = next(node for node in world_memory["nodes"] if node["depth_candidate"])
+            cluster_detail = simulation_world_memory_cluster_detail(
+                cluster_id=depth_node["cluster_id"],
+                room_id="restricted-room",
+                services=app.state.services,
+            ).model_dump(mode="json")
+            node_detail = simulation_world_memory_node_detail(
+                node_id=depth_node["node_id"],
+                room_id="restricted-room",
+                services=app.state.services,
+            ).model_dump(mode="json")
+            linked_square_detail = simulation_hybrid_board_square_detail(
+                row_id=node_detail["linked_square"]["row_id"],
+                column_id=node_detail["linked_square"]["column_id"],
+                room_id="restricted-room",
+                services=app.state.services,
+            ).model_dump(mode="json")
             aggregate_repeat = simulation_hybrid_board(
                 room_id=None,
                 services=app.state.services,
@@ -138,7 +193,10 @@ class SimulationPhaseS11Tests(unittest.TestCase):
                 "aggregate": aggregate,
                 "restricted": restricted,
                 "square_detail": square_detail,
+                "linked_square_detail": linked_square_detail,
                 "world_memory": world_memory,
+                "cluster_detail": cluster_detail,
+                "node_detail": node_detail,
                 "aggregate_repeat": aggregate_repeat,
                 "world_memory_repeat": world_memory_repeat,
             }

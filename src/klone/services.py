@@ -251,6 +251,30 @@ class SimulationService:
                 description="Read the first governed world-memory shell projected from indexed local assets.",
                 backed_by=["SimulationService", "BlobService", "PolicyService"],
             ),
+            PublicCapabilityRecord(
+                id="simulation.world_memory.cluster_detail.read",
+                name="World Memory Cluster Detail",
+                category="simulation",
+                path="/api/simulation/world-memory/clusters/{cluster_id}",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=True,
+                status="available",
+                description="Inspect one governed world-memory cluster and its linked simulation squares.",
+                backed_by=["SimulationService", "BlobService", "PolicyService"],
+            ),
+            PublicCapabilityRecord(
+                id="simulation.world_memory.node_detail.read",
+                name="World Memory Node Detail",
+                category="simulation",
+                path="/api/simulation/world-memory/nodes/{node_id}",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=True,
+                status="available",
+                description="Inspect one governed world-memory node with its place/depth candidate shell.",
+                backed_by=["SimulationService", "BlobService", "PolicyService"],
+            ),
         ]
 
 

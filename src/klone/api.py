@@ -28,6 +28,8 @@ from .schemas import (
     AssetRecord,
     AuditEventRecord,
     CloneChatRequest,
+    CloneChatOpenAIConfigRequest,
+    CloneChatOpenAIConfigResponse,
     CloneChatResponseRecord,
     CloneChatStatusRecord,
     ConstitutionSnapshotRecord,
@@ -78,6 +80,8 @@ from .schemas import (
     BootstrapStatusRecord,
     RoomRecord,
     RuntimeConfigRecord,
+    WorldMemoryClusterDetailRecord,
+    WorldMemoryNodeDetailRecord,
     WorldMemoryRecord,
 )
 from .services import ServiceContainer
@@ -644,6 +648,54 @@ def simulation_world_memory(
     )
 
 
+@router.get(
+    "/simulation/world-memory/clusters/{cluster_id}",
+    response_model=WorldMemoryClusterDetailRecord,
+)
+def simulation_world_memory_cluster_detail(
+    cluster_id: str,
+    room_id: str | None = Query(default=None),
+    services: ServiceContainer = Depends(get_service_container),
+) -> WorldMemoryClusterDetailRecord:
+    rooms = _resolve_rooms(
+        requested_room_id=room_id,
+        permission="summarize",
+        accept_requires_approval=True,
+    )
+    try:
+        return services.simulation.world_memory.build_cluster_detail(
+            room_ids=[room.id for room in rooms],
+            requested_room_id=room_id,
+            cluster_id=cluster_id,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get(
+    "/simulation/world-memory/nodes/{node_id}",
+    response_model=WorldMemoryNodeDetailRecord,
+)
+def simulation_world_memory_node_detail(
+    node_id: str,
+    room_id: str | None = Query(default=None),
+    services: ServiceContainer = Depends(get_service_container),
+) -> WorldMemoryNodeDetailRecord:
+    rooms = _resolve_rooms(
+        requested_room_id=room_id,
+        permission="summarize",
+        accept_requires_approval=True,
+    )
+    try:
+        return services.simulation.world_memory.build_node_detail(
+            room_ids=[room.id for room in rooms],
+            requested_room_id=room_id,
+            node_id=node_id,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
 @router.get("/constitution", response_model=ConstitutionSnapshotRecord)
 def constitution_snapshot(
     services: ServiceContainer = Depends(get_service_container),
@@ -693,6 +745,20 @@ def clone_chat_status(
     services: ServiceContainer = Depends(get_service_container),
 ) -> CloneChatStatusRecord:
     return services.dialogue_corpus.chat_status()
+
+
+@router.post("/clone-chat/openai/configure", response_model=CloneChatOpenAIConfigResponse)
+def clone_chat_openai_configure(
+    request: CloneChatOpenAIConfigRequest,
+    services: ServiceContainer = Depends(get_service_container),
+) -> CloneChatOpenAIConfigResponse:
+    try:
+        return services.dialogue_corpus.configure_openai_api_key(
+            api_key=request.api_key,
+            persist=request.persist,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @router.post("/clone-chat/respond", response_model=CloneChatResponseRecord)

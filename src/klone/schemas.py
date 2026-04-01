@@ -200,6 +200,19 @@ class CloneChatRequest(BaseModel):
     history: list[CloneChatMessageRecord] = Field(default_factory=list, max_length=24)
 
 
+class CloneChatOpenAIConfigRequest(BaseModel):
+    api_key: str = Field(..., min_length=20, max_length=400)
+    persist: bool = True
+
+
+class CloneChatOpenAIConfigResponse(BaseModel):
+    configured: bool
+    persisted: bool
+    key_source: str
+    preferred_model: str
+    note: str
+
+
 class DialogueCorpusSourceRecord(BaseModel):
     label: str
     path: str
@@ -315,6 +328,7 @@ class DialogueCorpusAnswerRecord(BaseModel):
 class CloneChatStatusRecord(BaseModel):
     default_source_path: str | None = None
     openai_api_configured: bool
+    openai_key_source: str | None = None
     preferred_model: str
     available_modes: list[str]
     channel_name: str
@@ -718,6 +732,31 @@ class HybridBoardSourceRecord(BaseModel):
     markers: list[str]
 
 
+class HybridBoardWorldMemoryClusterRefRecord(BaseModel):
+    cluster_id: str
+    room_id: str
+    dataset_label: str
+    label: str
+    node_count: int
+    dominant_asset_kind: str
+    primary_square_id: str | None = None
+    primary_square_title: str | None = None
+    place_score: float
+
+
+class HybridBoardWorldMemoryNodeRefRecord(BaseModel):
+    node_id: str
+    cluster_id: str
+    room_id: str
+    label: str
+    anchor_type: str
+    asset_kind: str
+    primary_square_id: str
+    primary_square_title: str
+    place_score: float
+    depth_candidate: bool
+
+
 class HybridBoardSquareRecord(BaseModel):
     square_id: str
     row_id: str
@@ -766,8 +805,29 @@ class HybridBoardSquareDetailRecord(BaseModel):
     square: HybridBoardSquareRecord
     source_count: int
     sources: list[HybridBoardSourceRecord]
+    linked_cluster_count: int = 0
+    linked_node_count: int = 0
+    linked_clusters: list[HybridBoardWorldMemoryClusterRefRecord] = Field(default_factory=list)
+    linked_nodes: list[HybridBoardWorldMemoryNodeRefRecord] = Field(default_factory=list)
     notes: list[str]
     warnings: list[str]
+
+
+class WorldMemorySquareLinkRecord(BaseModel):
+    square_id: str
+    row_id: str
+    column_id: str
+    title: str
+    weight: float
+
+
+class WorldMemoryPlaceShellRecord(BaseModel):
+    stage: str
+    eligible: bool
+    depth_candidate: bool
+    place_score: float
+    rationale: str
+    cues: list[str]
 
 
 class WorldMemoryClusterRecord(BaseModel):
@@ -779,6 +839,11 @@ class WorldMemoryClusterRecord(BaseModel):
     label: str
     node_count: int
     dominant_asset_kind: str
+    primary_square_id: str | None = None
+    primary_square_title: str | None = None
+    place_score: float = 0.0
+    image_candidate_count: int = 0
+    depth_candidate_count: int = 0
     recent_indexed_at: str | None = None
 
 
@@ -796,6 +861,10 @@ class WorldMemoryNodeRecord(BaseModel):
     file_name: str
     size_bytes: int
     intensity: float
+    primary_square_id: str
+    primary_square_title: str
+    place_score: float
+    depth_candidate: bool
     indexed_at: str
     fs_modified_at: str
 
@@ -807,9 +876,36 @@ class WorldMemoryRecord(BaseModel):
     resolved_room_ids: list[str]
     node_count: int
     cluster_count: int
+    place_candidate_count: int
+    depth_candidate_count: int
     anchor_types: list[str]
     clusters: list[WorldMemoryClusterRecord]
     nodes: list[WorldMemoryNodeRecord]
+    notes: list[str]
+    warnings: list[str]
+
+
+class WorldMemoryClusterDetailRecord(BaseModel):
+    projection_version: str
+    read_only: bool = True
+    requested_room_id: str | None = None
+    resolved_room_ids: list[str]
+    cluster: WorldMemoryClusterRecord
+    linked_squares: list[WorldMemorySquareLinkRecord]
+    nodes: list[WorldMemoryNodeRecord]
+    notes: list[str]
+    warnings: list[str]
+
+
+class WorldMemoryNodeDetailRecord(BaseModel):
+    projection_version: str
+    read_only: bool = True
+    requested_room_id: str | None = None
+    resolved_room_ids: list[str]
+    node: WorldMemoryNodeRecord
+    linked_square: WorldMemorySquareLinkRecord
+    place_shell: WorldMemoryPlaceShellRecord
+    metadata: dict[str, Any] | None = None
     notes: list[str]
     warnings: list[str]
 

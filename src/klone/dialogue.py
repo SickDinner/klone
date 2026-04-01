@@ -13,6 +13,7 @@ from typing import Any
 
 from .schemas import (
     CloneChatMessageRecord,
+    CloneChatOpenAIConfigResponse,
     CloneChatResponseRecord,
     CloneChatStatusRecord,
     DialogueCorpusActivityBucketRecord,
@@ -347,6 +348,21 @@ class DialogueCorpusService:
                 ),
                 backed_by=["DialogueCorpusService"],
             ),
+            PublicCapabilityRecord(
+                id="clone.chat.configure_openai",
+                name="Clone Chat Configure OpenAI",
+                category="clone_chat",
+                path="/api/clone-chat/openai/configure",
+                methods=["POST"],
+                read_only=False,
+                room_scoped=False,
+                status="available",
+                description=(
+                    "Persist an OpenAI API key locally for the clone chat room so GPT-5.4 rendering can be used "
+                    "without manual environment-variable setup."
+                ),
+                backed_by=["DialogueCorpusService"],
+            ),
         ]
 
     def analyze(
@@ -431,18 +447,53 @@ class DialogueCorpusService:
         return self._unsupported_answer(question=question, analysis=analysis)
 
     def chat_status(self) -> CloneChatStatusRecord:
+        _, key_source = self._resolve_openai_api_key()
         return CloneChatStatusRecord(
             default_source_path=self._default_source_path(),
             openai_api_configured=self._openai_api_configured(),
+            openai_key_source=key_source,
             preferred_model=self._preferred_openai_model(),
             available_modes=["auto", "bounded", "gpt-5.4"],
             channel_name=CHAT_CHANNEL_NAME,
             notes=[
                 "The chat room is read-only and grounded in the bounded dialogue-corpus shell.",
                 "If OpenAI is not configured, replies stay in local bounded mode without external calls.",
+                "You can configure an API key once from the chat room UI and keep GPT-5.4 available on this machine.",
                 "Raw semantic retrieval, embeddings, and memory writes stay disabled in this phase.",
             ],
             suggested_queries=list(SUGGESTED_DIALOGUE_QUERIES),
+        )
+
+    def configure_openai_api_key(
+        self,
+        *,
+        api_key: str,
+        persist: bool = True,
+    ) -> CloneChatOpenAIConfigResponse:
+        normalized_key = api_key.strip()
+        if len(normalized_key) < 20:
+            raise ValueError("OpenAI API key looks too short.")
+        os.environ["OPENAI_API_KEY"] = normalized_key
+
+        persisted = False
+        key_source = "process_env"
+        if persist:
+            key_path = self._local_openai_api_key_path()
+            key_path.parent.mkdir(parents=True, exist_ok=True)
+            key_path.write_text(normalized_key, encoding="utf-8")
+            persisted = True
+            key_source = "local_file"
+
+        return CloneChatOpenAIConfigResponse(
+            configured=True,
+            persisted=persisted,
+            key_source=key_source,
+            preferred_model=self._preferred_openai_model(),
+            note=(
+                "OpenAI API key configured for clone chat. GPT-5.4 can now be used in auto mode."
+                if persisted
+                else "OpenAI API key configured for this server process."
+            ),
         )
 
     def chat_reply(
@@ -1688,7 +1739,28 @@ class DialogueCorpusService:
         return os.environ.get("KLONE_OPENAI_MODEL", DEFAULT_OPENAI_MODEL).strip() or DEFAULT_OPENAI_MODEL
 
     def _openai_api_configured(self) -> bool:
-        return bool(os.environ.get("OPENAI_API_KEY", "").strip())
+        api_key, _ = self._resolve_openai_api_key()
+        return bool(api_key)
+
+    def _resolve_openai_api_key(self) -> tuple[str, str | None]:
+        env_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        if env_key:
+            return env_key, "env"
+
+        key_path = self._local_openai_api_key_path()
+        if key_path.is_file():
+            persisted_key = key_path.read_text(encoding="utf-8").strip()
+            if persisted_key:
+                return persisted_key, "local_file"
+
+        return "", None
+
+    @staticmethod
+    def _local_openai_api_key_path() -> Path:
+        local_app_data = os.environ.get("LOCALAPPDATA", "").strip()
+        if local_app_data:
+            return Path(local_app_data) / "Klone" / "openai_api_key.txt"
+        return Path.home() / ".klone" / "openai_api_key.txt"
 
     def _normalize_chat_message(self, message: str) -> str:
         repaired = self._repair_text(message)
@@ -1759,7 +1831,7 @@ class DialogueCorpusService:
         owner_name: str,
         model: str,
     ) -> str:
-        api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        api_key, _ = self._resolve_openai_api_key()
         if not api_key:
             raise ValueError("OPENAI_API_KEY is not configured.")
 

@@ -32,7 +32,11 @@ class Phase2B8Tests(unittest.TestCase):
         app = create_app(self._settings_for("phase_2b_8_status.sqlite"))
         with patch.dict(
             "os.environ",
-            {"KLONE_DIALOGUE_SOURCE": str(self.meta_root)},
+            {
+                "KLONE_DIALOGUE_SOURCE": str(self.meta_root),
+                "LOCALAPPDATA": str(self.root / "localappdata"),
+                "OPENAI_API_KEY": "",
+            },
             clear=False,
         ):
             observed = asyncio.run(self._perform_request(app, method="GET", path="/api/clone-chat/status"))
@@ -41,8 +45,37 @@ class Phase2B8Tests(unittest.TestCase):
         payload = observed["json"]
         self.assertEqual(payload["default_source_path"], str(self.meta_root))
         self.assertFalse(payload["openai_api_configured"])
+        self.assertIsNone(payload["openai_key_source"])
         self.assertEqual(payload["preferred_model"], "gpt-5.4")
         self.assertEqual(payload["channel_name"], "#clone-test-room")
+
+    def test_clone_chat_openai_configure_route_persists_local_key(self) -> None:
+        app = create_app(self._settings_for("phase_2b_8_configure.sqlite"))
+        local_app_data = self.root / "localappdata"
+        with patch.dict(
+            "os.environ",
+            {"LOCALAPPDATA": str(local_app_data), "OPENAI_API_KEY": ""},
+            clear=False,
+        ):
+            observed = asyncio.run(
+                self._perform_request(
+                    app,
+                    method="POST",
+                    path="/api/clone-chat/openai/configure",
+                    body={"api_key": "sk-test-abcdefghijklmnopqrstuvwxyz", "persist": True},
+                )
+            )
+            status = asyncio.run(self._perform_request(app, method="GET", path="/api/clone-chat/status"))
+
+        self.assertEqual(observed["status_code"], 200)
+        payload = observed["json"]
+        self.assertTrue(payload["configured"])
+        self.assertTrue(payload["persisted"])
+        self.assertEqual(payload["key_source"], "local_file")
+        self.assertTrue((local_app_data / "Klone" / "openai_api_key.txt").is_file())
+        self.assertEqual(status["status_code"], 200)
+        self.assertTrue(status["json"]["openai_api_configured"])
+        self.assertEqual(status["json"]["openai_key_source"], "env")
 
     def test_clone_chat_respond_route_returns_bounded_local_reply(self) -> None:
         app = create_app(self._settings_for("phase_2b_8_reply.sqlite"))
@@ -89,12 +122,48 @@ class Phase2B8Tests(unittest.TestCase):
         self.assertEqual(payload["backend_mode"], "bounded_local")
         self.assertIn("OPENAI_API_KEY is not configured", payload["system_notes"][0])
 
+    def test_clone_chat_respond_route_uses_openai_when_key_is_configured(self) -> None:
+        app = create_app(self._settings_for("phase_2b_8_openai.sqlite"))
+        local_app_data = self.root / "localappdata"
+        key_dir = local_app_data / "Klone"
+        key_dir.mkdir(parents=True, exist_ok=True)
+        (key_dir / "openai_api_key.txt").write_text("sk-test-abcdefghijklmnopqrstuvwxyz", encoding="utf-8")
+
+        with patch.dict(
+            "os.environ",
+            {"LOCALAPPDATA": str(local_app_data), "OPENAI_API_KEY": ""},
+            clear=False,
+        ):
+            with patch(
+                "klone.dialogue.DialogueCorpusService._call_openai_responses_api",
+                return_value={"output_text": "Tama tuli OpenAI-polun kautta."},
+            ):
+                observed = asyncio.run(
+                    self._perform_request(
+                        app,
+                        method="POST",
+                        path="/api/clone-chat/respond",
+                        body={
+                            "source_path": str(self.meta_root),
+                            "message": "Keiden kanssa olen puhunut eniten?",
+                            "mode": "gpt-5.4",
+                            "history": [],
+                        },
+                    )
+                )
+
+        self.assertEqual(observed["status_code"], 200)
+        payload = observed["json"]
+        self.assertEqual(payload["backend_mode"], "openai_gpt_5_4")
+        self.assertTrue(payload["llm_call_performed"])
+        self.assertEqual(payload["reply"]["content"], "Tama tuli OpenAI-polun kautta.")
+
     def test_clone_chat_ui_copy_is_present(self) -> None:
         html = (PROJECT_ROOT / "src" / "klone" / "static" / "chat.html").read_text(encoding="utf-8")
         js = (PROJECT_ROOT / "src" / "klone" / "static" / "chat.js").read_text(encoding="utf-8")
         self.assertIn("#clone-test-room", html)
         self.assertIn("/api/clone-chat/respond", js)
-        self.assertIn("OPENAI_API_KEY", js)
+        self.assertIn("/api/clone-chat/openai/configure", js)
 
     async def _perform_request(
         self,

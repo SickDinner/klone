@@ -10,6 +10,8 @@ const CHAT_STORAGE_KEYS = {
   mode: "klone.chat.mode",
 };
 
+const OPENAI_CONFIG_ROUTE = "/api/clone-chat/openai/configure";
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -67,6 +69,31 @@ function setModeBadge(message) {
   document.querySelector("#chat-mode-badge").textContent = message;
 }
 
+function renderOpenAISetup(status) {
+  const setupBlock = document.querySelector("#chat-openai-setup-block");
+  const setupRoot = document.querySelector("#chat-openai-setup");
+  const shouldHide = Boolean(status.openai_api_configured);
+
+  setupBlock.classList.toggle("is-hidden", shouldHide);
+  if (shouldHide) {
+    setupRoot.innerHTML = `
+      <p class="irc-setup-copy">GPT-yhteys on jo konfiguroitu talle koneelle.</p>
+    `;
+    return;
+  }
+
+  setupRoot.innerHTML = `
+    <p class="irc-setup-copy">
+      Liita OpenAI API -avaimesi kerran, niin huone vaihtaa GPT-5.4-tilaan talla koneella.
+    </p>
+    <form id="chat-openai-form" class="irc-openai-form">
+      <input id="chat-openai-key" type="password" placeholder="sk-..." autocomplete="off" />
+      <button class="button" id="chat-openai-connect" type="submit">Ota GPT kayttoon</button>
+    </form>
+  `;
+  bindOpenAISetupForm();
+}
+
 function renderStatus(status) {
   const root = document.querySelector("#chat-status");
   root.className = "detail-card";
@@ -75,6 +102,7 @@ function renderStatus(status) {
       <span class="chip">channel: ${escapeHtml(status.channel_name)}</span>
       <span class="chip">OpenAI: ${status.openai_api_configured ? "configured" : "missing"}</span>
       <span class="chip">preferred_model: ${escapeHtml(status.preferred_model)}</span>
+      ${status.openai_key_source ? `<span class="chip">key_source: ${escapeHtml(status.openai_key_source)}</span>` : ""}
     </div>
     <ul class="detail-list">
       <li><strong>default_source_path</strong>: ${escapeHtml(status.default_source_path || "not set")}</li>
@@ -102,6 +130,7 @@ function renderStatus(status) {
   modeSelect.value = loadStoredValue(CHAT_STORAGE_KEYS.mode) || "auto";
 
   setModeBadge(status.openai_api_configured ? "auto -> GPT-5.4 kaytettavissa" : "auto -> bounded local");
+  renderOpenAISetup(status);
 }
 
 function renderLog() {
@@ -265,6 +294,56 @@ async function submitChatMessage(rawValue) {
   }
 }
 
+async function configureOpenAI(event) {
+  event.preventDefault();
+  const input = document.querySelector("#chat-openai-key");
+  const button = document.querySelector("#chat-openai-connect");
+  const apiKey = input.value.trim();
+
+  if (!apiKey) {
+    setFeedback("OpenAI API -avain puuttuu.");
+    input.focus();
+    return;
+  }
+
+  button.disabled = true;
+  setFeedback("Tallennetaan OpenAI-yhteys...");
+  try {
+    const response = await fetchJson(OPENAI_CONFIG_ROUTE, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: apiKey, persist: true }),
+    });
+    input.value = "";
+    chatState.status = await fetchJson("/api/clone-chat/status");
+    renderStatus(chatState.status);
+    document.querySelector("#chat-mode").value = "auto";
+    saveStoredValue(CHAT_STORAGE_KEYS.mode, "auto");
+    setModeBadge("auto -> GPT-5.4 kaytettavissa");
+    appendLine({
+      role: "system",
+      speaker: "system",
+      content: response.note,
+      meta: [`model: ${response.preferred_model}`],
+    });
+    setFeedback("GPT-5.4 on nyt valmiina kayttoon.");
+  } catch (error) {
+    setFeedback(error.message);
+    appendLine({ role: "system", speaker: "system", content: error.message });
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function bindOpenAISetupForm() {
+  const form = document.querySelector("#chat-openai-form");
+  if (!form || form.dataset.bound === "true") {
+    return;
+  }
+  form.addEventListener("submit", configureOpenAI);
+  form.dataset.bound = "true";
+}
+
 async function sendChatMessage(event) {
   event.preventDefault();
   const input = document.querySelector("#chat-input");
@@ -306,6 +385,7 @@ function bindEvents() {
   document.querySelector("#chat-owner-name").addEventListener("change", (event) => {
     saveStoredValue(CHAT_STORAGE_KEYS.ownerName, event.currentTarget.value.trim());
   });
+  bindOpenAISetupForm();
 }
 
 async function main() {

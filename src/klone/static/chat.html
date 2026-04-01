@@ -24,6 +24,23 @@
           <h2>Room Status</h2>
           <div id="chat-status" class="detail-card empty-state">Loading chat room status...</div>
         </div>
+        <div class="irc-side-block" id="chat-openai-setup-block">
+          <h2>GPT Setup</h2>
+          <div id="chat-openai-setup" class="detail-card">
+            <p class="irc-setup-copy">
+              Liita OpenAI API -avaimesi kerran, niin huone vaihtaa GPT-5.4-tilaan talla koneella.
+            </p>
+            <form id="chat-openai-form" class="irc-openai-form">
+              <input
+                id="chat-openai-key"
+                type="password"
+                placeholder="sk-..."
+                autocomplete="off"
+              />
+              <button class="button" id="chat-openai-connect" type="submit">Ota GPT kayttoon</button>
+            </form>
+          </div>
+        </div>
         <div class="irc-side-block">
           <h2>Suggested Queries</h2>
           <div id="chat-suggestions" class="stack"></div>

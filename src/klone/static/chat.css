@@ -40,6 +40,10 @@ body {
   gap: 10px;
 }
 
+.is-hidden {
+  display: none !important;
+}
+
 .irc-channel-list {
   display: grid;
   gap: 10px;
@@ -249,6 +253,29 @@ body {
   background: rgba(7, 15, 16, 0.68);
   color: var(--text);
   font: inherit;
+}
+
+.irc-openai-form {
+  display: grid;
+  gap: 10px;
+}
+
+.irc-openai-form input {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line-strong);
+  background: rgba(7, 15, 16, 0.68);
+  color: var(--text);
+  font: inherit;
+}
+
+.irc-setup-copy {
+  margin-bottom: 0;
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: 0.92rem;
 }
 
 .irc-suggestion {

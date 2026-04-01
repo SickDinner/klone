@@ -142,6 +142,39 @@ class ArtAssetComparisonRecord(BaseModel):
     warnings: list[str]
 
 
+class ConstitutionParameterRecord(BaseModel):
+    key: str
+    value: float
+    min_value: float
+    max_value: float
+    category: str
+    description: str
+
+
+class ConstitutionChangeRecord(BaseModel):
+    version: str
+    changed_at: str
+    actor: str
+    summary: str
+    effect_scope: str
+    notes: list[str]
+
+
+class ConstitutionSnapshotRecord(BaseModel):
+    profile_id: str
+    layer_version: str
+    summary: str
+    approval_state: str
+    read_only: bool = True
+    routing_influence_enabled: bool = False
+    parameter_count: int
+    change_count: int
+    parameters: list[ConstitutionParameterRecord]
+    recent_changes: list[ConstitutionChangeRecord]
+    notes: list[str]
+    warnings: list[str]
+
+
 class BlobMetadataRecord(BaseModel):
     blob_id: str
     asset_id: int

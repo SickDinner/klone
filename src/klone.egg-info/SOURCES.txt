@@ -42,6 +42,7 @@ tests/test_memory_phase_2c4.py
 tests/test_memory_phase_2c5.py
 tests/test_phase_2b_6.py
 tests/test_phase_2b_7.py
+tests/test_phase_2b_8.py
 tests/test_phase_2e_1.py
 tests/test_phase_a1_1.py
 tests/test_phase_a1_2.py

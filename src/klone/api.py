@@ -27,6 +27,9 @@ from .schemas import (
     ArtAssetMetricsRecord,
     AssetRecord,
     AuditEventRecord,
+    CloneChatRequest,
+    CloneChatResponseRecord,
+    CloneChatStatusRecord,
     ConstitutionSnapshotRecord,
     DialogueCorpusAnalysisRecord,
     DialogueCorpusAnalysisRequest,
@@ -35,6 +38,7 @@ from .schemas import (
     DatasetIngestRequest,
     DatasetRecord,
     GovernanceGuardRecord,
+    HybridBoardSquareDetailRecord,
     HybridMemoryBoardRecord,
     IngestExecutionResponse,
     IngestPreflightResponse,
@@ -74,6 +78,7 @@ from .schemas import (
     BootstrapStatusRecord,
     RoomRecord,
     RuntimeConfigRecord,
+    WorldMemoryRecord,
 )
 from .services import ServiceContainer
 
@@ -597,6 +602,48 @@ def simulation_hybrid_board(
     )
 
 
+@router.get(
+    "/simulation/hybrid-board/squares/{row_id}/{column_id}",
+    response_model=HybridBoardSquareDetailRecord,
+)
+def simulation_hybrid_board_square_detail(
+    row_id: str,
+    column_id: str,
+    room_id: str | None = Query(default=None),
+    services: ServiceContainer = Depends(get_service_container),
+) -> HybridBoardSquareDetailRecord:
+    rooms = _resolve_rooms(
+        requested_room_id=room_id,
+        permission="summarize",
+        accept_requires_approval=True,
+    )
+    try:
+        return services.simulation.hybrid_board.build_square_detail(
+            room_ids=[room.id for room in rooms],
+            requested_room_id=room_id,
+            row_id=row_id,
+            column_id=column_id,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get("/simulation/world-memory", response_model=WorldMemoryRecord)
+def simulation_world_memory(
+    room_id: str | None = Query(default=None),
+    services: ServiceContainer = Depends(get_service_container),
+) -> WorldMemoryRecord:
+    rooms = _resolve_rooms(
+        requested_room_id=room_id,
+        permission="summarize",
+        accept_requires_approval=True,
+    )
+    return services.simulation.world_memory.build_world_memory(
+        room_ids=[room.id for room in rooms],
+        requested_room_id=room_id,
+    )
+
+
 @router.get("/constitution", response_model=ConstitutionSnapshotRecord)
 def constitution_snapshot(
     services: ServiceContainer = Depends(get_service_container),
@@ -639,6 +686,34 @@ def dialogue_corpus_answer(
         raise HTTPException(status_code=400, detail=str(error)) from error
     except OSError as error:
         raise HTTPException(status_code=500, detail=f"Dialogue corpus answer failed: {error}") from error
+
+
+@router.get("/clone-chat/status", response_model=CloneChatStatusRecord)
+def clone_chat_status(
+    services: ServiceContainer = Depends(get_service_container),
+) -> CloneChatStatusRecord:
+    return services.dialogue_corpus.chat_status()
+
+
+@router.post("/clone-chat/respond", response_model=CloneChatResponseRecord)
+def clone_chat_respond(
+    request: CloneChatRequest,
+    services: ServiceContainer = Depends(get_service_container),
+) -> CloneChatResponseRecord:
+    try:
+        return services.dialogue_corpus.chat_reply(
+            source_path=request.source_path,
+            message=request.message,
+            history=request.history,
+            owner_name=request.owner_name,
+            mode=request.mode,
+        )
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except OSError as error:
+        raise HTTPException(status_code=500, detail=f"Clone chat failed: {error}") from error
 
 
 @router.get("/modules")

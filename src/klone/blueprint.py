@@ -93,11 +93,11 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
             name="Dialogue Corpus",
             zone_id="intimate",
             supervisor="memory supervisor",
-            stage="phase-2b7",
-            status="read_only_query_shell",
+            stage="phase-2b8",
+            status="read_only_chat_shell",
             purpose=(
                 "Analyze local conversation exports into relationship, network, style, and history priors and "
-                "answer bounded aggregate questions before any memory write path is enabled."
+                "answer bounded aggregate questions through a test chat room before any memory write path is enabled."
             ),
             key_inputs=["messenger exports", "chat exports", "thread metadata"],
             outputs=[
@@ -106,6 +106,7 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
                 "network visibility",
                 "style signals",
                 "bounded dialogue answers",
+                "clone chat room",
             ],
         ),
         ModuleCard(
@@ -161,7 +162,7 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
             status="read_only_projection",
             purpose="Project governed audit and memory evidence into runtime-visible boards and other read-only simulation surfaces without creating a second source of truth.",
             key_inputs=["audit evidence", "memory events", "memory episodes", "room registry"],
-            outputs=["hybrid board", "pressure summaries", "projection diagnostics"],
+            outputs=["hybrid board", "pressure summaries", "projection diagnostics", "world memory anchors"],
         ),
         ModuleCard(
             id="circadian-layer",
@@ -296,7 +297,7 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
             id="phase-2b",
             title="Memory and Timeline Spine",
             goal="Model raw events, entities, episodes, and conversation-corpus priors while keeping interpretations visibly linked to source truth.",
-            deliverables=["event model", "entity model", "episode model", "memory search", "conversation corpus shell"],
+            deliverables=["event model", "entity model", "episode model", "memory search", "conversation corpus shell", "clone chat room"],
         ),
         BuildPhase(
             id="phase-2c",

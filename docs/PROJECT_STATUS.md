@@ -3,7 +3,7 @@
 Last updated: 2026-04-01
 
 ## Current phase
-Phase 2B.7 complete; no further approved 2B.7, 2E, A1, G1, or V1 substep is defined yet
+Phase 2B.8 complete; no further approved 2B.8, 2E, A1, G1, or V1 substep is defined yet
 
 ## Phase state
 - Phase 2B.1 complete
@@ -13,6 +13,7 @@ Phase 2B.7 complete; no further approved 2B.7, 2E, A1, G1, or V1 substep is defi
 - Phase 2B.5 complete
 - Phase 2B.6 complete
 - Phase 2B.7 complete
+- Phase 2B.8 complete
 - Phase 2C.1 complete
 - Phase 2C.2 complete
 - Phase 2C.3 complete
@@ -67,6 +68,16 @@ Phase 2B.7 complete; no further approved 2B.7, 2E, A1, G1, or V1 substep is defi
 - repo now exposes a local `klone` CLI command for direct parser testing against a source path such as `C:\META`
 - `/v1/capabilities` now exposes the dialogue-corpus answer capability alongside the existing analysis capability
 - focused 2B.7 tests green
+- compile pass green
+
+## Completed in 2B.8
+- first browser-based clone chat room over the bounded dialogue-corpus shell
+- GET `/chat` now serves an IRC-style local test room for trying the clone interactively in browser
+- GET `/api/clone-chat/status` reports default source-path readiness, preferred model, and whether OpenAI-backed rendering is configured
+- POST `/api/clone-chat/respond` reuses the completed 2B.7 bounded answer surface and keeps unsupported-question gating intact
+- when `OPENAI_API_KEY` is configured, chat can render through GPT-5.4 via the OpenAI Responses API; otherwise it falls back to bounded local replies without blocking the room
+- the phase remains read-only and does not enable raw-message semantic retrieval, embeddings, autonomous roleplay loops, or memory writes
+- focused 2B.8 tests green
 - compile pass green
 
 
@@ -298,7 +309,7 @@ Phase 2B.7 complete; no further approved 2B.7, 2E, A1, G1, or V1 substep is defi
 - compile pass green
 
 ## Next approved substep
-- no further approved 2B.7, 2E, A1, G1, or V1 substep is enumerated in canonical repo evidence
-- require explicit roadmap extension or approval before widening the dialogue-corpus shell beyond the completed 2B.7 bounded export-query route, the constitution layer beyond the completed 2E.1 read-only shell, the public control-plane seam beyond the completed A1.9 change preview route, the ingest spine beyond the completed G1.5 bounded queue history seam, or the art-lab beyond the completed V1.2 bounded comparison seam
+- no further approved 2B.8, 2E, A1, G1, or V1 substep is enumerated in canonical repo evidence
+- require explicit roadmap extension or approval before widening the dialogue-corpus shell beyond the completed 2B.8 clone-chat route, the constitution layer beyond the completed 2E.1 read-only shell, the public control-plane seam beyond the completed A1.9 change preview route, the ingest spine beyond the completed G1.5 bounded queue history seam, or the art-lab beyond the completed V1.2 bounded comparison seam
 - do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, G1.4 local resumable queue work, G1.5 queue history work, V1.1 asset formal metrics work, V1.2 bounded comparison work, or 2E.1 constitution shell work
 

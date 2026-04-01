@@ -30,7 +30,7 @@ Requires-Dist: pillow<12,>=11
 
 Nykyinen kanoninen tila on:
 
-- `Phase 2B.7 bounded dialogue query shell complete`
+- `Phase 2B.8 clone chat shell complete`
 - `Phase 2E.1 read-only constitution shell complete`
 - `Phase A1 approved`
 - `A1.1 public control-plane seam kickoff complete`
@@ -105,6 +105,8 @@ Uutta tässä versiossa:
   `POST /api/dialogue-corpus/analyze` analysoi nyt local Messenger-export-rootit tai ChatGPT-export-JSONit read-only-tilassa ja nostaa näkyviin suhteet, verkoston laajuuden, tyyli-signaalit ja aikajanan silloin kun lähde oikeasti tukee niitä
 - `bounded dialogue query shell`
   `POST /api/dialogue-corpus/answer` ja paikallinen `klone`-CLI vastaavat nyt rajattuihin kysymyksiin kuten vahvimmat kontaktit, suurimmat ryhmät, verkoston koko, aikajana, tyyli, top-termit ja nimellä haettu counterpart ilman raw semantic searchia
+- `clone chat shell`
+  `GET /chat`, `GET /api/clone-chat/status` ja `POST /api/clone-chat/respond` avaavat nyt IRC-henkisen testihuoneen kloonille; huone käyttää bounded-korpusvastausta paikallisesti ja voi renderöidä GPT-5.4:llä heti kun `OPENAI_API_KEY` on asetettu
 - `constitution layer shell`
   `GET /api/constitution` näyttää nyt hitaasti muuttuvat malliparametrit, approval-tilan ja append-only muutosmuistiinpanot erillään memorystä
 
@@ -198,6 +200,9 @@ Supervisor hallitsee liikennettä vyöhykkeiden välillä. Moduulit eivät saa l
 │     ├─ v1_contracts.py
 │     └─ static/
 │        ├─ app.js
+│        ├─ chat.css
+│        ├─ chat.html
+│        ├─ chat.js
 │        ├─ index.html
 │        └─ styles.css
 └─ pyproject.toml
@@ -222,6 +227,12 @@ klone --source C:\META "Mitä tiedät Katja Asumasta tämän korpuksen perusteel
 klone --analyze
 ```
 
+Selainhuone löytyy nyt myös omasta URLista:
+
+```text
+http://127.0.0.1:8000/chat
+```
+
 ## Nykyinen API
 
 - `GET /api/health`
@@ -236,6 +247,8 @@ klone --analyze
 - `GET /api/constitution`
 - `POST /api/dialogue-corpus/analyze`
 - `POST /api/dialogue-corpus/answer`
+- `GET /api/clone-chat/status`
+- `POST /api/clone-chat/respond`
 - `GET /api/datasets`
 - `GET /api/assets`
 - `GET /api/assets/{asset_id}`

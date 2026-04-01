@@ -12,7 +12,11 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from klone.api import simulation_hybrid_board  # noqa: E402
+from klone.api import (  # noqa: E402
+    simulation_hybrid_board,
+    simulation_hybrid_board_square_detail,
+    simulation_world_memory,
+)
 from klone.config import Settings  # noqa: E402
 from klone.ingest import ingest_dataset  # noqa: E402
 from klone.main import create_app  # noqa: E402
@@ -33,6 +37,9 @@ class SimulationPhaseS11Tests(unittest.TestCase):
 
         aggregate_board = observed["aggregate"]
         restricted_board = observed["restricted"]
+        square_detail = observed["square_detail"]
+        world_memory = observed["world_memory"]
+        world_memory_repeat = observed["world_memory_repeat"]
 
         self.assertTrue(aggregate_board["read_only"])
         self.assertEqual(aggregate_board["square_count"], 64)
@@ -55,7 +62,28 @@ class SimulationPhaseS11Tests(unittest.TestCase):
         self.assertEqual(restricted_board["square_count"], 64)
         self.assertTrue(any(square["event_count"] > 0 for square in restricted_board["squares"]))
 
+        self.assertEqual(
+            square_detail["square"]["square_id"],
+            f"{square_detail['square']['row_id']}:{square_detail['square']['column_id']}",
+        )
+        self.assertGreater(square_detail["source_count"], 0)
+        self.assertGreater(len(square_detail["sources"]), 0)
+        self.assertTrue(
+            all(source["room_id"] == "restricted-room" for source in square_detail["sources"])
+        )
+
+        self.assertTrue(world_memory["read_only"])
+        self.assertEqual(world_memory["requested_room_id"], "restricted-room")
+        self.assertEqual(world_memory["resolved_room_ids"], ["restricted-room"])
+        self.assertGreater(world_memory["node_count"], 0)
+        self.assertGreater(world_memory["cluster_count"], 0)
+        self.assertTrue(
+            any(node["relative_path"].endswith("scene.jpg") for node in world_memory["nodes"])
+        )
+        self.assertIn("image_scene", world_memory["anchor_types"])
+
         self.assertEqual(aggregate_board, observed["aggregate_repeat"])
+        self.assertEqual(world_memory, world_memory_repeat)
 
     async def _collect_board_payloads(self, app) -> dict[str, object]:
         async with app.router.lifespan_context(app):
@@ -83,14 +111,36 @@ class SimulationPhaseS11Tests(unittest.TestCase):
                 room_id="restricted-room",
                 services=app.state.services,
             ).model_dump(mode="json")
+            active_square = next(
+                square
+                for square in restricted["squares"]
+                if square["event_count"] > 0 or square["episode_count"] > 0 or square["audit_count"] > 0
+            )
+            square_detail = simulation_hybrid_board_square_detail(
+                row_id=active_square["row_id"],
+                column_id=active_square["column_id"],
+                room_id="restricted-room",
+                services=app.state.services,
+            ).model_dump(mode="json")
+            world_memory = simulation_world_memory(
+                room_id="restricted-room",
+                services=app.state.services,
+            ).model_dump(mode="json")
             aggregate_repeat = simulation_hybrid_board(
                 room_id=None,
+                services=app.state.services,
+            ).model_dump(mode="json")
+            world_memory_repeat = simulation_world_memory(
+                room_id="restricted-room",
                 services=app.state.services,
             ).model_dump(mode="json")
             return {
                 "aggregate": aggregate,
                 "restricted": restricted,
+                "square_detail": square_detail,
+                "world_memory": world_memory,
                 "aggregate_repeat": aggregate_repeat,
+                "world_memory_repeat": world_memory_repeat,
             }
 
     def _ingest_dataset(

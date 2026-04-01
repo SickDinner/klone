@@ -1,0 +1,7 @@
+INFO:     Started server process [53660]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+ERROR:    [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8000): [winerror 10048] kutakin vastakeosoitetta (protokolla, verkko-osoite tai portti) voi k‰ytt‰‰ normaalisti vain 
+kerran
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.

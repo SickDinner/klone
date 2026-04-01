@@ -276,11 +276,12 @@ class DialogueCorpusService:
             id="dialogue-corpus-service",
             name="DialogueCorpusService",
             implementation="in_process_local_file_shell",
-            status="read_only_analysis_and_query_shell",
+            status="read_only_analysis_query_and_chat_shell",
             notes=[
                 "Analyzes local conversation exports without writing them into memory rows.",
                 "Current detectors support extracted Facebook/Messenger exports and ChatGPT conversation export JSON files.",
                 "Bounded question answering stays aggregate-only and does not expose raw semantic retrieval.",
+                "Clone chat can optionally use OpenAI Responses API when OPENAI_API_KEY is configured, but falls back to bounded local replies.",
             ],
         )
 
@@ -313,6 +314,36 @@ class DialogueCorpusService:
                 description=(
                     "Answer bounded relationship, network, style, and timeline questions from aggregate "
                     "dialogue-corpus evidence without enabling memory writes or raw semantic search."
+                ),
+                backed_by=["DialogueCorpusService"],
+            ),
+            PublicCapabilityRecord(
+                id="clone.chat.status",
+                name="Clone Chat Status",
+                category="clone_chat",
+                path="/api/clone-chat/status",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=False,
+                status="available",
+                description=(
+                    "Report whether the local clone chat room is ready, which source path will be used by default, "
+                    "and whether OpenAI-backed chat is configured."
+                ),
+                backed_by=["DialogueCorpusService"],
+            ),
+            PublicCapabilityRecord(
+                id="clone.chat.respond",
+                name="Clone Chat Respond",
+                category="clone_chat",
+                path="/api/clone-chat/respond",
+                methods=["POST"],
+                read_only=True,
+                room_scoped=False,
+                status="available",
+                description=(
+                    "Reply in an IRC-style clone test room using bounded dialogue evidence, with optional GPT-5.4 rendering "
+                    "when OPENAI_API_KEY is configured."
                 ),
                 backed_by=["DialogueCorpusService"],
             ),
@@ -398,6 +429,95 @@ class DialogueCorpusService:
                 )
 
         return self._unsupported_answer(question=question, analysis=analysis)
+
+    def chat_status(self) -> CloneChatStatusRecord:
+        return CloneChatStatusRecord(
+            default_source_path=self._default_source_path(),
+            openai_api_configured=self._openai_api_configured(),
+            preferred_model=self._preferred_openai_model(),
+            available_modes=["auto", "bounded", "gpt-5.4"],
+            channel_name=CHAT_CHANNEL_NAME,
+            notes=[
+                "The chat room is read-only and grounded in the bounded dialogue-corpus shell.",
+                "If OpenAI is not configured, replies stay in local bounded mode without external calls.",
+                "Raw semantic retrieval, embeddings, and memory writes stay disabled in this phase.",
+            ],
+            suggested_queries=list(SUGGESTED_DIALOGUE_QUERIES),
+        )
+
+    def chat_reply(
+        self,
+        *,
+        source_path: str,
+        message: str,
+        history: list[CloneChatMessageRecord] | None = None,
+        owner_name: str | None = None,
+        mode: str = "auto",
+    ) -> CloneChatResponseRecord:
+        normalized_message = self._normalize_chat_message(message)
+        if not normalized_message:
+            raise ValueError("Clone chat message is required.")
+
+        bounded_answer = self.answer(
+            source_path=source_path,
+            question=normalized_message,
+            owner_name=owner_name,
+        )
+
+        openai_configured = self._openai_api_configured()
+        requested_mode = mode
+        backend_mode = "bounded_local"
+        llm_call_performed = False
+        model: str | None = None
+        system_notes: list[str] = []
+
+        if requested_mode == "gpt-5.4" and not openai_configured:
+            system_notes.append(
+                "GPT-5.4 rendering was requested, but OPENAI_API_KEY is not configured, so the room fell back to bounded local mode."
+            )
+
+        if requested_mode in {"auto", "gpt-5.4"} and openai_configured:
+            model = self._preferred_openai_model()
+            try:
+                reply_text = self._render_chat_reply_with_openai(
+                    message=normalized_message,
+                    bounded_answer=bounded_answer,
+                    history=history or [],
+                    owner_name=owner_name or bounded_answer.owner_name,
+                    model=model,
+                )
+                backend_mode = "openai_gpt_5_4"
+                llm_call_performed = True
+            except ValueError as error:
+                system_notes.append(f"OpenAI rendering failed, so the room fell back to bounded local mode: {error}")
+                reply_text = self._render_local_chat_reply(
+                    message=normalized_message,
+                    bounded_answer=bounded_answer,
+                )
+                backend_mode = "bounded_fallback"
+                llm_call_performed = False
+        else:
+            reply_text = self._render_local_chat_reply(
+                message=normalized_message,
+                bounded_answer=bounded_answer,
+            )
+
+        reply = CloneChatMessageRecord(
+            role="assistant",
+            speaker="klone",
+            content=reply_text,
+        )
+        return CloneChatResponseRecord(
+            requested_mode=requested_mode,
+            backend_mode=backend_mode,
+            model=model,
+            openai_api_configured=openai_configured,
+            llm_call_performed=llm_call_performed,
+            reply=reply,
+            answer=bounded_answer,
+            system_notes=self._unique_strings(system_notes),
+            suggested_queries=list(bounded_answer.suggested_queries),
+        )
 
     def _analyze_facebook_export(
         self,
@@ -1554,6 +1674,221 @@ class DialogueCorpusService:
                 "Relationship conclusions still require human review before they become durable labels or training truth.",
             ]
         )
+
+    def _default_source_path(self) -> str | None:
+        configured = os.environ.get("KLONE_DIALOGUE_SOURCE")
+        if configured:
+            return configured
+        default_path = Path("C:/META")
+        if default_path.exists():
+            return str(default_path)
+        return None
+
+    def _preferred_openai_model(self) -> str:
+        return os.environ.get("KLONE_OPENAI_MODEL", DEFAULT_OPENAI_MODEL).strip() or DEFAULT_OPENAI_MODEL
+
+    def _openai_api_configured(self) -> bool:
+        return bool(os.environ.get("OPENAI_API_KEY", "").strip())
+
+    def _normalize_chat_message(self, message: str) -> str:
+        repaired = self._repair_text(message)
+        normalized = repaired.strip()
+        if normalized.startswith("/klone "):
+            normalized = normalized[len("/klone ") :].strip()
+        return normalized
+
+    def _render_local_chat_reply(
+        self,
+        *,
+        message: str,
+        bounded_answer: DialogueCorpusAnswerRecord,
+    ) -> str:
+        if not bounded_answer.supported:
+            suggestions = "\n".join(f"- {item}" for item in bounded_answer.suggested_queries[:4])
+            limitations = "\n".join(f"- {item}" for item in bounded_answer.limitations[:3])
+            return (
+                "En pysty vastaamaan tuohon rehellisesti tämän nykyisen bounded-korpuksen perusteella.\n\n"
+                f"Kysymys oli: {message}\n\n"
+                "Tämän vaiheen rajat ovat:\n"
+                f"{limitations}\n\n"
+                "Kokeile mieluummin jotain näistä:\n"
+                f"{suggestions}"
+            )
+
+        evidence_lines = "\n".join(
+            f"- {item.content}" for item in bounded_answer.source_backed_content[:4]
+        )
+        limitation_line = bounded_answer.limitations[0] if bounded_answer.limitations else ""
+        explanation_map = {
+            "top_counterparts": "Tämän korpuksen perusteella vahvimmat suorat siteet näyttävät tällä hetkellä tältä:",
+            "top_groups": "Tämän korpuksen perusteella suurimmat näkyvät ryhmäkeskustelut ovat nämä:",
+            "network": "Tämän korpuksen perusteella verkoston muoto näyttää tältä:",
+            "timeline": "Tämän korpuksen perusteella aikajana näyttää tältä:",
+            "style": "Tämän korpuksen perusteella viestityylissäsi näkyy ainakin tämä:",
+            "topics": "Tämän korpuksen perusteella esiin nousevia aihevihjeitä ovat nämä:",
+            "summary": "Tämän korpuksen perusteella pystyn sanomaan tämän:",
+            "counterpart_lookup": "Tämän korpuksen perusteella kyseisestä ihmisestä näkyy ainakin tämä:",
+        }
+        explanation = explanation_map.get(
+            bounded_answer.query_kind,
+            "Tämän korpuksen perusteella pystyn sanomaan tämän:",
+        )
+        rendered = [
+            explanation,
+            "",
+            evidence_lines,
+        ]
+        if bounded_answer.uncertainty:
+            rendered.extend(
+                [
+                    "",
+                    "Epävarmuus:",
+                    "\n".join(f"- {item}" for item in bounded_answer.uncertainty[:2]),
+                ]
+            )
+        if limitation_line:
+            rendered.extend(["", f"Raja: {limitation_line}"])
+        return "\n".join(part for part in rendered if part)
+
+    def _render_chat_reply_with_openai(
+        self,
+        *,
+        message: str,
+        bounded_answer: DialogueCorpusAnswerRecord,
+        history: list[CloneChatMessageRecord],
+        owner_name: str,
+        model: str,
+    ) -> str:
+        api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY is not configured.")
+
+        input_messages = [
+            {
+                "role": "developer",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": self._openai_developer_prompt(owner_name=owner_name),
+                    }
+                ],
+            }
+        ]
+        for item in history[-6:]:
+            if item.role not in {"user", "assistant"}:
+                continue
+            input_messages.append(
+                {
+                    "role": item.role,
+                    "content": [{"type": "input_text", "text": item.content[:3000]}],
+                }
+            )
+        input_messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": self._openai_user_prompt(message=message, bounded_answer=bounded_answer),
+                    }
+                ],
+            }
+        )
+
+        payload = {
+            "model": model,
+            "reasoning": {"effort": "medium"},
+            "input": input_messages,
+        }
+        response_payload = self._call_openai_responses_api(api_key=api_key, payload=payload)
+        output_text = self._extract_openai_text(response_payload)
+        if not output_text:
+            raise ValueError("OpenAI response did not contain assistant text.")
+        return output_text.strip()
+
+    @staticmethod
+    def _openai_developer_prompt(*, owner_name: str) -> str:
+        return (
+            "You are Klone, an experimental IRC-style clone test interface. "
+            f"The owner identity label is {owner_name}. "
+            "You must answer only from the bounded evidence package that follows. "
+            "Do not invent raw message quotes, hidden motives, diagnoses, sentiment labels, or unsupported social claims. "
+            "If the bounded answer says the question is unsupported, explain that plainly and steer the user toward supported questions. "
+            "Keep the tone conversational and human, and reply in the same language as the user's latest message."
+        )
+
+    @staticmethod
+    def _openai_user_prompt(
+        *,
+        message: str,
+        bounded_answer: DialogueCorpusAnswerRecord,
+    ) -> str:
+        evidence = "\n".join(
+            f"- {item.content} | refs: {', '.join(item.source_refs)}"
+            for item in bounded_answer.source_backed_content
+        ) or "- No source-backed content was available."
+        uncertainty = "\n".join(f"- {item}" for item in bounded_answer.uncertainty) or "- none"
+        limitations = "\n".join(f"- {item}" for item in bounded_answer.limitations) or "- none"
+        suggestions = "\n".join(f"- {item}" for item in bounded_answer.suggested_queries[:5]) or "- none"
+        return (
+            f"User message:\n{message}\n\n"
+            f"Bounded query kind: {bounded_answer.query_kind}\n"
+            f"Supported: {bounded_answer.supported}\n"
+            f"Derived explanation: {bounded_answer.derived_explanation or 'none'}\n\n"
+            f"Source-backed content:\n{evidence}\n\n"
+            f"Uncertainty:\n{uncertainty}\n\n"
+            f"Limitations:\n{limitations}\n\n"
+            f"Suggested follow-up questions:\n{suggestions}\n\n"
+            "Reply as Klone in a short, natural chat message grounded only in the evidence above."
+        )
+
+    def _call_openai_responses_api(
+        self,
+        *,
+        api_key: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        request = urllib_request.Request(
+            OPENAI_RESPONSES_URL,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib_request.urlopen(request, timeout=90) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib_error.HTTPError as error:
+            detail = error.read().decode("utf-8", errors="replace")
+            raise ValueError(f"OpenAI API error {error.code}: {detail}") from error
+        except urllib_error.URLError as error:
+            raise ValueError(f"OpenAI API request failed: {error.reason}") from error
+
+    @staticmethod
+    def _extract_openai_text(payload: dict[str, Any]) -> str:
+        direct_text = payload.get("output_text")
+        if isinstance(direct_text, str) and direct_text.strip():
+            return direct_text
+        output = payload.get("output")
+        if not isinstance(output, list):
+            return ""
+        parts: list[str] = []
+        for item in output:
+            if not isinstance(item, dict):
+                continue
+            content = item.get("content")
+            if not isinstance(content, list):
+                continue
+            for content_part in content:
+                if not isinstance(content_part, dict):
+                    continue
+                if content_part.get("type") == "output_text":
+                    text = content_part.get("text")
+                    if isinstance(text, str) and text:
+                        parts.append(text)
+        return "\n".join(parts).strip()
 
     def _discover_facebook_sources(self, base_path: Path) -> list[_DiscoveredFacebookSource]:
         discovered: dict[str, _DiscoveredFacebookSource] = {}

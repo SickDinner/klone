@@ -57,6 +57,17 @@ Bounded Dialogue Query Shell:
 - keep named counterpart lookup structural and thread-backed; do not summarize raw message meaning or relationship psychology
 - no memory writes, no durable identity labels, no raw-message semantic search, no embeddings, no OCR/transcription, and no sentiment or psychological inference in this phase
 
+## Phase 2B.8
+Clone Chat Room Shell:
+- GET /api/clone-chat/status
+- POST /api/clone-chat/respond
+- GET /chat
+- IRC-style local chat room for testing the bounded clone shell in browser
+- reuse the completed 2B.7 bounded dialogue answer surface rather than introducing free-form memory retrieval
+- allow optional GPT-5.4 rendering through the OpenAI Responses API only when OPENAI_API_KEY is configured
+- preserve bounded evidence grounding, unsupported-question gating, and no-memory-write behavior even when GPT rendering is enabled
+- no raw-message semantic retrieval, no embeddings, no autonomous roleplay loop, and no durable memory writes in this phase
+
 ## Phase 2C.1
 Query / Retrieval Primitives:
 - status-aware filtering
@@ -259,7 +270,7 @@ Read-Only Constitution Layer Shell:
 - no write route, no live routing influence, no self-modification loop, and no agent authority expansion in this phase
 
 ## Not approved yet
-- post-2B.7 dialogue expansion
+- post-2B.8 dialogue expansion
 - post-2E.1 constitution expansion
 - post-V1.2 art-lab expansion
 - semantic search

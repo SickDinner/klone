@@ -706,6 +706,18 @@ class HybridBoardSourceTotalsRecord(BaseModel):
     audit_events: int
 
 
+class HybridBoardSourceRecord(BaseModel):
+    source_kind: Literal["audit", "memory_event", "memory_episode"]
+    source_id: str
+    room_id: str
+    title: str
+    summary: str
+    status: str | None = None
+    occurred_at: str | None = None
+    route_hint: str | None = None
+    markers: list[str]
+
+
 class HybridBoardSquareRecord(BaseModel):
     square_id: str
     row_id: str
@@ -740,6 +752,64 @@ class HybridMemoryBoardRecord(BaseModel):
     row_axes: list[HybridBoardAxisRecord]
     column_axes: list[HybridBoardAxisRecord]
     squares: list[HybridBoardSquareRecord]
+    notes: list[str]
+    warnings: list[str]
+
+
+class HybridBoardSquareDetailRecord(BaseModel):
+    projection_version: str
+    read_only: bool = True
+    requested_room_id: str | None = None
+    resolved_room_ids: list[str]
+    row_axes: list[HybridBoardAxisRecord]
+    column_axes: list[HybridBoardAxisRecord]
+    square: HybridBoardSquareRecord
+    source_count: int
+    sources: list[HybridBoardSourceRecord]
+    notes: list[str]
+    warnings: list[str]
+
+
+class WorldMemoryClusterRecord(BaseModel):
+    cluster_id: str
+    room_id: str
+    dataset_id: int
+    dataset_label: str
+    anchor_prefix: str
+    label: str
+    node_count: int
+    dominant_asset_kind: str
+    recent_indexed_at: str | None = None
+
+
+class WorldMemoryNodeRecord(BaseModel):
+    node_id: str
+    cluster_id: str
+    room_id: str
+    dataset_id: int
+    dataset_label: str
+    asset_id: int
+    asset_kind: str
+    anchor_type: str
+    label: str
+    relative_path: str
+    file_name: str
+    size_bytes: int
+    intensity: float
+    indexed_at: str
+    fs_modified_at: str
+
+
+class WorldMemoryRecord(BaseModel):
+    projection_version: str
+    read_only: bool = True
+    requested_room_id: str | None = None
+    resolved_room_ids: list[str]
+    node_count: int
+    cluster_count: int
+    anchor_types: list[str]
+    clusters: list[WorldMemoryClusterRecord]
+    nodes: list[WorldMemoryNodeRecord]
     notes: list[str]
     warnings: list[str]
 

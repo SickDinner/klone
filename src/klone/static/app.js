@@ -15,6 +15,10 @@ const state = {
   constitution: null,
   simulation: {
     board: null,
+    selectedRoomId: "",
+    selectedSquare: null,
+    squareDetail: null,
+    worldMemory: null,
   },
   assets: [],
   selectedAsset: null,
@@ -431,11 +435,16 @@ function renderHybridBoard(board) {
           if (!square) {
             return '<div class="hybrid-board-cell hybrid-board-cell-empty">n/a</div>';
           }
+          const selected =
+            state.simulation.selectedSquare?.rowId === square.row_id &&
+            state.simulation.selectedSquare?.columnId === square.column_id;
           return `
             <div
-              class="hybrid-board-cell hybrid-${escapeHtml(square.dominant_polarity)}"
+              class="hybrid-board-cell hybrid-${escapeHtml(square.dominant_polarity)} ${selected ? "hybrid-selected" : ""}"
               style="--hybrid-intensity:${Math.max(0.08, square.intensity)};"
               title="${escapeHtml(square.title)} | markers: ${escapeHtml(square.top_markers.join(", ") || "none")}"
+              data-hybrid-row-id="${escapeHtml(square.row_id)}"
+              data-hybrid-column-id="${escapeHtml(square.column_id)}"
             >
               <div class="hybrid-cell-title">${escapeHtml(square.dominant_polarity)}</div>
               <div class="hybrid-cell-metric">${square.activity_score.toFixed(2)}</div>
@@ -463,6 +472,143 @@ function renderHybridBoard(board) {
         ${headerMarkup}
         ${rowMarkup}
       </div>
+    </div>
+  `;
+}
+
+function renderHybridBoardDetail(detail) {
+  const root = document.querySelector("#simulation-board-detail");
+  if (!detail) {
+    root.className = "detail-card empty-state";
+    root.textContent = "Select a board square to inspect its source slices.";
+    return;
+  }
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>${escapeHtml(detail.square.title)}</h3>
+    <p>Source slices that currently feed this governed simulation square.</p>
+    <div class="meta">${chips([
+      `signals: ${detail.square.signal_count}`,
+      `activity: ${detail.square.activity_score.toFixed(2)}`,
+      `alignment: ${detail.square.alignment_score.toFixed(2)}`,
+      `sources: ${detail.source_count}`,
+      detail.requested_room_id ? `room: ${detail.requested_room_id}` : `rooms: ${detail.resolved_room_ids.length}`,
+    ])}</div>
+    ${
+      detail.sources?.length
+        ? `<div class="stack compact-stack">${detail.sources
+            .map(
+              (source) => `
+                <article class="stack-item compact-item">
+                  <small>${escapeHtml(source.source_kind)}</small>
+                  <h3>${escapeHtml(source.title)}</h3>
+                  <p>${escapeHtml(source.summary)}</p>
+                  <div class="meta">${chips([
+                    `room: ${source.room_id}`,
+                    `status: ${source.status || "n/a"}`,
+                    `at: ${formatTime(source.occurred_at)}`,
+                    ...source.markers.map((marker) => `marker: ${marker}`),
+                  ])}</div>
+                  ${
+                    source.route_hint
+                      ? `<div class="table-subtitle">${escapeHtml(source.route_hint)}</div>`
+                      : ""
+                  }
+                </article>
+              `,
+            )
+            .join("")}</div>`
+        : '<div class="empty-state">No source slices mapped to this square.</div>'
+    }
+  `;
+}
+
+function renderWorldMemory(worldMemory) {
+  const summaryRoot = document.querySelector("#world-memory-summary");
+  const shellRoot = document.querySelector("#world-memory-shell");
+  if (!worldMemory) {
+    summaryRoot.className = "detail-card empty-state";
+    summaryRoot.textContent = "No world-memory shell loaded yet.";
+    shellRoot.className = "detail-card empty-state";
+    shellRoot.textContent = "No world-memory shell loaded yet.";
+    return;
+  }
+
+  summaryRoot.className = "detail-card";
+  summaryRoot.innerHTML = `
+    <h3>World Memory Summary</h3>
+    <p>The first world-memory shell groups indexed local assets into deterministic place anchors and clusters.</p>
+    <div class="meta">${chips([
+      `version: ${worldMemory.projection_version}`,
+      `read_only: ${worldMemory.read_only}`,
+      worldMemory.requested_room_id ? `room: ${worldMemory.requested_room_id}` : `rooms: ${worldMemory.resolved_room_ids.length}`,
+      `nodes: ${worldMemory.node_count}`,
+      `clusters: ${worldMemory.cluster_count}`,
+      ...worldMemory.anchor_types.map((anchorType) => `type: ${anchorType}`),
+    ])}</div>
+    <ul class="detail-list">
+      ${worldMemory.notes.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+    </ul>
+    ${
+      worldMemory.warnings?.length
+        ? `<div class="meta">${chips(worldMemory.warnings.map((warning) => `warning: ${warning}`))}</div>`
+        : ""
+    }
+  `;
+
+  const clusterMarkup = worldMemory.clusters?.length
+    ? `<div class="stack compact-stack">${worldMemory.clusters
+        .slice(0, 8)
+        .map(
+          (cluster) => `
+            <article class="stack-item compact-item">
+              <small>${escapeHtml(cluster.room_id)}</small>
+              <h3>${escapeHtml(cluster.label)}</h3>
+              <div class="meta">${chips([
+                `nodes: ${cluster.node_count}`,
+                `dataset: ${cluster.dataset_label}`,
+                `kind: ${cluster.dominant_asset_kind}`,
+                `recent: ${formatTime(cluster.recent_indexed_at)}`,
+              ])}</div>
+            </article>
+          `,
+        )
+        .join("")}</div>`
+    : '<div class="empty-state">No world-memory clusters available yet.</div>';
+
+  const nodeMarkup = worldMemory.nodes?.length
+    ? `<div class="stack compact-stack">${worldMemory.nodes
+        .slice(0, 16)
+        .map(
+          (node) => `
+            <article class="stack-item compact-item">
+              <small>${escapeHtml(node.anchor_type)}</small>
+              <h3>${escapeHtml(node.label)}</h3>
+              <div class="meta">${chips([
+                `room: ${node.room_id}`,
+                `dataset: ${node.dataset_label}`,
+                `kind: ${node.asset_kind}`,
+                `intensity: ${node.intensity.toFixed(2)}`,
+                `indexed: ${formatTime(node.indexed_at)}`,
+              ])}</div>
+            </article>
+          `,
+        )
+        .join("")}</div>`
+    : '<div class="empty-state">No world-memory nodes available yet.</div>';
+
+  shellRoot.className = "detail-card";
+  shellRoot.innerHTML = `
+    <div class="preview-grid">
+      <section class="preview-block">
+        <h4>Clusters</h4>
+        ${clusterMarkup}
+      </section>
+      <section class="preview-block">
+        <h4>Recent Nodes</h4>
+        ${nodeMarkup}
+      </section>
     </div>
   `;
 }
@@ -1163,6 +1309,17 @@ function populateMemoryRoomFilter(rooms) {
   state.memory.roomId = select.value;
 }
 
+function populateSimulationRoomFilter(rooms) {
+  const select = document.querySelector("#simulation-room-filter");
+  const current = state.simulation.selectedRoomId || select.value;
+  select.innerHTML = [
+    '<option value="">All readable rooms</option>',
+    ...rooms.map((room) => `<option value="${escapeHtml(room.id)}">${escapeHtml(room.label)}</option>`),
+  ].join("");
+  select.value = rooms.some((room) => room.id === current) ? current : "";
+  state.simulation.selectedRoomId = select.value;
+}
+
 function renderMemoryEvents(events) {
   const root = document.querySelector("#memory-events");
   if (!events.length) {
@@ -1761,8 +1918,86 @@ async function refreshMemoryExplorer(event) {
   }
 }
 
+async function loadHybridBoardSquareDetail(rowId, columnId) {
+  state.simulation.selectedSquare = { rowId, columnId };
+  renderHybridBoard(state.simulation.board);
+
+  const params = new URLSearchParams();
+  if (state.simulation.selectedRoomId) {
+    params.set("room_id", state.simulation.selectedRoomId);
+  }
+
+  try {
+    const detail = await fetchJson(
+      `/api/simulation/hybrid-board/squares/${encodeURIComponent(rowId)}/${encodeURIComponent(columnId)}?${params.toString()}`,
+    );
+    state.simulation.squareDetail = detail;
+    renderHybridBoardDetail(detail);
+  } catch (error) {
+    state.simulation.squareDetail = null;
+    const root = document.querySelector("#simulation-board-detail");
+    root.className = "detail-card";
+    root.textContent = error.message;
+  }
+}
+
+async function refreshSimulationProjection(options = {}) {
+  const { preserveSelection = true } = options;
+  const params = new URLSearchParams();
+  if (state.simulation.selectedRoomId) {
+    params.set("room_id", state.simulation.selectedRoomId);
+  }
+  const query = params.toString();
+  const suffix = query ? `?${query}` : "";
+
+  try {
+    const [board, worldMemory] = await Promise.all([
+      fetchJson(`/api/simulation/hybrid-board${suffix}`),
+      fetchJson(`/api/simulation/world-memory${suffix}`),
+    ]);
+    state.simulation.board = board;
+    state.simulation.worldMemory = worldMemory;
+    renderHybridBoard(board);
+    renderWorldMemory(worldMemory);
+
+    if (
+      preserveSelection &&
+      state.simulation.selectedSquare &&
+      board.squares.some(
+        (square) =>
+          square.row_id === state.simulation.selectedSquare.rowId &&
+          square.column_id === state.simulation.selectedSquare.columnId,
+      )
+    ) {
+      await loadHybridBoardSquareDetail(
+        state.simulation.selectedSquare.rowId,
+        state.simulation.selectedSquare.columnId,
+      );
+      return;
+    }
+
+    const nextSquare = board.squares.find((square) => square.activity_score > 0) || board.squares[0];
+    if (nextSquare) {
+      await loadHybridBoardSquareDetail(nextSquare.row_id, nextSquare.column_id);
+    } else {
+      state.simulation.selectedSquare = null;
+      state.simulation.squareDetail = null;
+      renderHybridBoardDetail(null);
+    }
+  } catch (error) {
+    state.simulation.board = null;
+    state.simulation.worldMemory = null;
+    state.simulation.squareDetail = null;
+    renderHybridBoard(null);
+    renderHybridBoardDetail(null);
+    renderWorldMemory(null);
+    document.querySelector("#simulation-board-summary").textContent = error.message;
+    document.querySelector("#simulation-board-summary").className = "detail-card";
+  }
+}
+
 async function refreshMissionControl() {
-  const [blueprint, status, rooms, guards, datasets, audit, ingestStatus, ingestQueue, constitution, hybridBoard] =
+  const [blueprint, status, rooms, guards, datasets, audit, ingestStatus, ingestQueue, constitution] =
     await Promise.all([
       fetchJson("/api/blueprint"),
       fetchJson("/api/status"),
@@ -1773,7 +2008,6 @@ async function refreshMissionControl() {
       fetchJson("/api/ingest/status"),
       fetchJson("/api/ingest/queue"),
       fetchJson("/api/constitution"),
-      fetchJson("/api/simulation/hybrid-board"),
     ]);
 
   state.blueprint = blueprint;
@@ -1785,7 +2019,6 @@ async function refreshMissionControl() {
   state.ingestStatus = ingestStatus;
   state.ingestQueue = ingestQueue;
   state.constitution = constitution;
-  state.simulation.board = hybridBoard;
 
   renderMission(blueprint);
   renderStatusCards(status);
@@ -1795,7 +2028,6 @@ async function refreshMissionControl() {
   renderAudit(audit);
   renderDialogueCorpus(state.dialogueCorpus);
   renderConstitution(constitution);
-  renderHybridBoard(hybridBoard);
   renderModules(blueprint.modules);
   renderAgents(blueprint.agents);
   renderPhases(blueprint.build_phases);
@@ -1807,8 +2039,10 @@ async function refreshMissionControl() {
   populateRoomFilter(rooms);
   populateDatasetFilter(datasets);
   populateMemoryRoomFilter(rooms);
+  populateSimulationRoomFilter(rooms);
   await refreshAssetBrowser();
   await refreshMemoryExplorer();
+  await refreshSimulationProjection({ preserveSelection: true });
 }
 
 async function loadIngestRunManifest(runId) {
@@ -2022,6 +2256,20 @@ function bindEvents() {
   document.querySelector("#asset-refresh").addEventListener("click", refreshAssetBrowser);
   document.querySelector("#asset-room-filter").addEventListener("change", refreshAssetBrowser);
   document.querySelector("#asset-dataset-filter").addEventListener("change", refreshAssetBrowser);
+  document.querySelector("#simulation-refresh").addEventListener("click", () =>
+    refreshSimulationProjection({ preserveSelection: true }),
+  );
+  document.querySelector("#simulation-room-filter").addEventListener("change", (event) => {
+    state.simulation.selectedRoomId = event.currentTarget.value;
+    refreshSimulationProjection({ preserveSelection: false });
+  });
+  document.querySelector("#simulation-board-shell").addEventListener("click", (event) => {
+    const cell = event.target.closest("[data-hybrid-row-id][data-hybrid-column-id]");
+    if (!cell) {
+      return;
+    }
+    loadHybridBoardSquareDetail(cell.dataset.hybridRowId, cell.dataset.hybridColumnId);
+  });
   document.querySelector("#ingest-queue-jobs").addEventListener("click", (event) => {
     const button = event.target.closest("[data-queue-job-id]");
     if (!button || button.disabled) {

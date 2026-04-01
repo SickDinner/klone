@@ -104,6 +104,10 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     def dashboard() -> FileResponse:
         return FileResponse(STATIC_DIR / "index.html")
 
+    @app.get("/chat", include_in_schema=False)
+    def clone_chat_room() -> FileResponse:
+        return FileResponse(STATIC_DIR / "chat.html")
+
     return app
 
 

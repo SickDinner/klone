@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Klone Chat Room</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/chat.css" />
+  </head>
+  <body>
+    <main class="irc-shell">
+      <aside class="irc-sidebar panel">
+        <p class="eyebrow">Clone Test Room</p>
+        <h1>Klone IRC</h1>
+        <p class="lede">
+          Read-only clone chat over the bounded dialogue corpus. Type naturally or use <code>/klone kysymys</code>.
+        </p>
+        <div class="irc-channel-list">
+          <button class="irc-channel irc-channel-active" type="button">#clone-test-room</button>
+          <button class="irc-channel" type="button" disabled>#evidence-tips</button>
+          <button class="irc-channel" type="button" disabled>#roadmap</button>
+        </div>
+        <div class="irc-side-block">
+          <h2>Room Status</h2>
+          <div id="chat-status" class="detail-card empty-state">Loading chat room status...</div>
+        </div>
+        <div class="irc-side-block">
+          <h2>Suggested Queries</h2>
+          <div id="chat-suggestions" class="stack"></div>
+        </div>
+        <div class="irc-side-block">
+          <a class="button button-secondary" href="/">Open Mission Control</a>
+        </div>
+      </aside>
+
+      <section class="irc-main panel">
+        <header class="irc-header">
+          <div>
+            <p class="eyebrow">Active Channel</p>
+            <h2>#clone-test-room</h2>
+          </div>
+          <div class="irc-header-meta" id="chat-mode-badge">Loading mode...</div>
+        </header>
+
+        <section class="irc-config">
+          <label class="field">
+            <span>Source Path</span>
+            <input id="chat-source-path" type="text" placeholder="C:\META" />
+          </label>
+          <label class="field">
+            <span>Owner Name</span>
+            <input id="chat-owner-name" type="text" placeholder="Optional override" />
+          </label>
+          <label class="field">
+            <span>Mode</span>
+            <select id="chat-mode">
+              <option value="auto">auto</option>
+              <option value="bounded">bounded</option>
+              <option value="gpt-5.4">gpt-5.4</option>
+            </select>
+          </label>
+        </section>
+
+        <section id="chat-log" class="irc-log" aria-live="polite"></section>
+
+        <footer class="irc-footer">
+          <form id="chat-form" class="irc-form">
+            <input
+              id="chat-input"
+              type="text"
+              maxlength="4000"
+              placeholder='Kirjoita viesti kloonillesi, esim. "Keiden kanssa olen puhunut eniten?"'
+              required
+            />
+            <button class="button" id="chat-send" type="submit">Send</button>
+            <button class="button button-secondary" id="chat-clear" type="button">Clear</button>
+          </form>
+          <p class="feedback" id="chat-feedback">Connecting to clone room...</p>
+        </footer>
+      </section>
+    </main>
+
+    <script src="/static/chat.js"></script>
+  </body>
+  </html>

@@ -19,7 +19,7 @@ from .schemas import (
     PublicCapabilityRecord,
     ServiceSeamRecord,
 )
-from .simulation import HybridMemoryBoardService
+from .simulation import HybridMemoryBoardService, WorldMemoryService
 
 
 def module_registry_payload() -> list[ModuleCapabilityRecord]:
@@ -198,6 +198,7 @@ class PolicyService:
 class SimulationService:
     def __init__(self, repository: KloneRepository) -> None:
         self.hybrid_board = HybridMemoryBoardService(repository)
+        self.world_memory = WorldMemoryService(repository)
 
     def seam_descriptor(self) -> ServiceSeamRecord:
         return ServiceSeamRecord(
@@ -207,6 +208,7 @@ class SimulationService:
             status="active_projection",
             notes=[
                 "Projects governed audit and memory records into a read-only hybrid board surface.",
+                "Projects indexed local assets into a read-only world-memory shell for later spatial layers.",
                 "Does not create a second source of truth and does not enable simulation writes.",
             ],
         )
@@ -224,7 +226,31 @@ class SimulationService:
                 status="available",
                 description="Read a governed 8x8 hybrid board projected from audit, memory event, and episode surfaces.",
                 backed_by=["SimulationService", "MemoryFacade", "AuditService", "PolicyService"],
-            )
+            ),
+            PublicCapabilityRecord(
+                id="simulation.hybrid_board.detail.read",
+                name="Hybrid Board Square Detail",
+                category="simulation",
+                path="/api/simulation/hybrid-board/squares/{row_id}/{column_id}",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=True,
+                status="available",
+                description="Inspect one hybrid board square and the contributing governed source slices behind it.",
+                backed_by=["SimulationService", "MemoryFacade", "AuditService", "PolicyService"],
+            ),
+            PublicCapabilityRecord(
+                id="simulation.world_memory.read",
+                name="World Memory Shell",
+                category="simulation",
+                path="/api/simulation/world-memory",
+                methods=["GET"],
+                read_only=True,
+                room_scoped=True,
+                status="available",
+                description="Read the first governed world-memory shell projected from indexed local assets.",
+                backed_by=["SimulationService", "BlobService", "PolicyService"],
+            ),
         ]
 
 

@@ -3,12 +3,13 @@
 Last updated: 2026-04-01
 
 ## Current approved phase
-Phase 2B.7 bounded dialogue query shell complete
+Phase 2B.8 clone chat shell complete
 
 ## Baseline
 - 2B.1 through 2B.5 complete
 - 2B.6 read-only dialogue corpus shell exists in repo reality
 - 2B.7 bounded dialogue query shell exists in repo reality
+- 2B.8 clone chat shell exists in repo reality
 - memory spine, provenance, replay, correction, contract lock, and stress verification are in place
 - read-only query, context, provenance-detail, bounded-answer, and Memory Explorer surfaces exist in repo reality
 - A1.1 request context, service seams, and GET /v1/capabilities exist in repo reality
@@ -30,24 +31,30 @@ Phase 2B.7 bounded dialogue query shell complete
 - 2E.1 read-only constitution shell exists in repo reality
 
 ## Immediate goal
-Phase 2B.7 is complete. No further approved 2B.7, 2E, A1, G1, or V1 substep is enumerated in canonical repo evidence.
-Await explicit roadmap extension or approval before widening the dialogue-corpus shell, the constitution layer, the public control-plane seam, the ingest spine, or the art-lab. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, 2B.6 dialogue-corpus analysis work, 2B.7 bounded dialogue query work, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, G1.4 local resumable queue work, G1.5 queue history work, V1.1 asset formal metrics work, V1.2 bounded comparison work, or 2E.1 constitution shell work.
+Phase 2B.8 is complete. No further approved 2B.8, 2E, A1, G1, or V1 substep is enumerated in canonical repo evidence.
+Await explicit roadmap extension or approval before widening the dialogue-corpus shell, the constitution layer, the public control-plane seam, the ingest spine, or the art-lab. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, 2B.6 dialogue-corpus analysis work, 2B.7 bounded dialogue query work, 2B.8 clone chat room work, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, G1.4 local resumable queue work, G1.5 queue history work, V1.1 asset formal metrics work, V1.2 bounded comparison work, or 2E.1 constitution shell work.
 
 ## Approved scope
 - read-only dialogue corpus analysis over extracted local Messenger exports and ChatGPT export JSON files
 - bounded dialogue-corpus question answering over the completed 2B.6 aggregate evidence only
 - local `klone` CLI path for direct parser testing against a bounded source path
+- browser-based clone chat room over the completed 2B.7 bounded answer surface
+- optional GPT-5.4 rendering only when OPENAI_API_KEY is configured
 - root-folder discovery that selects the richest Messenger export candidate without merging partial exports
 - Mission Control visibility for the dialogue corpus shell
 - service seam and capability visibility through `/v1/capabilities`
-- no unrelated runtime behavior beyond the completed 2B.7 shell
+- no unrelated runtime behavior beyond the completed 2B.8 shell
 
 ## Hard constraints
 - do not modify ingest behavior
 - do not regress the completed read-only dialogue corpus seam at `/api/dialogue-corpus/analyze`
 - do not regress the completed bounded dialogue answer seam at `/api/dialogue-corpus/answer`
+- do not regress the completed clone chat readiness seam at `/api/clone-chat/status`
+- do not regress the completed clone chat reply seam at `/api/clone-chat/respond`
+- do not regress the completed browser room at `/chat`
 - do not widen dialogue corpus analysis into memory writes, durable relationship labels, OCR/transcription, embeddings, sentiment scoring, or psychological inference without a new approved phase
 - do not widen dialogue corpus querying into raw-message semantic retrieval, generative roleplay, or autonomous memory mutation without a new approved phase
+- do not allow GPT-backed chat rendering to bypass bounded evidence or unsupported-question gating
 - do not regress the completed read-only preflight manifest seam at `/api/ingest/preflight`
 - do not regress the completed bounded manifest-history seam at `/api/ingest/runs/{run_id}/manifest`
 - do not regress the completed local ingest queue shell at `/api/ingest/queue`
@@ -91,6 +98,7 @@ Await explicit roadmap extension or approval before widening the dialogue-corpus
 ## Required verification
 - focused 2B.6 tests green
 - focused 2B.7 tests green
+- focused 2B.8 tests green
 - focused 2E.1 tests green
 - compile pass
 - focused A1.9 tests green

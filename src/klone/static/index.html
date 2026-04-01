@@ -307,14 +307,31 @@
         </article>
       </section>
 
-      <section class="section">
+      <section class="section two-up">
         <article class="panel">
           <div class="section-head">
             <h2>Hybrid Memory Board</h2>
             <p>Read-only 8x8 simulation surface projected from governed audit and memory evidence.</p>
           </div>
+          <div class="toolbar">
+            <label class="field field-inline">
+              <span>Room</span>
+              <select id="simulation-room-filter"></select>
+            </label>
+            <button class="button button-secondary" id="simulation-refresh" type="button">Refresh Simulation</button>
+          </div>
           <div id="simulation-board-summary" class="detail-card empty-state">Loading hybrid board...</div>
           <div id="simulation-board-shell" class="detail-card empty-state">No board projection loaded yet.</div>
+          <div id="simulation-board-detail" class="detail-card empty-state">Select a board square to inspect its source slices.</div>
+        </article>
+
+        <article class="panel">
+          <div class="section-head">
+            <h2>World Memory Shell</h2>
+            <p>First governed place-memory layer projected from indexed local assets, datasets, and path anchors.</p>
+          </div>
+          <div id="world-memory-summary" class="detail-card empty-state">Loading world-memory shell...</div>
+          <div id="world-memory-shell" class="detail-card empty-state">No world-memory shell loaded yet.</div>
         </article>
       </section>
 

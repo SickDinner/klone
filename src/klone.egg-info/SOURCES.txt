@@ -6,7 +6,9 @@ src/klone/art.py
 src/klone/audit.py
 src/klone/blueprint.py
 src/klone/config.py
+src/klone/constitution.py
 src/klone/contracts.py
+src/klone/dialogue.py
 src/klone/guards.py
 src/klone/ingest.py
 src/klone/main.py
@@ -35,6 +37,8 @@ tests/test_memory_phase_2c2.py
 tests/test_memory_phase_2c3.py
 tests/test_memory_phase_2c4.py
 tests/test_memory_phase_2c5.py
+tests/test_phase_2b_6.py
+tests/test_phase_2e_1.py
 tests/test_phase_a1_1.py
 tests/test_phase_a1_2.py
 tests/test_phase_a1_3.py

@@ -19,6 +19,7 @@
 
 Nykyinen kanoninen tila on:
 
+- `Phase 2B.6 read-only dialogue corpus shell complete`
 - `Phase 2E.1 read-only constitution shell complete`
 - `Phase A1 approved`
 - `A1.1 public control-plane seam kickoff complete`
@@ -89,6 +90,8 @@ Uutta tässä versiossa:
   `GET /api/art/assets/compare` vertailee rajatun saman huoneen image-asset-joukon samoilla deterministisillä formaalimittareilla ja näyttää ajan mukaan järjestetyt mittarit sekä ensimmäisestä viimeiseen lasketut delta-arvot
 - `mission control art metrics`
   Asset Detail -paneelin alla näkyy nyt Art Metrics -kortti, joka analysoi valitun image-assetin read-only-tilassa ja kertoo selvästi, jos asset ei ole kuva
+- `dialogue corpus shell`
+  `POST /api/dialogue-corpus/analyze` analysoi nyt local Messenger-export-rootit tai ChatGPT-export-JSONit read-only-tilassa ja nostaa näkyviin suhteet, verkoston laajuuden, tyyli-signaalit ja aikajanan silloin kun lähde oikeasti tukee niitä
 - `constitution layer shell`
   `GET /api/constitution` näyttää nyt hitaasti muuttuvat malliparametrit, approval-tilan ja append-only muutosmuistiinpanot erillään memorystä
 
@@ -110,6 +113,8 @@ Samalla repo sisältää jo valmiina `Phase 2C.5` read-only delivery surfacen, j
   asset-backed formal metrics for selected image assets without pseudo-clinical interpretation
 - `memory explorer UI`
   room-scoped events, episodes, detail-paneeli, provenance lens, context payload ja bounded read-only answer preview
+- `dialogue corpus UI`
+  Mission Controlissa on nyt Dialogue Corpus -paneeli Messenger- ja ChatGPT-exporttien read-only analyysille ennen memory-writeä
 - `constitution UI`
   read-only constitution snapshot näkyy Mission Controlissa omana kerroksenaan ennen write- tai routing-vaikutuksia
 - `memory context APIs`
@@ -167,6 +172,7 @@ Supervisor hallitsee liikennettä vyöhykkeiden välillä. Moduulit eivät saa l
 │     ├─ ingest.py
 │     ├─ main.py
 │     ├─ memory.py
+│     ├─ dialogue.py
 │     ├─ models.py
 │     ├─ request_context.py
 │     ├─ repository.py
@@ -205,6 +211,7 @@ Avaa sitten [http://127.0.0.1:8000](http://127.0.0.1:8000).
 - `GET /api/permission-levels`
 - `GET /api/governance/guards`
 - `GET /api/constitution`
+- `POST /api/dialogue-corpus/analyze`
 - `GET /api/datasets`
 - `GET /api/assets`
 - `GET /api/assets/{asset_id}`

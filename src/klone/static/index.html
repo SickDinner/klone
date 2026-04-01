@@ -88,6 +88,32 @@
         </article>
       </section>
 
+      <section class="section">
+        <article class="panel">
+          <div class="section-head">
+            <h2>Dialogue Corpus</h2>
+            <p>Analyze Messenger exports or ChatGPT export JSON files into relationship, network, style, and history priors before any memory write path exists.</p>
+          </div>
+          <form id="dialogue-corpus-form" class="form-stack">
+            <div class="toolbar">
+              <label class="field field-inline">
+                <span>Source Path</span>
+                <input type="text" name="source_path" placeholder="C:\\META or C:\\path\\to\\conversations.json" required />
+              </label>
+              <label class="field field-inline">
+                <span>Owner Name</span>
+                <input type="text" name="owner_name" placeholder="Optional override" />
+              </label>
+              <button class="button" type="submit">Analyze Corpus</button>
+              <span class="feedback" id="dialogue-corpus-feedback">No dialogue corpus analyzed yet.</span>
+            </div>
+          </form>
+          <div id="dialogue-corpus-detail" class="detail-card empty-state">
+            Analyze a local Messenger export root or ChatGPT export JSON file without writing raw dialogue into memory.
+          </div>
+        </article>
+      </section>
+
       <section class="section two-up">
         <article>
           <div class="section-head">

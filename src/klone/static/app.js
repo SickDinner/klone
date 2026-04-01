@@ -11,6 +11,7 @@ const state = {
   ingestQueueHistory: null,
   ingestPreview: null,
   ingestManifest: null,
+  dialogueCorpus: null,
   constitution: null,
   assets: [],
   selectedAsset: null,
@@ -371,6 +372,157 @@ function renderConstitution(constitution) {
         ${constitution.notes.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
         ${constitution.warnings.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
       </ul>
+    </section>
+  `;
+}
+
+function renderDialogueCorpus(analysis) {
+  const root = document.querySelector("#dialogue-corpus-detail");
+  if (!analysis) {
+    root.className = "detail-card empty-state";
+    root.textContent =
+      "Analyze a local Messenger export root or ChatGPT export JSON file without writing raw dialogue into memory.";
+    return;
+  }
+
+  const selectedSource = analysis.detected_sources?.find((item) => item.selected);
+
+  const sourceMarkup = analysis.detected_sources?.length
+    ? `<ul class="manifest-list">${analysis.detected_sources
+        .map(
+          (source) =>
+            `<li><strong>${escapeHtml(source.label)}</strong>: ${escapeHtml(source.status)} (${escapeHtml(
+              source.record_count,
+            )} records) <span class="table-subtitle">${escapeHtml(source.path)}${source.selected ? " | selected" : ""}</span></li>`,
+        )
+        .join("")}</ul>`
+    : '<div class="empty-state">No source roots discovered.</div>';
+
+  const sectionMarkup = analysis.section_breakdown?.length
+    ? `<ul class="manifest-list">${analysis.section_breakdown
+        .map(
+          (item) =>
+            `<li><strong>${escapeHtml(item.section)}</strong>: ${escapeHtml(item.thread_count)} threads, ${escapeHtml(
+              item.message_count,
+            )} messages</li>`,
+        )
+        .join("")}</ul>`
+    : '<div class="empty-state">No section breakdown is available.</div>';
+
+  const counterpartMarkup = analysis.top_counterparts?.length
+    ? `<ul class="manifest-list">${analysis.top_counterparts
+        .map(
+          (item) =>
+            `<li><strong>${escapeHtml(item.name)}</strong>: ${escapeHtml(
+              item.interaction_message_count,
+            )} direct-thread interactions <span class="table-subtitle">${escapeHtml(
+              item.thread_count,
+            )} threads | last ${escapeHtml(formatTime(item.last_message_at))}</span></li>`,
+        )
+        .join("")}</ul>`
+    : '<div class="empty-state">No direct counterpart ranking is available for this source.</div>';
+
+  const groupMarkup = analysis.top_group_threads?.length
+    ? `<ul class="manifest-list">${analysis.top_group_threads
+        .map(
+          (item) =>
+            `<li><strong>${escapeHtml(item.title)}</strong>: ${escapeHtml(
+              item.message_count,
+            )} messages <span class="table-subtitle">${escapeHtml(
+              item.participant_count,
+            )} participants | last ${escapeHtml(formatTime(item.last_message_at))}</span></li>`,
+        )
+        .join("")}</ul>`
+    : '<div class="empty-state">No group-thread ranking is available for this source.</div>';
+
+  const termMarkup = analysis.top_terms?.length
+    ? `<div class="meta">${analysis.top_terms
+        .map((item) => `<span class="chip">${escapeHtml(item.token)} (${escapeHtml(item.count)})</span>`)
+        .join("")}</div>`
+    : '<div class="empty-state">No stable topical hints were extracted.</div>';
+
+  const styleMarkup = analysis.style_signals?.length
+    ? `<ul class="manifest-list">${analysis.style_signals
+        .map(
+          (item) =>
+            `<li><strong>${escapeHtml(item.label)}</strong>: ${escapeHtml(item.value)} ${escapeHtml(
+              item.unit,
+            )}<div>${escapeHtml(item.summary)}</div></li>`,
+        )
+        .join("")}</ul>`
+    : '<div class="empty-state">No style signals are available yet.</div>';
+
+  const activityMarkup = analysis.activity_by_year?.length
+    ? `<ul class="manifest-list">${analysis.activity_by_year
+        .map(
+          (item) =>
+            `<li><strong>${escapeHtml(item.bucket)}</strong>: ${escapeHtml(item.message_count)} messages <span class="table-subtitle">${escapeHtml(
+              item.thread_count,
+            )} threads | sent ${escapeHtml(item.sent_message_count)} | received ${escapeHtml(
+              item.received_message_count,
+            )}</span></li>`,
+        )
+        .join("")}</ul>`
+    : '<div class="empty-state">No activity timeline is available.</div>';
+
+  const notesMarkup = [...(analysis.relationship_priors || []), ...(analysis.history_priors || []), ...(analysis.clone_foundation || []), ...(analysis.notes || []), ...(analysis.warnings || [])]
+    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .join("");
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>Dialogue Corpus Snapshot</h3>
+    <p>${escapeHtml(analysis.source_kind)} routed from ${escapeHtml(analysis.requested_path)} into a read-only corpus summary.</p>
+    <div class="meta">${chips([
+      `selected_source: ${selectedSource?.label || analysis.selected_source_path}`,
+      `owner_name: ${analysis.owner_name}`,
+      `room: ${analysis.recommended_room_id}`,
+      `classification: ${analysis.recommended_classification_level}`,
+      `threads: ${analysis.thread_count}`,
+      `direct_threads: ${analysis.direct_thread_count}`,
+      `group_threads: ${analysis.group_thread_count}`,
+      `counterparts: ${analysis.counterpart_count}`,
+      `participants: ${analysis.unique_participant_count}`,
+      `messages: ${analysis.message_count}`,
+      `sent: ${analysis.sent_message_count}`,
+      `received: ${analysis.received_message_count}`,
+      `attachments: ${analysis.attachment_message_count}`,
+      `first: ${formatTime(analysis.first_message_at)}`,
+      `last: ${formatTime(analysis.last_message_at)}`,
+    ])}</div>
+    <div class="preview-grid">
+      <section class="preview-block">
+        <h4>Detected Sources</h4>
+        ${sourceMarkup}
+      </section>
+      <section class="preview-block">
+        <h4>Section Breakdown</h4>
+        ${sectionMarkup}
+      </section>
+      <section class="preview-block">
+        <h4>Top Counterparts</h4>
+        ${counterpartMarkup}
+      </section>
+      <section class="preview-block">
+        <h4>Top Group Threads</h4>
+        ${groupMarkup}
+      </section>
+      <section class="preview-block">
+        <h4>Activity by Year</h4>
+        ${activityMarkup}
+      </section>
+      <section class="preview-block">
+        <h4>Style Signals</h4>
+        ${styleMarkup}
+      </section>
+    </div>
+    <section class="preview-block">
+      <h4>Top Terms</h4>
+      ${termMarkup}
+    </section>
+    <section class="preview-block warning-list">
+      <h4>Notes and Warnings</h4>
+      <ul class="manifest-list">${notesMarkup}</ul>
     </section>
   `;
 }
@@ -1547,6 +1699,7 @@ async function refreshMissionControl() {
   renderRooms(rooms);
   renderGuards(guards);
   renderAudit(audit);
+  renderDialogueCorpus(state.dialogueCorpus);
   renderConstitution(constitution);
   renderModules(blueprint.modules);
   renderAgents(blueprint.agents);
@@ -1604,6 +1757,45 @@ async function inspectIngestQueueJob(jobId) {
 
 function collectIngestPayload(form) {
   return Object.fromEntries(new FormData(form).entries());
+}
+
+function collectDialogueCorpusPayload(form) {
+  const payload = {
+    source_path: form.source_path.value.trim(),
+  };
+  const ownerName = form.owner_name.value.trim();
+  if (ownerName) {
+    payload.owner_name = ownerName;
+  }
+  return payload;
+}
+
+async function analyzeDialogueCorpus(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const submitButton = form.querySelector("button[type='submit']");
+  const feedback = document.querySelector("#dialogue-corpus-feedback");
+  const payload = collectDialogueCorpusPayload(form);
+
+  submitButton.disabled = true;
+  feedback.textContent = "Analyzing dialogue corpus...";
+
+  try {
+    const result = await fetchJson("/api/dialogue-corpus/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    state.dialogueCorpus = result;
+    renderDialogueCorpus(result);
+    feedback.textContent = `Dialogue corpus ready: ${result.thread_count} threads and ${result.message_count} messages.`;
+  } catch (error) {
+    state.dialogueCorpus = null;
+    renderDialogueCorpus(null);
+    feedback.textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
+  }
 }
 
 async function previewIngestForm() {
@@ -1731,6 +1923,7 @@ function bindEvents() {
   document.querySelector("#ingest-form").addEventListener("submit", submitIngestForm);
   document.querySelector("#ingest-preview-button").addEventListener("click", previewIngestForm);
   document.querySelector("#ingest-queue-button").addEventListener("click", queueIngestForm);
+  document.querySelector("#dialogue-corpus-form").addEventListener("submit", analyzeDialogueCorpus);
   document.querySelector("#asset-refresh").addEventListener("click", refreshAssetBrowser);
   document.querySelector("#asset-room-filter").addEventListener("change", refreshAssetBrowser);
   document.querySelector("#asset-dataset-filter").addEventListener("change", refreshAssetBrowser);

@@ -89,6 +89,17 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
             outputs=["event records", "episode candidates", "retrieval results", "context packages", "read-only answers"],
         ),
         ModuleCard(
+            id="dialogue-corpus",
+            name="Dialogue Corpus",
+            zone_id="intimate",
+            supervisor="memory supervisor",
+            stage="phase-2b6",
+            status="read_only_corpus_shell",
+            purpose="Analyze local conversation exports into relationship, network, style, and history priors before any memory write path is enabled.",
+            key_inputs=["messenger exports", "chat exports", "thread metadata"],
+            outputs=["corpus summaries", "relationship priors", "network visibility", "style signals"],
+        ),
+        ModuleCard(
             id="media-lake",
             name="Media Lake",
             zone_id="personal",
@@ -264,8 +275,8 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
         BuildPhase(
             id="phase-2b",
             title="Memory and Timeline Spine",
-            goal="Model raw events, entities, and episodes while keeping interpretations visibly linked to source truth.",
-            deliverables=["event model", "entity model", "episode model", "memory search"],
+            goal="Model raw events, entities, episodes, and conversation-corpus priors while keeping interpretations visibly linked to source truth.",
+            deliverables=["event model", "entity model", "episode model", "memory search", "conversation corpus shell"],
         ),
         BuildPhase(
             id="phase-2c",

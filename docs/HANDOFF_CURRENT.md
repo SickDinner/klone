@@ -3,17 +3,17 @@
 Last updated: 2026-04-01
 
 ## Current approved phase
-Phase 2E.1 closeout complete / awaiting next approved phase
+Phase 2B.6 dialogue corpus shell complete
 
 ## Baseline
 - 2B.1 through 2B.5 complete
+- 2B.6 read-only dialogue corpus shell exists in repo reality
 - memory spine, provenance, replay, correction, contract lock, and stress verification are in place
 - read-only query, context, provenance-detail, bounded-answer, and Memory Explorer surfaces exist in repo reality
 - A1.1 request context, service seams, and GET /v1/capabilities exist in repo reality
 - A1.2 contract shells and append-only control-plane audit chain exist in repo reality
 - A1.3 local blob metadata shell exists in repo reality without adding a new /v1 blob route
 - A1.4 local object envelope shell exists in repo reality without adding a public /v1 object route
-- Phase A1 roadmap bullets are satisfied in current repo reality
 - A1.5 public room-scoped object get exists in repo reality
 - A1.6 public room-scoped query shell exists in repo reality
 - A1.7 public room-scoped blob metadata detail exists in repo reality
@@ -29,18 +29,20 @@ Phase 2E.1 closeout complete / awaiting next approved phase
 - 2E.1 read-only constitution shell exists in repo reality
 
 ## Immediate goal
-Phase 2E.1 is complete. No further approved 2E, A1, G1, or V1 substep is enumerated in canonical repo evidence.
-Await explicit roadmap extension or approval before widening the constitution layer, the public control-plane seam, the ingest spine, or the art-lab. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local ingest queue shell work, G1.4 local resumable queue work, G1.5 queue history work, V1.1 asset formal metrics work, V1.2 bounded comparison work, or 2E.1 constitution shell work.
+Phase 2B.6 is complete. No further approved 2B.6, 2E, A1, G1, or V1 substep is enumerated in canonical repo evidence.
+Await explicit roadmap extension or approval before widening the dialogue-corpus shell, the constitution layer, the public control-plane seam, the ingest spine, or the art-lab. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, 2B.6 dialogue-corpus work, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, G1.4 local resumable queue work, G1.5 queue history work, V1.1 asset formal metrics work, V1.2 bounded comparison work, or 2E.1 constitution shell work.
 
 ## Approved scope
-- canonical docs closeout after completed Phase 2E.1
-- verified confirmation that no further post-2E.1, post-A1.9, post-G1.5, or post-V1.2 approved substep is currently defined
-- duplicate-work prevention
-- no unrelated runtime behavior
-- no unrelated API widening
+- read-only dialogue corpus analysis over extracted local Messenger exports and ChatGPT export JSON files
+- root-folder discovery that selects the richest Messenger export candidate without merging partial exports
+- Mission Control visibility for the dialogue corpus shell
+- service seam and capability visibility through `/v1/capabilities`
+- no unrelated runtime behavior beyond the completed 2B.6 shell
 
 ## Hard constraints
 - do not modify ingest behavior
+- do not regress the completed read-only dialogue corpus seam at `/api/dialogue-corpus/analyze`
+- do not widen dialogue corpus analysis into memory writes, durable relationship labels, OCR/transcription, embeddings, sentiment scoring, or psychological inference without a new approved phase
 - do not regress the completed read-only preflight manifest seam at `/api/ingest/preflight`
 - do not regress the completed bounded manifest-history seam at `/api/ingest/runs/{run_id}/manifest`
 - do not regress the completed local ingest queue shell at `/api/ingest/queue`
@@ -77,18 +79,12 @@ Await explicit roadmap extension or approval before widening the constitution la
 - do not regress the completed `audit_preview` query kind on `/v1/rooms/{room_id}/query`
 - do not regress the public room-scoped read-only change preview seam at `/v1/rooms/{room_id}/changes`
 - do not widen queue history into full file-by-file archival or background processing without a new approved phase
-- do not add semantic search, fuzzy matching, embeddings, or query-time synthesis
-- do not add /v1/changes/{change_id}, /v1/objects/set, /v1/blobs/upload, or any new blob list/query route beyond the completed A1.7 blob metadata seam
+- do not add `/v1/changes/{change_id}`, `/v1/objects/set`, `/v1/blobs/upload`, or any new blob list/query route beyond the completed A1.7 blob metadata seam
 - do not widen supported query kinds beyond `memory_events`, `memory_episodes`, and `audit_preview` without a new approved phase
 - do not widen supported object kinds beyond `dataset`, `asset`, `memory_event`, and `memory_episode` without a new approved phase
-- do not widen blob semantics beyond deterministic metadata detail over existing asset-backed rows
-- do not widen change preview beyond the existing room-scoped audit preview backing or add a change detail/write surface without a new approved phase
-- do not widen ingest preview into writes, audit side effects, or background workers without a new approved phase
-- do not widen the local resumable queue shell into async interruption, background auto-retry, or startup auto-execute without a new approved phase
-- do not widen the art-lab beyond the completed single-asset formal metrics shell without a new approved phase
-- do not widen the constitution shell beyond read-only parameter visibility and append-only change notes without a new approved phase
 
 ## Required verification
+- focused 2B.6 tests green
 - focused 2E.1 tests green
 - compile pass
 - focused A1.9 tests green
@@ -100,8 +96,3 @@ Await explicit roadmap extension or approval before widening the constitution la
 - regression slice for G1.1 green
 - full unittest suite green
 - local verification if read behavior changes
-
-
-
-
-

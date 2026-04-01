@@ -7,6 +7,7 @@ from .art import ArtLabService
 from .audit import AuditService
 from .blueprint import SYSTEM_BLUEPRINT
 from .constitution import ConstitutionService
+from .dialogue import DialogueCorpusService
 from .guards import governance_guard_catalog, output_guard
 from .memory import MemoryService
 from .repository import KloneRepository
@@ -683,6 +684,7 @@ class ServiceContainer:
     blob: BlobService
     art: ArtLabService
     constitution: ConstitutionService
+    dialogue_corpus: DialogueCorpusService
     object_envelope: _ObjectEnvelopeProjector
 
     @classmethod
@@ -694,6 +696,7 @@ class ServiceContainer:
             blob=BlobService(repository),
             art=ArtLabService(repository),
             constitution=ConstitutionService(),
+            dialogue_corpus=DialogueCorpusService(),
             object_envelope=_ObjectEnvelopeProjector(repository),
         )
 
@@ -714,6 +717,7 @@ class ServiceContainer:
             self.blob.seam_descriptor(),
             self.art.seam_descriptor(),
             self.constitution.seam_descriptor(),
+            self.dialogue_corpus.seam_descriptor(),
             self.object_envelope.seam_descriptor(),
         ]
 
@@ -736,6 +740,7 @@ class ServiceContainer:
             *self.blob.public_capabilities(),
             *self.art.public_capabilities(),
             *self.constitution.public_capabilities(),
+            *self.dialogue_corpus.public_capabilities(),
             *self.object_envelope.public_capabilities(),
             PublicCapabilityRecord(
                 id="audit.preview.read",

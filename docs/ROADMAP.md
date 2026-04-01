@@ -38,6 +38,16 @@ Stress / invariant verification:
 - legacy SQLite bootstrap tolerance
 - no runtime feature expansion
 
+## Phase 2B.6
+Read-Only Dialogue Corpus Shell:
+- POST /api/dialogue-corpus/analyze
+- read-only local conversation-export analysis only
+- support extracted Facebook/Messenger export roots and ChatGPT conversation export JSON files already present on disk
+- expose relationship, network, style, and timeline priors only when the source format actually supports them
+- allow root-folder discovery that selects the richest Messenger export candidate without blindly merging partial exports
+- Mission Control dialogue corpus panel
+- no memory writes, no durable identity labels, no OCR/transcription, no embeddings, and no sentiment or psychological inference in this phase
+
 ## Phase 2C.1
 Query / Retrieval Primitives:
 - status-aware filtering

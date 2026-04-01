@@ -28,6 +28,8 @@ from .schemas import (
     AssetRecord,
     AuditEventRecord,
     ConstitutionSnapshotRecord,
+    DialogueCorpusAnalysisRecord,
+    DialogueCorpusAnalysisRequest,
     DatasetIngestRequest,
     DatasetRecord,
     GovernanceGuardRecord,
@@ -581,6 +583,24 @@ def constitution_snapshot(
     services: ServiceContainer = Depends(get_service_container),
 ) -> ConstitutionSnapshotRecord:
     return services.constitution.snapshot()
+
+
+@router.post("/dialogue-corpus/analyze", response_model=DialogueCorpusAnalysisRecord)
+def dialogue_corpus_analyze(
+    request: DialogueCorpusAnalysisRequest,
+    services: ServiceContainer = Depends(get_service_container),
+) -> DialogueCorpusAnalysisRecord:
+    try:
+        return services.dialogue_corpus.analyze(
+            source_path=request.source_path,
+            owner_name=request.owner_name,
+        )
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except OSError as error:
+        raise HTTPException(status_code=500, detail=f"Dialogue corpus analysis failed: {error}") from error
 
 
 @router.get("/modules")

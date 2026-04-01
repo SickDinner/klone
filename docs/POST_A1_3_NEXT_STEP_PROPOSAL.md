@@ -1,9 +1,11 @@
 # Post-A1.3 Next Step Proposal
 
-Status: non-canonical architect proposal  
+Status: historical non-canonical architect proposal; superseded by later `Phase A1.4` through `Phase A1.9` completion state reflected in canonical docs on 2026-04-01  
 Date: 2026-03-28
 
 This file does not approve a new phase by itself.
+
+This proposal is preserved for historical reasoning only. Do not use it as the current handoff or approval source.
 
 Canonical phase control remains in:
 

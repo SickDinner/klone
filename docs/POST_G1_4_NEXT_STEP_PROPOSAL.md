@@ -1,9 +1,11 @@
 # Post-G1.4 Next Step Proposal
 
-Status: non-canonical architect proposal  
+Status: historical non-canonical architect proposal; superseded by `Phase G1.5` completion on 2026-04-01  
 Date: 2026-03-29
 
 This file does not approve a new phase by itself.
+
+This proposal is preserved for historical reasoning only. Do not use it as the current handoff or approval source.
 
 Canonical phase control remains in:
 

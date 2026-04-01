@@ -1,8 +1,21 @@
 # Next Steps Assessment
 
+Status: historical non-canonical assessment; superseded by completed `Phase 2C.5`, `Phase A1.9`, `Phase G1.5`, and `Phase V1.2` on 2026-04-01  
+Date: 2026-03-28
+
+Do not use this file as the current handoff or approval source.
+
+Canonical phase control remains in:
+
+- `docs/PROJECT_STATUS.md`
+- `docs/HANDOFF_CURRENT.md`
+- `docs/ROADMAP.md`
+
 ## Tavoite
 
 Tämä selvitys kokoaa, mitä projektissa on jo valmiina, missä nykyinen käyttöliittymä jää jälkeen toteutetusta backendistä, ja mikä on järkevin seuraava etenemisjärjestys.
+
+Tämä arvio kuvasi repoa ennen kuin `Memory Explorer`, julkinen read-only delivery surface, `A1.9`, `G1.5`, ja `V1.2` suljettiin kanonisesti valmiiksi. Se säilytetään historiallisena taustana, mutta monet sen alla olevista suosituksista on sittemmin toteutettu tai korvattu uudemmilla kanonisilla docseilla.
 
 Arvio perustuu erityisesti näihin kohtiin:
 

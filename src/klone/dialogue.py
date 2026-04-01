@@ -65,6 +65,8 @@ STOPWORDS = {
     "hello",
     "here",
     "hyvin",
+    "http",
+    "https",
     "ihan",
     "into",
     "itse",
@@ -77,6 +79,7 @@ STOPWORDS = {
     "jotta",
     "just",
     "kaikki",
+    "kans",
     "kanssa",
     "kautta",
     "koko",
@@ -116,6 +119,7 @@ STOPWORDS = {
     "sent",
     "sille",
     "sitten",
+    "siis",
     "some",
     "suoraan",
     "tahan",
@@ -134,6 +138,7 @@ STOPWORDS = {
     "vaan",
     "vähän",
     "very",
+    "viel",
     "vielä",
     "voiko",
     "voisi",
@@ -141,6 +146,7 @@ STOPWORDS = {
     "with",
     "without",
     "would",
+    "varmaa",
     "your",
 }
 
@@ -272,7 +278,7 @@ class DialogueCorpusService:
         for section, json_path in thread_files:
             payload = self._load_json_file(json_path)
             thread_id = str(payload.get("thread_path") or f"{section}/{json_path.parent.name}")
-            title = str(payload.get("title") or json_path.parent.name)
+            title = self._repair_text(str(payload.get("title") or json_path.parent.name))
             participants = self._extract_facebook_participants(payload)
             participant_names = set(participants)
             unique_participants.update(participant_names)
@@ -319,7 +325,7 @@ class DialogueCorpusService:
                 if has_attachment:
                     attachment_message_count += 1
 
-                sender_name = str(message.get("sender_name") or "").strip()
+                sender_name = self._repair_text(str(message.get("sender_name") or ""))
                 if sender_name in owner_names:
                     thread_sent_count += 1
                     sent_message_count += 1
@@ -599,7 +605,7 @@ class DialogueCorpusService:
         owner_question_message_count = 0
         owner_link_message_count = 0
 
-        resolved_owner_name = owner_name.strip() if owner_name and owner_name.strip() else "user"
+        resolved_owner_name = self._repair_text(owner_name.strip()) if owner_name and owner_name.strip() else "user"
 
         for conversation in payload:
             if not isinstance(conversation, dict):
@@ -820,7 +826,7 @@ class DialogueCorpusService:
         for participant in participants:
             if not isinstance(participant, dict):
                 continue
-            name = str(participant.get("name") or "").strip()
+            name = DialogueCorpusService._repair_text(str(participant.get("name") or ""))
             if name:
                 names.append(name)
         return names
@@ -829,7 +835,7 @@ class DialogueCorpusService:
     def _facebook_message_text(message: dict[str, Any]) -> str:
         content = message.get("content")
         if isinstance(content, str):
-            return content.strip()
+            return DialogueCorpusService._repair_text(content)
         return ""
 
     @staticmethod
@@ -839,10 +845,14 @@ class DialogueCorpusService:
             return ""
         parts = content.get("parts")
         if isinstance(parts, list):
-            return "\n".join(str(part).strip() for part in parts if str(part).strip()).strip()
+            return "\n".join(
+                DialogueCorpusService._repair_text(str(part))
+                for part in parts
+                if DialogueCorpusService._repair_text(str(part))
+            ).strip()
         text = content.get("text")
         if isinstance(text, str):
-            return text.strip()
+            return DialogueCorpusService._repair_text(text)
         return ""
 
     @staticmethod
@@ -862,7 +872,11 @@ class DialogueCorpusService:
         participant_thread_counts: Counter[str],
         owner_name: str | None,
     ) -> str:
-        normalized_owner = owner_name.strip() if owner_name and owner_name.strip() else None
+        normalized_owner = (
+            DialogueCorpusService._repair_text(owner_name.strip())
+            if owner_name and owner_name.strip()
+            else None
+        )
         if normalized_owner is not None and normalized_owner in participant_thread_counts:
             return normalized_owner
         if not participant_thread_counts:
@@ -889,6 +903,20 @@ class DialogueCorpusService:
             for token in TOKEN_PATTERN.findall(name.lower()):
                 tokens.add(token)
         return tokens
+
+    @staticmethod
+    def _repair_text(value: str) -> str:
+        text = value.strip()
+        if not text:
+            return ""
+        if any(marker in text for marker in ("Ã", "Â", "ð", "�")):
+            try:
+                repaired = text.encode("latin1").decode("utf-8")
+                if repaired:
+                    return repaired.strip()
+            except UnicodeError:
+                return text
+        return text
 
     @staticmethod
     def _build_style_signals(

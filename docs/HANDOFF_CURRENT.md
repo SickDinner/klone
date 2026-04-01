@@ -3,7 +3,7 @@
 Last updated: 2026-04-01
 
 ## Current approved phase
-Phase 2B.8 clone chat shell complete
+Phase V1.3 read-only 2.5D depth map shell complete
 
 ## Baseline
 - 2B.1 through 2B.5 complete
@@ -28,10 +28,11 @@ Phase 2B.8 clone chat shell complete
 - G1.5 bounded ingest queue history/detail seam exists in repo reality
 - V1.1 read-only asset formal metrics exists in repo reality
 - V1.2 bounded room-scoped art comparison seam exists in repo reality
+- V1.3 read-only 2.5D depth map shell exists in repo reality
 - 2E.1 read-only constitution shell exists in repo reality
 
 ## Immediate goal
-Phase 2B.8 is complete. No further approved 2B.8, 2E, A1, G1, or V1 substep is enumerated in canonical repo evidence.
+Phase V1.3 is complete. No further approved 2B, 2E, A1, G1, or V1 substep is enumerated in canonical repo evidence.
 Await explicit roadmap extension or approval before widening the dialogue-corpus shell, the constitution layer, the public control-plane seam, the ingest spine, or the art-lab. Do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, 2B.6 dialogue-corpus analysis work, 2B.7 bounded dialogue query work, 2B.8 clone chat room work, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob metadata detail seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, G1.4 local resumable queue work, G1.5 queue history work, V1.1 asset formal metrics work, V1.2 bounded comparison work, or 2E.1 constitution shell work.
 
 ## Approved scope
@@ -42,8 +43,9 @@ Await explicit roadmap extension or approval before widening the dialogue-corpus
 - optional GPT-5.4 rendering only when OPENAI_API_KEY is configured
 - root-folder discovery that selects the richest Messenger export candidate without merging partial exports
 - Mission Control visibility for the dialogue corpus shell
+- read-only transient 2.5D depth mapping from either a dropped browser image or an existing indexed image asset
 - service seam and capability visibility through `/v1/capabilities`
-- no unrelated runtime behavior beyond the completed 2B.8 shell
+- no unrelated runtime behavior beyond the completed V1.3 shell
 
 ## Hard constraints
 - do not modify ingest behavior
@@ -68,9 +70,11 @@ Await explicit roadmap extension or approval before widening the dialogue-corpus
 - do not regress the completed read-only art metrics seam at `/api/art/assets/{asset_id}/metrics`
 - do not regress explicit non-image rejection for art metrics
 - do not regress the completed bounded art comparison seam at `/api/art/assets/compare`
+- do not regress the completed read-only 2.5D depth-map shell at `/api/art/depth-map`
 - do not regress the completed read-only constitution shell at `/api/constitution`
 - do not widen art metrics into personality inference, clinical interpretation, OCR, embeddings, or batch profiling without a new approved phase
 - do not widen art comparison into embeddings, semantic similarity, clustering, batch writeback, or `/v1` expansion without a new approved phase
+- do not widen depth mapping into learned monocular-depth models, segmentation writeback, asset creation, OCR, embeddings, or `/v1` expansion without a new approved phase
 - do not widen constitution into write routes, live routing influence, self-modification, or agentic self-editing without a new approved phase
 - do not modify evidence_text
 - do not add public write endpoints
@@ -107,6 +111,7 @@ Await explicit roadmap extension or approval before widening the dialogue-corpus
 - focused G1.5 tests green
 - focused V1.1 tests green
 - focused V1.2 tests green
+- focused V1.3 tests green
 - regression slice for G1.1 green
 - full unittest suite green
 - local verification if read behavior changes

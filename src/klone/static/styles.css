@@ -388,8 +388,76 @@ td {
 
 #memory-context,
 #memory-answer,
-#art-comparison {
+#art-comparison,
+#depth-map-detail {
   margin-top: 14px;
+}
+
+.depth-drop-zone {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px dashed rgba(137, 198, 221, 0.45);
+  background:
+    linear-gradient(135deg, rgba(137, 198, 221, 0.08), rgba(242, 168, 106, 0.06)),
+    rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.depth-drop-zone:hover,
+.depth-drop-zone-active {
+  border-color: rgba(242, 168, 106, 0.62);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+}
+
+.depth-drop-zone-compact {
+  margin-bottom: 14px;
+}
+
+.depth-drop-title {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.depth-drop-subtitle {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.depth-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.depth-preview-card {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.depth-preview-card figcaption {
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.depth-preview-card img {
+  display: block;
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(7, 15, 16, 0.68);
 }
 
 .preview-grid {

@@ -19,10 +19,20 @@ const state = {
     selectedSquare: null,
     squareDetail: null,
     worldMemory: null,
+    worldMemoryFilters: {
+      search: "",
+      assetKind: "",
+      anchorType: "",
+      depthOnly: false,
+    },
     selectedClusterId: null,
     selectedNodeId: null,
     clusterDetail: null,
     nodeDetail: null,
+    depthJobs: null,
+    selectedDepthJobId: null,
+    depthJobDetail: null,
+    placeView: null,
   },
   assets: [],
   selectedAsset: null,
@@ -120,6 +130,92 @@ function shortHash(value) {
     return "n/a";
   }
   return `${value.slice(0, 8)}...${value.slice(-8)}`;
+}
+
+function assetContentRoute(assetId) {
+  return `/api/assets/${encodeURIComponent(assetId)}/content`;
+}
+
+function worldMemoryThumbnail(node, className = "world-memory-thumb") {
+  if (!node || node.asset_kind !== "image") {
+    return '<div class="world-memory-thumb world-memory-thumb-placeholder">No preview</div>';
+  }
+  return `<img class="${escapeHtml(className)}" src="${assetContentRoute(node.asset_id)}" alt="${escapeHtml(node.label)}" loading="lazy" />`;
+}
+
+function currentWorldMemoryActionRoomId() {
+  return (
+    state.simulation.nodeDetail?.node?.room_id ||
+    state.simulation.clusterDetail?.cluster?.room_id ||
+    state.simulation.selectedRoomId ||
+    state.simulation.worldMemory?.resolved_room_ids?.[0] ||
+    ""
+  );
+}
+
+function worldMemoryNodeMatchesFilter(node, filters) {
+  if (!node) {
+    return false;
+  }
+
+  if (filters.assetKind && node.asset_kind !== filters.assetKind) {
+    return false;
+  }
+  if (filters.anchorType && node.anchor_type !== filters.anchorType) {
+    return false;
+  }
+  if (filters.depthOnly && !node.depth_candidate) {
+    return false;
+  }
+  if (filters.search) {
+    const haystack = `${node.label} ${node.relative_path} ${node.dataset_label} ${node.room_id}`.toLowerCase();
+    if (!haystack.includes(filters.search.toLowerCase())) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function filterWorldMemoryProjection(worldMemory) {
+  if (!worldMemory) {
+    return { nodes: [], clusters: [], clusterPreviewNodes: new Map() };
+  }
+
+  const filters = state.simulation.worldMemoryFilters;
+  const filteredNodes = (worldMemory.nodes || []).filter((node) => worldMemoryNodeMatchesFilter(node, filters));
+  const nodesByClusterId = new Map();
+  filteredNodes.forEach((node) => {
+    if (!nodesByClusterId.has(node.cluster_id)) {
+      nodesByClusterId.set(node.cluster_id, []);
+    }
+    nodesByClusterId.get(node.cluster_id).push(node);
+  });
+
+  const filteredClusters = (worldMemory.clusters || []).filter((cluster) => {
+    const clusterNodes = nodesByClusterId.get(cluster.cluster_id) || [];
+    if (clusterNodes.length > 0) {
+      return true;
+    }
+    if (!filters.search) {
+      return false;
+    }
+    return cluster.label.toLowerCase().includes(filters.search.toLowerCase());
+  });
+
+  const clusterPreviewNodes = new Map();
+  filteredClusters.forEach((cluster) => {
+    const previewNode =
+      (nodesByClusterId.get(cluster.cluster_id) || []).find((node) => node.asset_kind === "image") ||
+      (nodesByClusterId.get(cluster.cluster_id) || [])[0] ||
+      null;
+    clusterPreviewNodes.set(cluster.cluster_id, previewNode);
+  });
+
+  return {
+    nodes: filteredNodes,
+    clusters: filteredClusters,
+    clusterPreviewNodes,
+  };
 }
 
 function chips(items = []) {
@@ -602,8 +698,13 @@ function renderWorldMemory(worldMemory) {
     shellRoot.textContent = "No world-memory shell loaded yet.";
     renderWorldMemoryClusterDetail(null);
     renderWorldMemoryNodeDetail(null);
+    renderWorldMemoryDepthJobs(null);
+    renderWorldMemoryPlaceView(null);
     return;
   }
+
+  const filtered = filterWorldMemoryProjection(worldMemory);
+  const filters = state.simulation.worldMemoryFilters;
 
   summaryRoot.className = "detail-card";
   summaryRoot.innerHTML = `
@@ -615,9 +716,17 @@ function renderWorldMemory(worldMemory) {
       worldMemory.requested_room_id ? `room: ${worldMemory.requested_room_id}` : `rooms: ${worldMemory.resolved_room_ids.length}`,
       `nodes: ${worldMemory.node_count}`,
       `clusters: ${worldMemory.cluster_count}`,
+      `shown_nodes: ${filtered.nodes.length}`,
+      `shown_clusters: ${filtered.clusters.length}`,
       `place_candidates: ${worldMemory.place_candidate_count}`,
       `depth_candidates: ${worldMemory.depth_candidate_count}`,
       ...worldMemory.anchor_types.map((anchorType) => `type: ${anchorType}`),
+    ])}</div>
+    <div class="meta">${chips([
+      filters.search ? `search: ${filters.search}` : null,
+      filters.assetKind ? `kind_filter: ${filters.assetKind}` : null,
+      filters.anchorType ? `anchor_filter: ${filters.anchorType}` : null,
+      filters.depthOnly ? "depth_only: true" : null,
     ])}</div>
     <ul class="detail-list">
       ${worldMemory.notes.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
@@ -629,12 +738,15 @@ function renderWorldMemory(worldMemory) {
     }
   `;
 
-  const clusterMarkup = worldMemory.clusters?.length
-    ? `<div class="stack compact-stack">${worldMemory.clusters
+  const clusterMarkup = filtered.clusters?.length
+    ? `<div class="stack compact-stack">${filtered.clusters
         .slice(0, 8)
         .map(
-          (cluster) => `
+          (cluster) => {
+            const previewNode = filtered.clusterPreviewNodes.get(cluster.cluster_id);
+            return `
             <article class="stack-item compact-item simulation-linked-item ${state.simulation.selectedClusterId === cluster.cluster_id ? "simulation-selected" : ""}" data-world-cluster-id="${escapeHtml(cluster.cluster_id)}">
+              ${worldMemoryThumbnail(previewNode, "world-memory-thumb world-memory-thumb-inline")}
               <small>${escapeHtml(cluster.room_id)}</small>
               <h3>${escapeHtml(cluster.label)}</h3>
               <div class="meta">${chips([
@@ -647,17 +759,19 @@ function renderWorldMemory(worldMemory) {
                 `recent: ${formatTime(cluster.recent_indexed_at)}`,
               ])}</div>
             </article>
-          `,
+          `;
+          },
         )
         .join("")}</div>`
     : '<div class="empty-state">No world-memory clusters available yet.</div>';
 
-  const nodeMarkup = worldMemory.nodes?.length
-    ? `<div class="stack compact-stack">${worldMemory.nodes
+  const nodeMarkup = filtered.nodes?.length
+    ? `<div class="stack compact-stack">${filtered.nodes
         .slice(0, 16)
         .map(
           (node) => `
             <article class="stack-item compact-item simulation-linked-item ${state.simulation.selectedNodeId === node.node_id ? "simulation-selected" : ""}" data-world-node-id="${escapeHtml(node.node_id)}">
+              ${worldMemoryThumbnail(node, "world-memory-thumb world-memory-thumb-inline")}
               <small>${escapeHtml(node.anchor_type)}</small>
               <h3>${escapeHtml(node.label)}</h3>
               <div class="meta">${chips([
@@ -703,6 +817,16 @@ function renderWorldMemoryClusterDetail(detail) {
   root.innerHTML = `
     <h3>${escapeHtml(detail.cluster.label)}</h3>
     <p>Governed place cluster projected from indexed local anchors.</p>
+    <div class="world-memory-thumb-wrap">
+      ${
+        detail.nodes?.length
+          ? worldMemoryThumbnail(
+              detail.nodes.find((node) => node.asset_kind === "image") || detail.nodes[0],
+              "world-memory-thumb world-memory-thumb-large",
+            )
+          : '<div class="world-memory-thumb world-memory-thumb-placeholder">No preview</div>'
+      }
+    </div>
     <div class="meta">${chips([
       `room: ${detail.cluster.room_id}`,
       `dataset: ${detail.cluster.dataset_label}`,
@@ -711,6 +835,10 @@ function renderWorldMemoryClusterDetail(detail) {
       `place: ${detail.cluster.place_score.toFixed(2)}`,
       `depth_candidates: ${detail.cluster.depth_candidate_count}`,
     ])}</div>
+    <div class="form-actions">
+      <button class="button button-secondary" type="button" data-depth-run="local_luma_shell">Run Cluster Depth</button>
+      <button class="button button-secondary" type="button" data-depth-refresh="true">Refresh Jobs</button>
+    </div>
     ${
       detail.linked_squares?.length
         ? `<section class="preview-block">
@@ -772,6 +900,9 @@ function renderWorldMemoryNodeDetail(detail) {
   root.innerHTML = `
     <h3>${escapeHtml(detail.node.label)}</h3>
     <p>One governed anchor with a deterministic place/depth shell.</p>
+    <div class="world-memory-thumb-wrap">
+      ${worldMemoryThumbnail(detail.node, "world-memory-thumb world-memory-thumb-large")}
+    </div>
     <div class="meta">${chips([
       `room: ${detail.node.room_id}`,
       `dataset: ${detail.node.dataset_label}`,
@@ -780,6 +911,11 @@ function renderWorldMemoryNodeDetail(detail) {
       `place: ${detail.place_shell.place_score.toFixed(2)}`,
       `depth_candidate: ${detail.place_shell.depth_candidate}`,
     ])}</div>
+    <div class="form-actions">
+      <button class="button button-secondary" type="button" data-depth-run="local_luma_shell">Run Local Depth</button>
+      <button class="button button-secondary" type="button" data-depth-run="depth_anything_v2_remote">Run Remote Depth</button>
+      <button class="button button-secondary" type="button" data-world-place-refresh="true">Refresh Place View</button>
+    </div>
     <section class="preview-block">
       <h4>Linked Square</h4>
       <article class="stack-item compact-item simulation-linked-item" data-open-hybrid-row-id="${escapeHtml(detail.linked_square.row_id)}" data-open-hybrid-column-id="${escapeHtml(detail.linked_square.column_id)}">
@@ -795,6 +931,7 @@ function renderWorldMemoryNodeDetail(detail) {
         <li><strong>eligible</strong>: ${escapeHtml(detail.place_shell.eligible)}</li>
         <li><strong>depth_candidate</strong>: ${escapeHtml(detail.place_shell.depth_candidate)}</li>
         <li><strong>rationale</strong>: ${escapeHtml(detail.place_shell.rationale)}</li>
+        <li><strong>source_image</strong>: <a href="${assetContentRoute(detail.node.asset_id)}" target="_blank" rel="noreferrer">open asset</a></li>
       </ul>
       <div class="meta">${chips(detail.place_shell.cues.map((cue) => `cue: ${cue}`))}</div>
     </section>
@@ -803,6 +940,283 @@ function renderWorldMemoryNodeDetail(detail) {
       <ul class="detail-list">${metadataEntries}</ul>
     </section>
   `;
+}
+
+function renderWorldMemoryDepthJobs(jobList) {
+  const root = document.querySelector("#world-memory-depth-jobs");
+  const actionRoomId = currentWorldMemoryActionRoomId();
+  const runnableNodeIds = currentWorldMemoryRunnableNodeIds();
+
+  if (!jobList) {
+    root.className = "detail-card empty-state";
+    root.textContent = actionRoomId
+      ? "No world-memory depth jobs loaded yet."
+      : "Select a single world-memory room, cluster, or node to inspect depth jobs.";
+    return;
+  }
+
+  const selectedDetail =
+    state.simulation.depthJobDetail &&
+    state.simulation.depthJobDetail.job_id === state.simulation.selectedDepthJobId
+      ? state.simulation.depthJobDetail
+      : null;
+
+  const jobsMarkup = jobList.jobs?.length
+    ? `<div class="stack compact-stack">${jobList.jobs
+        .map(
+          (job) => `
+            <article class="stack-item compact-item simulation-linked-item ${state.simulation.selectedDepthJobId === job.job_id ? "simulation-selected" : ""}" data-depth-job-id="${job.job_id}">
+              <small>${escapeHtml(job.renderer)}</small>
+              <h3>Depth Job ${job.job_id}</h3>
+              <div class="meta">${chips([
+                `status: ${job.status}`,
+                `nodes: ${job.node_count}`,
+                `results: ${job.result_count}`,
+                `created: ${formatTime(job.created_at)}`,
+              ])}</div>
+            </article>
+          `,
+        )
+        .join("")}</div>`
+    : '<div class="empty-state">No depth jobs exist yet for this room.</div>';
+
+  const detailMarkup = selectedDetail
+    ? `
+      <section class="preview-block">
+        <h4>Selected Job</h4>
+        <div class="meta">${chips([
+          `job: ${selectedDetail.job_id}`,
+          `renderer: ${selectedDetail.renderer}`,
+          `status: ${selectedDetail.status}`,
+          `started: ${formatTime(selectedDetail.started_at)}`,
+          `completed: ${formatTime(selectedDetail.completed_at)}`,
+        ])}</div>
+        ${
+          selectedDetail.results?.length
+            ? `<div class="stack compact-stack">${selectedDetail.results
+                .map(
+                  (result) => `
+                    <article class="stack-item compact-item">
+                      <div class="world-memory-thumb-wrap">
+                        <img class="world-memory-thumb world-memory-thumb-inline" src="${escapeHtml(result.depth_preview_route)}?room_id=${encodeURIComponent(
+                          selectedDetail.room_id,
+                        )}" alt="${escapeHtml(result.label)} depth preview" loading="lazy" />
+                      </div>
+                      <small>${escapeHtml(result.status)}</small>
+                      <h3>${escapeHtml(result.label)}</h3>
+                      <div class="meta">${chips([
+                        `node: ${result.node_id}`,
+                        `size: ${result.width_px}x${result.height_px}`,
+                      ])}</div>
+                    </article>
+                  `,
+                )
+                .join("")}</div>`
+            : '<div class="empty-state">This depth job has no result artifacts yet.</div>'
+        }
+      </section>
+    `
+    : "";
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>World Memory Depth Jobs</h3>
+    <p>Bounded depth rendering over selected world-memory image anchors only.</p>
+    <div class="meta">${chips([
+      `room: ${actionRoomId || "not_selected"}`,
+      `jobs: ${jobList.job_count}`,
+      `runnable_nodes: ${runnableNodeIds.length}`,
+      ...jobList.notes,
+    ])}</div>
+    <div class="form-actions">
+      <button class="button button-secondary" type="button" data-depth-run="local_luma_shell" ${!runnableNodeIds.length ? "disabled" : ""}>Run Local Depth</button>
+      <button class="button button-secondary" type="button" data-depth-run="depth_anything_v2_remote" ${!runnableNodeIds.length ? "disabled" : ""}>Run Remote Depth</button>
+      <button class="button button-secondary" type="button" data-depth-refresh="true" ${!actionRoomId ? "disabled" : ""}>Refresh Jobs</button>
+    </div>
+    <section class="preview-block">
+      <h4>Recent Jobs</h4>
+      ${jobsMarkup}
+    </section>
+    ${detailMarkup}
+  `;
+}
+
+function renderWorldMemoryPlaceView(placeView) {
+  const root = document.querySelector("#world-memory-place-view");
+  if (!placeView) {
+    root.className = "detail-card empty-state";
+    root.textContent = "Select a world-memory node to inspect the local place viewer.";
+    return;
+  }
+
+  root.className = "detail-card";
+  root.innerHTML = `
+    <h3>Local Place Viewer</h3>
+    <p>2.5D parallax shell over one governed image anchor.</p>
+    <div class="meta">${chips([
+      `room: ${placeView.room_id}`,
+      `viewer: ${placeView.viewer_kind}`,
+      `available: ${placeView.available}`,
+      placeView.latest_job_id ? `job: ${placeView.latest_job_id}` : null,
+      placeView.renderer ? `renderer: ${placeView.renderer}` : null,
+    ])}</div>
+    <div class="form-actions">
+      <button class="button button-secondary" type="button" data-world-place-refresh="true">Refresh Place View</button>
+      <button class="button button-secondary" type="button" data-depth-run="local_luma_shell">Run Local Depth</button>
+    </div>
+    ${
+      placeView.available
+        ? `
+          <div class="place-view-shell">
+            <canvas
+              id="world-memory-place-canvas"
+              class="place-view-canvas"
+              data-source-image="${escapeHtml(placeView.source_image_route)}"
+              data-depth-preview="${escapeHtml(placeView.depth_preview_route)}?room_id=${encodeURIComponent(placeView.room_id)}"
+            ></canvas>
+            <div class="toolbar">
+              <label class="field field-inline">
+                <span>Parallax</span>
+                <input id="world-memory-place-strength" type="range" min="4" max="64" value="22" />
+              </label>
+              <label class="field field-inline">
+                <span>Zoom</span>
+                <input id="world-memory-place-zoom" type="range" min="90" max="150" value="106" />
+              </label>
+            </div>
+            <div class="preview-grid">
+              <section class="preview-block">
+                <h4>Source Image</h4>
+                <img class="world-memory-thumb world-memory-thumb-large" src="${escapeHtml(placeView.source_image_route)}" alt="${escapeHtml(placeView.label)} source" loading="lazy" />
+              </section>
+              <section class="preview-block">
+                <h4>Depth Preview</h4>
+                <img class="world-memory-thumb world-memory-thumb-large" src="${escapeHtml(placeView.depth_preview_route)}?room_id=${encodeURIComponent(placeView.room_id)}" alt="${escapeHtml(placeView.label)} depth" loading="lazy" />
+              </section>
+            </div>
+          </div>
+        `
+        : `<div class="empty-state">${escapeHtml(
+            placeView.warnings?.[0] || "No depth artifact exists for this node yet.",
+          )}</div>`
+    }
+  `;
+
+  if (placeView.available) {
+    queueMicrotask(() => {
+      mountWorldMemoryPlaceViewer(placeView);
+    });
+  }
+}
+
+function mountWorldMemoryPlaceViewer(placeView) {
+  const canvas = document.querySelector("#world-memory-place-canvas");
+  if (!canvas) {
+    return;
+  }
+  const strengthInput = document.querySelector("#world-memory-place-strength");
+  const zoomInput = document.querySelector("#world-memory-place-zoom");
+  if (!strengthInput || !zoomInput) {
+    return;
+  }
+
+  const ctx = canvas.getContext("2d");
+  const sourceUrl = canvas.dataset.sourceImage;
+  const depthUrl = canvas.dataset.depthPreview;
+  const host = canvas.parentElement;
+  if (!ctx || !sourceUrl || !depthUrl || !host) {
+    return;
+  }
+
+  let targetX = 0.5;
+  let targetY = 0.5;
+
+  const loadImage = (src) =>
+    new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = reject;
+      image.src = src;
+    });
+
+  const resizeCanvas = () => {
+    const rect = host.getBoundingClientRect();
+    canvas.width = Math.max(320, Math.floor(rect.width));
+    canvas.height = 280;
+  };
+
+  Promise.all([loadImage(sourceUrl), loadImage(depthUrl)])
+    .then(([sourceImage, depthImage]) => {
+      const depthCanvas = document.createElement("canvas");
+      depthCanvas.width = depthImage.width;
+      depthCanvas.height = depthImage.height;
+      const depthContext = depthCanvas.getContext("2d");
+      depthContext.drawImage(depthImage, 0, 0);
+
+      const draw = () => {
+        resizeCanvas();
+        const strength = Number(strengthInput.value || 22);
+        const zoom = Number(zoomInput.value || 106) / 100;
+        const depthData = depthContext.getImageData(0, 0, depthCanvas.width, depthCanvas.height).data;
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = sourceImage.width;
+        tempCanvas.height = sourceImage.height;
+        const tempContext = tempCanvas.getContext("2d");
+        tempContext.drawImage(sourceImage, 0, 0);
+        const sourcePixels = tempContext.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const output = tempContext.createImageData(tempCanvas.width, tempCanvas.height);
+
+        for (let y = 0; y < tempCanvas.height; y += 1) {
+          for (let x = 0; x < tempCanvas.width; x += 1) {
+            const index = (y * tempCanvas.width + x) * 4;
+            const depthValue = depthData[index] / 255;
+            const shiftX = (targetX - 0.5) * 2 * strength * depthValue;
+            const shiftY = (targetY - 0.5) * 2 * strength * depthValue;
+            const sampleX = Math.max(0, Math.min(tempCanvas.width - 1, Math.round(x - shiftX)));
+            const sampleY = Math.max(0, Math.min(tempCanvas.height - 1, Math.round(y - shiftY)));
+            const sampleIndex = (sampleY * tempCanvas.width + sampleX) * 4;
+            output.data[index] = sourcePixels.data[sampleIndex];
+            output.data[index + 1] = sourcePixels.data[sampleIndex + 1];
+            output.data[index + 2] = sourcePixels.data[sampleIndex + 2];
+            output.data[index + 3] = 255;
+          }
+        }
+
+        tempContext.putImageData(output, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const scale = Math.min(canvas.width / tempCanvas.width, canvas.height / tempCanvas.height) * zoom;
+        const drawWidth = tempCanvas.width * scale;
+        const drawHeight = tempCanvas.height * scale;
+        const originX = (canvas.width - drawWidth) / 2;
+        const originY = (canvas.height - drawHeight) / 2;
+        ctx.drawImage(tempCanvas, originX, originY, drawWidth, drawHeight);
+      };
+
+      const updatePointer = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        targetX = (event.clientX - rect.left) / rect.width;
+        targetY = (event.clientY - rect.top) / rect.height;
+        draw();
+      };
+
+      canvas.onmousemove = updatePointer;
+      canvas.onmouseleave = () => {
+        targetX = 0.5;
+        targetY = 0.5;
+        draw();
+      };
+      strengthInput.oninput = draw;
+      zoomInput.oninput = draw;
+      window.addEventListener("resize", draw, { once: true });
+      draw();
+    })
+    .catch((error) => {
+      const root = document.querySelector("#world-memory-place-view");
+      if (root) {
+        root.className = "detail-card";
+        root.innerHTML = `<h3>Local Place Viewer</h3><p>${escapeHtml(error.message)}</p>`;
+      }
+    });
 }
 
 function renderDialogueCorpus(analysis) {

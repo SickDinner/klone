@@ -126,10 +126,10 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
             zone_id="personal",
             supervisor="art supervisor",
             stage="phase-2c",
-            status="read_only_asset_metrics",
-            purpose="Measure formal visual properties without drifting into personality or clinical inference.",
+            status="read_only_visual_lab",
+            purpose="Measure formal visual properties and transient visual projections without drifting into personality or clinical inference.",
             key_inputs=["drawings", "visual archives", "image assets"],
-            outputs=["asset formal metrics", "composition features", "longitudinal comparisons"],
+            outputs=["asset formal metrics", "composition features", "longitudinal comparisons", "2.5D depth maps"],
         ),
         ModuleCard(
             id="genomics-lab",
@@ -302,8 +302,8 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
         BuildPhase(
             id="phase-2c",
             title="Art and Drawing Metrics",
-            goal="Measure formal properties of drawings and art without drifting into personality profiling.",
-            deliverables=["figure count", "line density", "symmetry", "composition balance"],
+            goal="Measure formal properties of drawings and art and add bounded transient visual projections without drifting into personality profiling.",
+            deliverables=["figure count", "line density", "symmetry", "composition balance", "2.5D depth mapper"],
         ),
         BuildPhase(
             id="phase-2d",

@@ -37,6 +37,7 @@ Nykyinen kanoninen tila on:
 - `G1.4 local resumable ingest queue complete`
 - `G1.5 bounded ingest queue history seam complete`
 - `V1.2 bounded batch art metrics and longitudinal comparison complete`
+- `V1.3 read-only 2.5D depth map shell complete`
 
 Uutta tässä versiossa:
 
@@ -88,8 +89,12 @@ Uutta tässä versiossa:
   `GET /api/art/assets/{asset_id}/metrics` laskee nyt olemassa oleville image-asseteille deterministiset formaalit mittarit kuten brightness, contrast, edge density, symmetry, balance, entropy ja colorfulness ilman persoonallisuustulkintaa
 - `bounded art comparison seam`
   `GET /api/art/assets/compare` vertailee rajatun saman huoneen image-asset-joukon samoilla deterministisillä formaalimittareilla ja näyttää ajan mukaan järjestetyt mittarit sekä ensimmäisestä viimeiseen lasketut delta-arvot
+- `2.5D depth map shell`
+  `POST /api/art/depth-map` renderöi nyt transientin paikallisen depth-map-version joko drag-and-drop-kuvasta tai olemassa olevasta image-assetista ilman että derived-kuva kirjoitetaan asset-indexiin
 - `mission control art metrics`
   Asset Detail -paneelin alla näkyy nyt Art Metrics -kortti, joka analysoi valitun image-assetin read-only-tilassa ja kertoo selvästi, jos asset ei ole kuva
+- `mission control depth mapper`
+  sama visual-lab-alue tukee nyt drag-and-drop depth-mappingiä ja valitun indexed image-assetin depth-previewtä heti selaimessa
 - `dialogue corpus shell`
   `POST /api/dialogue-corpus/analyze` analysoi nyt local Messenger-export-rootit tai ChatGPT-export-JSONit read-only-tilassa ja nostaa näkyviin suhteet, verkoston laajuuden, tyyli-signaalit ja aikajanan silloin kun lähde oikeasti tukee niitä
 - `bounded dialogue query shell`

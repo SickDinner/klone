@@ -3,7 +3,7 @@
 Last updated: 2026-04-01
 
 ## Current phase
-Phase 2B.8 complete; no further approved 2B.8, 2E, A1, G1, or V1 substep is defined yet
+Phase V1.3 complete; no further approved 2B, 2E, A1, G1, or V1 substep is defined yet
 
 ## Phase state
 - Phase 2B.1 complete
@@ -40,6 +40,7 @@ Phase 2B.8 complete; no further approved 2B.8, 2E, A1, G1, or V1 substep is defi
 - Phase V1 approved
 - Phase V1.1 complete
 - Phase V1.2 complete
+- Phase V1.3 complete
 
 ## Completed in 2B.5
 - stress verification for replay/correction/provenance/room isolation
@@ -297,6 +298,15 @@ Phase 2B.8 complete; no further approved 2B.8, 2E, A1, G1, or V1 substep is defi
 - full unittest suite green
 - compile pass green
 
+## Completed in V1.3
+- first read-only 2.5D depth-map shell over transient uploads and existing governed image assets
+- POST `/api/art/depth-map` now renders a deterministic local depth approximation for one uploaded browser image or one existing image asset
+- the response includes original preview, grayscale depth-map preview, and colorized relief preview without writing a derived asset row
+- Mission Control Asset Detail now includes a drag-and-drop `2.5D Depth Mapper` panel plus a shortcut to reuse the selected indexed image asset
+- the phase remains read-only and explicitly avoids learned monocular-depth models, OCR, embeddings, segmentation writeback, asset creation, and `/v1` widening
+- focused V1.3 tests green
+- compile pass green
+
 ## Completed in 2E.1
 - first read-only Constitution Layer shell over slow-cycle model defaults
 - GET `/api/constitution` returns a visible constitution snapshot with parameter defaults, approval state, and append-only recent change notes
@@ -309,7 +319,7 @@ Phase 2B.8 complete; no further approved 2B.8, 2E, A1, G1, or V1 substep is defi
 - compile pass green
 
 ## Next approved substep
-- no further approved 2B.8, 2E, A1, G1, or V1 substep is enumerated in canonical repo evidence
-- require explicit roadmap extension or approval before widening the dialogue-corpus shell beyond the completed 2B.8 clone-chat route, the constitution layer beyond the completed 2E.1 read-only shell, the public control-plane seam beyond the completed A1.9 change preview route, the ingest spine beyond the completed G1.5 bounded queue history seam, or the art-lab beyond the completed V1.2 bounded comparison seam
-- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, G1.4 local resumable queue work, G1.5 queue history work, V1.1 asset formal metrics work, V1.2 bounded comparison work, or 2E.1 constitution shell work
+- no further approved 2B, 2E, A1, G1, or V1 substep is enumerated in canonical repo evidence
+- require explicit roadmap extension or approval before widening the dialogue-corpus shell beyond the completed 2B.8 clone-chat route, the constitution layer beyond the completed 2E.1 read-only shell, the public control-plane seam beyond the completed A1.9 change preview route, the ingest spine beyond the completed G1.5 bounded queue history seam, or the art-lab beyond the completed V1.3 transient depth-map shell
+- do not reopen completed 2C retrieval, context, provenance, bounded-answer, Memory Explorer, A1.1 seam work, A1.2 audit/contract-shell work, A1.3 blob metadata shell work, A1.4 object envelope shell work, A1.5 public object-get seam work, A1.6 public query seam work, A1.7 public blob-meta seam work, A1.8 audit preview query work, A1.9 change preview seam work, G1.1 preflight manifest work, G1.2 manifest history work, G1.3 local queue shell work, G1.4 local resumable queue work, G1.5 queue history work, V1.1 asset formal metrics work, V1.2 bounded comparison work, V1.3 depth-map shell work, or 2E.1 constitution shell work
 

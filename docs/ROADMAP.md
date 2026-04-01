@@ -260,6 +260,15 @@ Bounded Batch Art Metrics and Longitudinal Comparison:
 - expose ordered side-by-side metric values plus simple first-to-last metric deltas only
 - no OCR, no embeddings, no semantic similarity, no clustering, no profiling, no batch writeback, and no /v1 expansion
 
+## Phase V1.3
+Read-Only 2.5D Depth Map Shell:
+- POST /api/art/depth-map
+- read-only transient depth-map rendering only
+- support either one uploaded browser image or one existing image asset per request
+- return deterministic local 2.5D-style depth-map and preview payloads only; do not persist derived files
+- Mission Control exposes drag-and-drop depth mapping and selected-asset reuse in the same visual-lab surface
+- no learned monocular-depth model, no OCR, no embeddings, no segmentation writeback, no asset creation, and no /v1 expansion
+
 ## Phase 2E.1
 Read-Only Constitution Layer Shell:
 - GET /api/constitution
@@ -272,7 +281,7 @@ Read-Only Constitution Layer Shell:
 ## Not approved yet
 - post-2B.8 dialogue expansion
 - post-2E.1 constitution expansion
-- post-V1.2 art-lab expansion
+- post-V1.3 art-lab expansion
 - semantic search
 - embeddings
 - OCR/transcription

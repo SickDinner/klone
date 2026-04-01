@@ -158,11 +158,21 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
             name="Simulation Lab",
             zone_id="public",
             supervisor="simulation supervisor",
-            stage="phase-3",
-            status="read_only_projection",
-            purpose="Project governed audit and memory evidence into runtime-visible boards and other read-only simulation surfaces without creating a second source of truth.",
+            stage="phase-w1",
+            status="world_memory_place_shell",
+            purpose=(
+                "Project governed audit, memory, and indexed asset evidence into runtime-visible boards, "
+                "world-memory clusters, bounded depth jobs, and local place-view shells without creating a second source of truth."
+            ),
             key_inputs=["audit evidence", "memory events", "memory episodes", "room registry"],
-            outputs=["hybrid board", "pressure summaries", "projection diagnostics", "world memory anchors"],
+            outputs=[
+                "hybrid board",
+                "pressure summaries",
+                "projection diagnostics",
+                "world memory anchors",
+                "bounded depth jobs",
+                "local place viewer",
+            ],
         ),
         ModuleCard(
             id="circadian-layer",
@@ -322,6 +332,12 @@ SYSTEM_BLUEPRINT = SystemBlueprint(
             title="Circadian and Sensory Shells",
             goal="Create interfaces for circadian control, sensory channels, and instinct-style routing without overbuilding simulation.",
             deliverables=["circadian controls", "sensory channels", "instinct router", "maintenance windows"],
+        ),
+        BuildPhase(
+            id="phase-w1",
+            title="World Memory and Place Shell",
+            goal="Turn governed asset anchors into filtered world-memory clusters, bounded local depth jobs, and a local place-view shell before any autonomous world-growth layer.",
+            deliverables=["world memory filters", "cluster/node thumbnails", "bounded depth jobs", "place viewer"],
         ),
         BuildPhase(
             id="phase-3",

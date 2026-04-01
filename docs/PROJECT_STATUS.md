@@ -3,7 +3,7 @@
 Last updated: 2026-04-01
 
 ## Current phase
-Phase V1.3 complete; no further approved 2B, 2E, A1, G1, or V1 substep is defined yet
+Phase W1.4 complete; no further approved W1 substep is defined yet
 
 ## Phase state
 - Phase 2B.1 complete
@@ -41,6 +41,11 @@ Phase V1.3 complete; no further approved 2B, 2E, A1, G1, or V1 substep is define
 - Phase V1.1 complete
 - Phase V1.2 complete
 - Phase V1.3 complete
+- Phase W1 approved
+- Phase W1.1 complete
+- Phase W1.2 complete
+- Phase W1.3 complete
+- Phase W1.4 complete
 
 ## Completed in 2B.5
 - stress verification for replay/correction/provenance/room isolation
@@ -306,6 +311,31 @@ Phase V1.3 complete; no further approved 2B, 2E, A1, G1, or V1 substep is define
 - the phase remains read-only and explicitly avoids learned monocular-depth models, OCR, embeddings, segmentation writeback, asset creation, and `/v1` widening
 - focused V1.3 tests green
 - compile pass green
+
+## Completed in W1.1
+- Mission Control world-memory shell now includes search, asset-kind, anchor-type, and depth-candidate-only filters
+- world-memory cluster and node cards now expose local image thumbnails over existing governed assets
+- world-memory detail surfaces remain read-only and projection-only
+- no new asset, memory, or simulation source of truth introduced
+
+## Completed in W1.2
+- first bounded world-memory depth-job shell over explicit node selection
+- GET `/api/simulation/world-memory/depth/jobs` exposes room-scoped recent job history
+- POST `/api/simulation/world-memory/depth/jobs` executes bounded local depth generation over selected world-memory nodes only
+- GET `/api/simulation/world-memory/depth/jobs/{job_id}` exposes per-job result detail
+- GET `/api/simulation/world-memory/depth/jobs/{job_id}/nodes/{node_id}/{artifact_kind}` serves stored preview/raw artifacts
+- default deterministic local `local_luma_shell` renderer added, with optional explicit `depth_anything_v2_remote` path
+
+## Completed in W1.3
+- local asset content route now supports governed thumbnail/source preview reuse for world-memory image anchors
+- depth job/result manifests persist local artifact lineage, renderer, dimensions, and timestamps
+- Mission Control now shows room-scoped depth-job history and selected-job result previews
+
+## Completed in W1.4
+- GET `/api/simulation/world-memory/nodes/{node_id}/place-view` provides a room-scoped local place-view shell
+- Mission Control now renders a local 2.5D parallax viewer over the latest completed depth artifact for the selected node
+- place-view availability stays explicitly false until a bounded depth job exists for that node
+- board/world-memory linkage remains read-only and governed by the existing ingest/memory evidence spine
 
 ## Completed in 2E.1
 - first read-only Constitution Layer shell over slow-cycle model defaults

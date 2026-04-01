@@ -13,16 +13,22 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from klone.api import (  # noqa: E402
+    asset_content,
     simulation_hybrid_board,
     simulation_hybrid_board_square_detail,
     simulation_world_memory,
     simulation_world_memory_cluster_detail,
+    simulation_world_memory_depth_artifact,
+    simulation_world_memory_depth_job_detail,
+    simulation_world_memory_depth_jobs,
+    simulation_world_memory_depth_run_job,
     simulation_world_memory_node_detail,
+    simulation_world_memory_place_view,
 )
 from klone.config import Settings  # noqa: E402
 from klone.ingest import ingest_dataset  # noqa: E402
 from klone.main import create_app  # noqa: E402
-from klone.schemas import DatasetIngestRequest  # noqa: E402
+from klone.schemas import DatasetIngestRequest, WorldMemoryDepthJobRequest  # noqa: E402
 
 
 class SimulationPhaseS11Tests(unittest.TestCase):
@@ -99,7 +105,7 @@ class SimulationPhaseS11Tests(unittest.TestCase):
         self.assertGreater(world_memory["place_candidate_count"], 0)
         self.assertGreater(world_memory["depth_candidate_count"], 0)
         self.assertTrue(
-            any(node["relative_path"].endswith("scene.jpg") for node in world_memory["nodes"])
+            any(node["relative_path"].endswith("scene.png") for node in world_memory["nodes"])
         )
         self.assertIn("image_scene", world_memory["anchor_types"])
         self.assertEqual(cluster_detail["requested_room_id"], "restricted-room")
@@ -123,6 +129,37 @@ class SimulationPhaseS11Tests(unittest.TestCase):
         self.assertEqual(aggregate_board, observed["aggregate_repeat"])
         self.assertEqual(world_memory, world_memory_repeat)
 
+    def test_world_memory_depth_jobs_and_place_view_are_local_and_bounded(self) -> None:
+        app = create_app(self._settings_for("simulation_depth.sqlite"))
+        observed = asyncio.run(self._collect_depth_payloads(app))
+
+        self.assertEqual(observed["jobs_before"]["job_count"], 0)
+        self.assertFalse(observed["place_before"]["available"])
+
+        job = observed["job"]
+        self.assertEqual(job["status"], "completed")
+        self.assertEqual(job["renderer"], "local_luma_shell")
+        self.assertEqual(job["result_count"], 1)
+        self.assertEqual(len(job["results"]), 1)
+
+        job_list = observed["jobs_after"]
+        self.assertEqual(job_list["job_count"], 1)
+        self.assertEqual(job_list["jobs"][0]["job_id"], job["job_id"])
+
+        job_detail = observed["job_detail"]
+        self.assertEqual(job_detail["job_id"], job["job_id"])
+        self.assertEqual(job_detail["result_count"], 1)
+        self.assertEqual(job_detail["results"][0]["node_id"], observed["node_id"])
+
+        self.assertTrue(Path(observed["preview_response"].path).exists())
+        self.assertTrue(Path(observed["raw_response"].path).exists())
+        self.assertTrue(Path(observed["asset_response"].path).exists())
+
+        self.assertTrue(observed["place_after"]["available"])
+        self.assertEqual(observed["place_after"]["latest_job_id"], job["job_id"])
+        self.assertIn("/api/assets/", observed["place_after"]["source_image_route"])
+        self.assertIn("/api/simulation/world-memory/depth/jobs/", observed["place_after"]["depth_preview_route"])
+
     async def _collect_board_payloads(self, app) -> dict[str, object]:
         async with app.router.lifespan_context(app):
             repository = app.state.repository
@@ -131,7 +168,10 @@ class SimulationPhaseS11Tests(unittest.TestCase):
                 label="Restricted Fixture",
                 classification_level="personal",
                 folder_name="restricted_fixture",
-                files={"notes\\alpha.txt": "alpha", "images\\scene.jpg": "beta"},
+                files={
+                    "notes\\alpha.txt": "alpha",
+                    "images\\scene.png": (28, 18, (140, 70, 30)),
+                },
             )
             self._ingest_dataset(
                 repository=repository,
@@ -201,6 +241,87 @@ class SimulationPhaseS11Tests(unittest.TestCase):
                 "world_memory_repeat": world_memory_repeat,
             }
 
+    async def _collect_depth_payloads(self, app) -> dict[str, object]:
+        async with app.router.lifespan_context(app):
+            repository = app.state.repository
+            self._ingest_dataset(
+                repository=repository,
+                label="Restricted Depth Fixture",
+                classification_level="personal",
+                folder_name="restricted_depth_fixture",
+                files={
+                    "notes\\alpha.txt": "alpha",
+                    "images\\scene.png": (32, 20, (90, 120, 180)),
+                },
+            )
+
+            world_memory = simulation_world_memory(
+                room_id="restricted-room",
+                services=app.state.services,
+            ).model_dump(mode="json")
+            depth_node = next(node for node in world_memory["nodes"] if node["depth_candidate"])
+
+            jobs_before = simulation_world_memory_depth_jobs(
+                room_id="restricted-room",
+                services=app.state.services,
+            ).model_dump(mode="json")
+            place_before = simulation_world_memory_place_view(
+                node_id=depth_node["node_id"],
+                room_id="restricted-room",
+                services=app.state.services,
+            ).model_dump(mode="json")
+
+            job = simulation_world_memory_depth_run_job(
+                request=WorldMemoryDepthJobRequest(
+                    node_ids=[depth_node["node_id"]],
+                    renderer="local_luma_shell",
+                ),
+                room_id="restricted-room",
+                services=app.state.services,
+            ).model_dump(mode="json")
+            jobs_after = simulation_world_memory_depth_jobs(
+                room_id="restricted-room",
+                services=app.state.services,
+            ).model_dump(mode="json")
+            job_detail = simulation_world_memory_depth_job_detail(
+                job_id=job["job_id"],
+                room_id="restricted-room",
+                services=app.state.services,
+            ).model_dump(mode="json")
+            preview_response = simulation_world_memory_depth_artifact(
+                job_id=job["job_id"],
+                node_id=depth_node["node_id"],
+                artifact_kind="preview",
+                room_id="restricted-room",
+                services=app.state.services,
+            )
+            raw_response = simulation_world_memory_depth_artifact(
+                job_id=job["job_id"],
+                node_id=depth_node["node_id"],
+                artifact_kind="raw",
+                room_id="restricted-room",
+                services=app.state.services,
+            )
+            asset_response = asset_content(depth_node["asset_id"], repository=repository)
+            place_after = simulation_world_memory_place_view(
+                node_id=depth_node["node_id"],
+                room_id="restricted-room",
+                services=app.state.services,
+            ).model_dump(mode="json")
+
+            return {
+                "node_id": depth_node["node_id"],
+                "jobs_before": jobs_before,
+                "place_before": place_before,
+                "job": job,
+                "jobs_after": jobs_after,
+                "job_detail": job_detail,
+                "preview_response": preview_response,
+                "raw_response": raw_response,
+                "asset_response": asset_response,
+                "place_after": place_after,
+            }
+
     def _ingest_dataset(
         self,
         *,
@@ -208,14 +329,22 @@ class SimulationPhaseS11Tests(unittest.TestCase):
         label: str,
         classification_level: str,
         folder_name: str,
-        files: dict[str, str],
+        files: dict[str, object],
     ) -> dict:
         folder = self.root / folder_name
         folder.mkdir(parents=True, exist_ok=True)
         for relative_name, content in files.items():
             target = folder / relative_name
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content, encoding="utf-8")
+            if isinstance(content, tuple) and len(content) == 3 and isinstance(content[0], int):
+                from PIL import Image
+
+                width, height, color = content
+                Image.new("RGB", (width, height), color).save(target)
+            elif isinstance(content, bytes):
+                target.write_bytes(content)
+            else:
+                target.write_text(str(content), encoding="utf-8")
 
         request = DatasetIngestRequest(
             label=label,

@@ -258,6 +258,47 @@ Bounded Batch Art Metrics and Longitudinal Comparison:
 - reuse the existing deterministic V1.1 formal metrics set; do not invent new learned features
 - preserve deterministic ordering by existing asset timestamps with stable tie-breaks
 - expose ordered side-by-side metric values plus simple first-to-last metric deltas only
+
+## Phase W1
+Governed World Memory and Place Shell:
+- extend the existing read-only Simulation Lab with a governed world-memory/place spine
+- keep world-memory nodes and clusters asset-backed, room-scoped, and projection-only
+- add bounded local depth-job execution over explicit node selection only
+- add a local place-view shell over generated depth artifacts without introducing a mutable 3D source of truth
+- preserve provenance, room scope, and deterministic local artifact generation
+
+## Phase W1.1
+World Memory UI Hardening:
+- Mission Control world-memory filters for search, asset kind, anchor type, and depth-candidate-only visibility
+- local thumbnail previews over existing governed image assets
+- cluster/node detail cards stay read-only and asset-backed
+- no new write surface and no autonomous world growth in this phase
+
+## Phase W1.2
+Bounded World Memory Depth Job Shell:
+- GET /api/simulation/world-memory/depth/jobs
+- POST /api/simulation/world-memory/depth/jobs
+- GET /api/simulation/world-memory/depth/jobs/{job_id}
+- GET /api/simulation/world-memory/depth/jobs/{job_id}/nodes/{node_id}/{artifact_kind}
+- bounded execution over explicit world-memory node_ids only
+- default deterministic local `local_luma_shell` renderer plus optional explicit remote `depth_anything_v2_remote` renderer
+- persist local job/result manifests and artifact paths without mutating source assets
+- no background worker swarm, no automatic whole-dataset processing, and no hidden batch expansion in this phase
+
+## Phase W1.3
+World Memory Depth Manifest and Artifact Visibility:
+- depth job history stays room-scoped and inspectable in Mission Control
+- each result exposes source image route, preview artifact route, raw artifact route, renderer, size, and timestamps
+- local asset content route is reused for world-memory thumbnails and source inspection
+- no new asset schema beyond artifact-backed projections in this phase
+
+## Phase W1.4
+Local Place Viewer Shell:
+- GET /api/simulation/world-memory/nodes/{node_id}/place-view
+- Mission Control local 2.5D place viewer over one governed image anchor
+- reuse the latest completed depth artifact when available; stay explicitly unavailable otherwise
+- viewer remains a parallax shell only, not a full reconstruction, navigation graph, or generative world-growth engine
+- board/world-memory linkage stays read-only and source-of-truth remains the existing governed ingest + memory spine
 - no OCR, no embeddings, no semantic similarity, no clustering, no profiling, no batch writeback, and no /v1 expansion
 
 ## Phase V1.3

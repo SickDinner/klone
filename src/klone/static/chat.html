@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fi">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -36,8 +36,11 @@
       <section class="irc-main panel">
         <header class="irc-header">
           <div>
-            <p class="eyebrow">Active Channel</p>
+            <p class="eyebrow">Aktiivinen huone</p>
             <h2>#clone-test-room</h2>
+            <p class="irc-subtitle">
+              Kysy suoraan alla olevasta kentästä. Enter lahettaa, <code>/clear</code> tyhjentaa keskustelun.
+            </p>
           </div>
           <div class="irc-header-meta" id="chat-mode-badge">Loading mode...</div>
         </header>
@@ -61,9 +64,33 @@
           </label>
         </section>
 
+        <section class="irc-quickstart" aria-label="Pikaohje">
+          <article class="irc-tip-card">
+            <span class="irc-tip-kicker">1. Lahde</span>
+            <strong>C:\META on oletuksena valittu</strong>
+            <p>Voit vaihtaa polun vain jos haluat testata jotain muuta korpusta.</p>
+          </article>
+          <article class="irc-tip-card">
+            <span class="irc-tip-kicker">2. Kysy</span>
+            <strong>Kirjoita luonnollinen kysymys</strong>
+            <p>Esimerkiksi verkostoista, ihmissuhteista, tyylista, ajallisesta historiasta tai yhdesta ihmisesta.</p>
+          </article>
+          <article class="irc-tip-card">
+            <span class="irc-tip-kicker">3. Testaa heti</span>
+            <div class="irc-inline-actions" id="chat-quickstart">
+              <button class="irc-pill" type="button" data-suggestion="Keiden kanssa olen puhunut eniten?">Top suhteet</button>
+              <button class="irc-pill" type="button" data-suggestion="Miltä viestityylini näyttää tässä korpuksessa?">Tyyli</button>
+              <button class="irc-pill" type="button" data-suggestion="Mikä on aikajanan laajuus ja aktiivisin vuosi?">Aikajana</button>
+            </div>
+          </article>
+        </section>
+
         <section id="chat-log" class="irc-log" aria-live="polite"></section>
 
         <footer class="irc-footer">
+          <div class="irc-footer-hint">
+            <strong>Kaytto heti:</strong> klikkaa vasemmalta valmista kysymysta tai kirjoita viesti alle ja paina Enter.
+          </div>
           <form id="chat-form" class="irc-form">
             <input
               id="chat-input"

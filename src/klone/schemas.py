@@ -175,6 +175,100 @@ class ConstitutionSnapshotRecord(BaseModel):
     warnings: list[str]
 
 
+class DialogueCorpusAnalysisRequest(BaseModel):
+    source_path: str = Field(..., min_length=1)
+    owner_name: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class DialogueCorpusSourceRecord(BaseModel):
+    label: str
+    path: str
+    thread_json_count: int
+    status: str
+    selected: bool
+
+
+class DialogueCorpusSectionRecord(BaseModel):
+    section: str
+    thread_count: int
+    message_count: int
+
+
+class DialogueCorpusActivityBucketRecord(BaseModel):
+    bucket: str
+    thread_count: int
+    message_count: int
+    sent_message_count: int
+    received_message_count: int
+
+
+class DialogueCorpusCounterpartRecord(BaseModel):
+    name: str
+    thread_count: int
+    sent_message_count: int
+    received_message_count: int
+    interaction_message_count: int
+    first_message_at: str | None = None
+    last_message_at: str | None = None
+    sections: list[str]
+
+
+class DialogueCorpusGroupThreadRecord(BaseModel):
+    title: str
+    participant_count: int
+    message_count: int
+    first_message_at: str | None = None
+    last_message_at: str | None = None
+    sections: list[str]
+
+
+class DialogueCorpusTopicRecord(BaseModel):
+    token: str
+    count: int
+
+
+class DialogueCorpusStyleSignalRecord(BaseModel):
+    key: str
+    label: str
+    value: float
+    unit: str
+    summary: str
+
+
+class DialogueCorpusAnalysisRecord(BaseModel):
+    analysis_version: str
+    source_kind: str
+    requested_path: str
+    selected_source_path: str
+    owner_name: str
+    recommended_room_id: str
+    recommended_classification_level: ClassificationLevel
+    read_only: bool = True
+    thread_count: int
+    direct_thread_count: int
+    group_thread_count: int
+    counterpart_count: int
+    unique_participant_count: int
+    message_count: int
+    sent_message_count: int
+    received_message_count: int
+    attachment_message_count: int
+    first_message_at: str | None = None
+    last_message_at: str | None = None
+    detected_sources: list[DialogueCorpusSourceRecord]
+    section_breakdown: list[DialogueCorpusSectionRecord]
+    activity_by_year: list[DialogueCorpusActivityBucketRecord]
+    top_counterparts: list[DialogueCorpusCounterpartRecord]
+    top_group_threads: list[DialogueCorpusGroupThreadRecord]
+    top_terms: list[DialogueCorpusTopicRecord]
+    style_signals: list[DialogueCorpusStyleSignalRecord]
+    relationship_priors: list[str]
+    history_priors: list[str]
+    clone_foundation: list[str]
+    notes: list[str]
+    warnings: list[str]
+
+
 class BlobMetadataRecord(BaseModel):
     blob_id: str
     asset_id: int

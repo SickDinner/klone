@@ -186,6 +186,20 @@ class DialogueCorpusAnswerRequest(BaseModel):
     owner_name: str | None = Field(default=None, min_length=1, max_length=200)
 
 
+class CloneChatMessageRecord(BaseModel):
+    role: Literal["system", "user", "assistant"]
+    speaker: str
+    content: str
+
+
+class CloneChatRequest(BaseModel):
+    source_path: str = Field(..., min_length=1)
+    message: str = Field(..., min_length=1, max_length=4000)
+    owner_name: str | None = Field(default=None, min_length=1, max_length=200)
+    mode: Literal["auto", "bounded", "gpt-5.4"] = "auto"
+    history: list[CloneChatMessageRecord] = Field(default_factory=list, max_length=24)
+
+
 class DialogueCorpusSourceRecord(BaseModel):
     label: str
     path: str
@@ -295,6 +309,28 @@ class DialogueCorpusAnswerRecord(BaseModel):
     derived_explanation: str | None = None
     uncertainty: list[str]
     limitations: list[str]
+    suggested_queries: list[str]
+
+
+class CloneChatStatusRecord(BaseModel):
+    default_source_path: str | None = None
+    openai_api_configured: bool
+    preferred_model: str
+    available_modes: list[str]
+    channel_name: str
+    notes: list[str]
+    suggested_queries: list[str]
+
+
+class CloneChatResponseRecord(BaseModel):
+    requested_mode: str
+    backend_mode: str
+    model: str | None = None
+    openai_api_configured: bool
+    llm_call_performed: bool = False
+    reply: CloneChatMessageRecord
+    answer: DialogueCorpusAnswerRecord
+    system_notes: list[str]
     suggested_queries: list[str]
 
 

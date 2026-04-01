@@ -4,11 +4,17 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import re
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 from typing import Any
 
 from .schemas import (
+    CloneChatMessageRecord,
+    CloneChatResponseRecord,
+    CloneChatStatusRecord,
     DialogueCorpusActivityBucketRecord,
     DialogueCorpusAnalysisRecord,
     DialogueCorpusAnswerRecord,
@@ -26,8 +32,12 @@ from .schemas import (
 
 DIALOGUE_CORPUS_ANALYSIS_VERSION = "2b.6.read_only_dialogue_corpus_shell"
 DIALOGUE_CORPUS_ANSWER_VERSION = "2b.7.bounded_dialogue_query_shell"
+CLONE_CHAT_VERSION = "2b.8.clone_chat_shell"
 FACEBOOK_SOURCE_KIND = "facebook_messenger_export"
 CHATGPT_SOURCE_KIND = "chatgpt_conversations_export"
+DEFAULT_OPENAI_MODEL = "gpt-5.4"
+OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
+CHAT_CHANNEL_NAME = "#clone-test-room"
 FACEBOOK_MESSAGE_SECTIONS = (
     "inbox",
     "archived_threads",

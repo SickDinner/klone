@@ -3,6 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import subprocess
+import os
+import signal
+import selectors
+import time
 from typing import Mapping, Sequence
 
 
@@ -45,24 +49,70 @@ class BoundedWorkerRunner:
         argv = self._workers.get(worker)
         if argv is None:
             raise WorkerExecutionError("Unregistered worker")
+        # Start a new process group on POSIX so timeout can terminate descendants.
+        # Windows uses process termination; descendants need a Job Object for full isolation.
+        kwargs = {"start_new_session": True} if os.name == "posix" else {}
         try:
-            completed = subprocess.run(
-                argv,
-                shell=False,
-                capture_output=True,
-                timeout=self._timeout,
-                check=False,
+            process = subprocess.Popen(
+                argv, shell=False, stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, **kwargs
             )
-        except subprocess.TimeoutExpired as exc:
-            raise WorkerExecutionError("Worker timed out") from exc
         except OSError as exc:
             raise WorkerExecutionError("Worker launch failed") from exc
-        if completed.returncode != 0:
-            raise WorkerExecutionError("Worker failed")
-        if len(completed.stdout) > self._limit:
-            raise WorkerExecutionError("Worker output exceeds byte limit")
+
+        def terminate() -> None:
+            if process.poll() is not None:
+                return
+            if os.name == "posix":
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            else:
+                process.kill()
+            process.wait()
+
+        output = bytearray()
+        deadline = time.monotonic() + self._timeout
         try:
-            payload = json.loads(completed.stdout)
+            if os.name == "posix":
+                with selectors.DefaultSelector() as selector:
+                    selector.register(process.stdout, selectors.EVENT_READ)
+                    while True:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            raise WorkerExecutionError("Worker timed out")
+                        events = selector.select(min(remaining, 0.1))
+                        if events:
+                            chunk = os.read(process.stdout.fileno(), min(8192, self._limit + 1 - len(output)))
+                            if not chunk:
+                                break
+                            output.extend(chunk)
+                            if len(output) > self._limit:
+                                raise WorkerExecutionError("Worker output exceeds byte limit")
+                        elif process.poll() is not None:
+                            # Keep reading until EOF after exit.
+                            continue
+            else:
+                # Windows pipe reads require a separate bounded implementation.
+                raise WorkerExecutionError("Windows bounded pipe reader not yet implemented")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise WorkerExecutionError("Worker timed out")
+            try:
+                returncode = process.wait(timeout=remaining)
+            except subprocess.TimeoutExpired as exc:
+                raise WorkerExecutionError("Worker timed out") from exc
+            if returncode != 0:
+                raise WorkerExecutionError("Worker failed")
+        except BaseException:
+            terminate()
+            raise
+        finally:
+            if process.stdout:
+                process.stdout.close()
+        try:
+            payload = json.loads(output)
         except (UnicodeError, json.JSONDecodeError) as exc:
             raise WorkerExecutionError("Worker returned invalid JSON") from exc
         if not isinstance(payload, dict):

@@ -94,6 +94,25 @@ class ResearchMemory:
                                     report.title, report.markdown,
                                     report.citations, digest, timestamp)
 
+    def list_reports(self, *, limit: int = 25) -> tuple[StoredResearchReport, ...]:
+        """Return newest public report versions with verified integrity."""
+        if not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise ValueError("Limit must be between 1 and 100")
+        with self._connect() as connection:
+            keys = connection.execute(
+                """SELECT trace_id, version FROM research_report_versions
+                   WHERE room_id = 'public-room'
+                   ORDER BY created_at DESC, trace_id DESC, version DESC LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        reports = []
+        for trace_id, version in keys:
+            report = self.read(trace_id=trace_id, version=version)
+            if report is None:
+                raise ValueError("Research history changed during read")
+            reports.append(report)
+        return tuple(reports)
+
     def read(self, *, trace_id: str, version: int | None = None) -> StoredResearchReport | None:
         if not trace_id or (version is not None and version < 1):
             raise ValueError("Invalid report identifier")

@@ -57,6 +57,20 @@ class SafeReadPipelineTests(unittest.TestCase):
                           trace_id="trace-audit", classification_level="public")
         self.assertEqual(self.calls, [])
 
+    def test_oversized_payload_is_rejected_and_audited(self):
+        pipeline = SafeReadPipeline(
+            runtime=HypervisorRuntime(),
+            handlers={"MemoryFacade": lambda room: {"text": "x" * 100}},
+            audit=lambda event, route, seam: self.events.append(event),
+            authorize_output=lambda _: "allowed",
+            max_output_bytes=20,
+        )
+        with self.assertRaises(ValueError):
+            pipeline.read(seam="MemoryFacade", room_id="public-room",
+                          actor_role="owner", trace_id="trace-limit",
+                          classification_level="public")
+        self.assertEqual(self.events, ["delegated", "failed"])
+
     def test_nonserializable_payload_fails_and_audits(self):
         pipeline = SafeReadPipeline(
             runtime=HypervisorRuntime(),

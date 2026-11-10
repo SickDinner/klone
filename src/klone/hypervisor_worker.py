@@ -23,7 +23,9 @@ class WorkerExecutionError(RuntimeError):
 class BoundedWorkerRunner:
     """Run only preconfigured workers in a child process, never through a shell.
 
-    On POSIX, timeout attempts to kill the dedicated process group.\n    Windows execution is disabled. This is not an OS security sandbox or\n    a CPU/memory resource isolation boundary.
+    On POSIX, timeout attempts to kill the dedicated process group.
+    Windows execution is disabled. This is not an OS security sandbox or
+    a CPU/memory resource isolation boundary.
     """
 
     def __init__(

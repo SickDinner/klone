@@ -89,5 +89,18 @@ class WorkerTests(unittest.TestCase):
             BoundedWorkerRunner(workers={"bad": []})
 
 
+class WindowsFailClosedTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == "win32", "Windows-specific guard")
+    def test_windows_rejects_worker_before_launch(self):
+        from unittest.mock import patch
+        runner = BoundedWorkerRunner(
+            workers={"echo": [sys.executable, "-c", "print('{}')"]},
+        )
+        with patch("klone.hypervisor_worker.subprocess.Popen") as popen:
+            with self.assertRaisesRegex(WorkerExecutionError, "Windows is disabled"):
+                runner.run("echo")
+            popen.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

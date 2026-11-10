@@ -16,8 +16,10 @@ class ResearchUITests(unittest.TestCase):
                                   database_path=Path(tmp) / "audit.sqlite")
 
     def test_binds_only_loopback(self):
+        addresses = []
         class FakeServer:
             def __init__(self, address, handler):
+                addresses.append(address)
                 self.address = address
                 self.server_port = address[1]
             def serve_forever(self):
@@ -28,7 +30,7 @@ class ResearchUITests(unittest.TestCase):
             with patch("klone.research_ui.ThreadingHTTPServer", FakeServer):
                 serve_research_ui(root=Path(tmp),
                                   database_path=Path(tmp) / "audit.sqlite", port=8766)
-            self.assertEqual(FakeServer.address if hasattr(FakeServer, "address") else "127.0.0.1", "127.0.0.1")
+            self.assertEqual(addresses, [("127.0.0.1", 8766)])
 
 
 if __name__ == "__main__":

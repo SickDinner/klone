@@ -61,14 +61,12 @@ class BoundedWorkerRunner:
             raise WorkerExecutionError("Worker launch failed") from exc
 
         def terminate() -> None:
-            if process.poll() is not None:
-                return
             if os.name == "posix":
                 try:
                     os.killpg(process.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
-            else:
+            elif process.poll() is None:
                 process.kill()
             process.wait()
 

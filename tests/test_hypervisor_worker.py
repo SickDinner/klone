@@ -41,6 +41,21 @@ class WorkerTests(unittest.TestCase):
         with self.assertRaises(WorkerExecutionError):
             runner.run("bad")
 
+    @unittest.skipIf(sys.platform == "win32", "POSIX process-group test")
+    def test_nonzero_exit_rejected(self):
+        runner = BoundedWorkerRunner(
+            workers={"exit": [sys.executable, "-c", "raise SystemExit(3)"]},
+        )
+        with self.assertRaises(WorkerExecutionError):
+            runner.run("exit")
+
+    def test_non_object_json_rejected(self):
+        runner = BoundedWorkerRunner(
+            workers={"list": [sys.executable, "-c", "print('[]')"]},
+        )
+        with self.assertRaises(WorkerExecutionError):
+            runner.run("list")
+
     def test_invalid_configuration(self):
         with self.assertRaises(ValueError):
             BoundedWorkerRunner(workers={"bad": []})

@@ -30,12 +30,17 @@ class ResearchWorkflowTests(unittest.TestCase):
         outcome = self.run_research()
         self.assertIn("Ancient DNA chronology.", outcome.report.markdown)
         self.assertIn("sha256=", outcome.report.citations[0])
-        self.assertEqual(outcome.audit_event_count, 4)
+        self.assertEqual(outcome.audit_event_count, 5)
         events = KloneRepository(self.db).list_audit_events(
             room_id="public-room", target_type="service_seam")
-        self.assertEqual(len(events), 4)
+        self.assertEqual(len(events), 5)
         self.assertEqual({e["event_type"] for e in events},
                          {"hypervisor_delegated", "hypervisor_completed"})
+
+    def test_invalid_question_does_not_touch_files(self):
+        with self.assertRaises(ValueError):
+            self.run_research(question="")
+        self.assertFalse(self.db.exists())
 
     def test_denied_room_does_not_read_files(self):
         with self.assertRaises(DispatchDenied):

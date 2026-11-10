@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import sqlite3
@@ -37,8 +38,9 @@ class ResearchMemoryTests(unittest.TestCase):
 
     def test_modified_report_is_detected(self):
         self.memory.save(self.report)
-        with sqlite3.connect(self.memory.database_path) as conn:
-            conn.execute("UPDATE research_report_versions SET markdown='tampered'")
+        with closing(sqlite3.connect(self.memory.database_path)) as conn:
+            with conn:
+                conn.execute("UPDATE research_report_versions SET markdown='tampered'")
         with self.assertRaisesRegex(ValueError, "integrity"):
             self.memory.read(trace_id="trace-a")
 

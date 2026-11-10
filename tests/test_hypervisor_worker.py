@@ -6,6 +6,7 @@ import unittest
 from klone.hypervisor_worker import BoundedWorkerRunner, WorkerExecutionError
 
 
+@unittest.skipIf(sys.platform == "win32", "POSIX-only bounded worker; Windows disabled fail-closed")
 class WorkerTests(unittest.TestCase):
     def test_fixed_worker_json(self):
         runner = BoundedWorkerRunner(

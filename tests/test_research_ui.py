@@ -9,6 +9,12 @@ from klone.research_ui import main, serve_research_ui
 
 
 class ResearchUITests(unittest.TestCase):
+    def test_server_rejects_privileged_port(self):
+        with TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError):
+                serve_research_ui(root=Path(tmp),
+                                  database_path=Path(tmp) / "audit.sqlite", port=80)
+
     def test_cli_rejects_privileged_port(self):
         with self.assertRaises(SystemExit):
             main(["--root", ".", "--database", "audit.sqlite", "--port", "80"])
@@ -31,7 +37,7 @@ class ResearchUITests(unittest.TestCase):
             def server_close(self):
                 pass
         with TemporaryDirectory() as tmp:
-            with patch("klone.research_ui.ThreadingHTTPServer", FakeServer):
+            with patch("klone.research_ui.HTTPServer", FakeServer):
                 serve_research_ui(root=Path(tmp),
                                   database_path=Path(tmp) / "audit.sqlite", port=8766)
             self.assertEqual(addresses, [("127.0.0.1", 8766)])

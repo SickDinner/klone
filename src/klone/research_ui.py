@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import html
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 import secrets
 from urllib.parse import parse_qs
@@ -18,11 +18,27 @@ def serve_research_ui(
     Never bind to a non-loopback address or expose this server on a network.
     """
     token = secrets.token_urlsafe(32)
+    if not 1024 <= port <= 65535:
+        raise ValueError("Port must be between 1024 and 65535")
     allowed_root = root.resolve(strict=True)
     if not allowed_root.is_dir() or allowed_root.is_symlink():
         raise ValueError("Root must be a real directory")
 
     class Handler(BaseHTTPRequestHandler):
+        def _trusted_request(self) -> bool:
+            host = self.headers.get("Host", "")
+            allowed = {f"127.0.0.1:{port}", f"localhost:{port}"}
+            if host not in allowed:
+                return False
+            origin = self.headers.get("Origin")
+            if origin is not None and origin not in {
+                f"http://127.0.0.1:{port}", f"http://localhost:{port}"
+            }:
+                return False
+            if self.headers.get("Sec-Fetch-Site", "").lower() == "cross-site":
+                return False
+            return True
+
         def _send(self, status: int, body: str) -> None:
             data = body.encode("utf-8")
             self.send_response(status)
@@ -50,12 +66,18 @@ button{padding:.6rem 1rem}</style><h1>KLONE Research Preview</h1>
                 + '<button type="submit">Tutki</button></form>' + content + "</html>")
 
         def do_GET(self) -> None:
+            if not self._trusted_request():
+                self._send(403, "Forbidden")
+                return
             if self.path != "/":
                 self._send(404, "Not found")
                 return
             self._send(200, self._page())
 
         def do_POST(self) -> None:
+            if not self._trusted_request():
+                self._send(403, "Forbidden")
+                return
             if self.path != "/research":
                 self._send(404, "Not found")
                 return
@@ -84,7 +106,8 @@ button{padding:.6rem 1rem}</style><h1>KLONE Research Preview</h1>
         def log_message(self, format: str, *args: object) -> None:
             return
 
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    # Serialize requests: SQLite writes and local file reads are not concurrent.
+    server = HTTPServer(("127.0.0.1", port), Handler)
     print(f"KLONE local research UI: http://127.0.0.1:{server.server_port}/")
     try:
         server.serve_forever()

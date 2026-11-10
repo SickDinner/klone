@@ -29,3 +29,20 @@ report printed to stdout, with trace-linked audit events in SQLite.
 
 The goal is to validate the full source → policy → retrieval → report → audit
 path before expanding the feature surface.
+
+## 3B.1 local browser hardening
+
+Start the browser UI using:
+
+```bash
+python -m klone.research_ui --root ./research_notes --database ./research-audit.sqlite --port 8765
+```
+
+Open `http://127.0.0.1:8765/` on the same machine. The server binds
+only to IPv4 loopback, processes requests sequentially and rejects unexpected
+Host/Origin and cross-site Fetch Metadata. The form has a random per-process
+CSRF token. These checks are **not user authentication**. A process running
+locally under the same account can still access the UI and files; use a
+trusted account and directory. Do not forward or proxy the port.
+
+The UI does not render source Markdown as HTML. No external scripts are loaded.

@@ -57,6 +57,27 @@ class ResearchAgentTests(unittest.TestCase):
         self.assertEqual(result["results"], [])
         self.assertEqual(result["source_count"], 0)
 
+    def test_missing_policy_callbacks_rejected(self):
+        with self.assertRaises(ValueError):
+            ResearchAgent(sources=self.sources, audit=None, authorize_output=lambda _: "allowed")
+        with self.assertRaises(ValueError):
+            ResearchAgent(sources=self.sources, audit=lambda *args: None, authorize_output=None)
+
+    def test_invalid_question_type_rejected(self):
+        with self.assertRaises(ValueError):
+            self.query(question=None)
+
+    def test_output_cap_fails_closed(self):
+        agent = ResearchAgent(
+            sources=self.sources, audit=lambda event, route, seam: self.events.append(event),
+            authorize_output=lambda _: "allowed", max_output_bytes=8,
+        )
+        with self.assertRaises(ValueError):
+            agent.search(question="DNA", room_id="public-room",
+                         actor_role="owner", trace_id="research-small",
+                         classification_level="public")
+        self.assertEqual(self.events[-1], "failed")
+
     def test_audit_failure_prevents_search(self):
         agent = ResearchAgent(sources=self.sources,
                               audit=lambda *args: (_ for _ in ()).throw(OSError("audit down")),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
 from typing import Sequence
 
@@ -30,6 +31,10 @@ def run_local_research(
     Caller must authenticate actor_role, authorize root and database_path,
     and isolate concurrent callers. No remote access or untrusted root.
     """
+    if not isinstance(question, str) or not question.strip() or len(question) > 500:
+        raise ValueError("Question must contain 1-500 characters")
+    if not isinstance(trace_id, str) or not trace_id.strip():
+        raise ValueError("Trace ID is required")
     repository = KloneRepository(database_path)
     repository.initialize()
     audit = DurableHypervisorAudit(AuditService(repository))
@@ -61,13 +66,18 @@ def run_local_research(
         question=question, room_id=room_id, actor_role=actor_role,
         trace_id=trace_id, classification_level=classification_level,
     )
-    report = build_research_report(result)
+    try:
+        report = build_research_report(result)
+        audit("completed", decision, "research.report")
+    except Exception:
+        audit("failed", decision, "research.report")
+        raise
     events = repository.list_audit_events(
         room_id=room_id, target_type="service_seam", limit=100,
     )
     count = sum(
         1 for event in events
         if event.get("metadata_json") and
-        __import__("json").loads(event["metadata_json"]).get("trace_id") == trace_id
+        json.loads(event["metadata_json"]).get("trace_id") == trace_id
     )
     return ResearchRun(report=report, audit_event_count=count)

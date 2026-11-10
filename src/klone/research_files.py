@@ -24,6 +24,8 @@ def load_research_texts(
         raise ValueError("Invalid room or classification")
     if max_files < 1 or max_file_bytes < 1 or max_total_bytes < 1:
         raise ValueError("File limits must be positive")
+    if any(not isinstance(item, str) for item in relative_paths):
+        raise ValueError("Paths must be strings")
     if len(relative_paths) > max_files or len(set(relative_paths)) != len(relative_paths):
         raise ValueError("Too many or duplicate paths")
     base = root.resolve(strict=True)

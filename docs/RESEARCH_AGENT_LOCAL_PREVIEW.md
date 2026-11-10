@@ -1,0 +1,31 @@
+# KLONE Research Agent: local developer preview
+
+This is a **local, public-data-only developer preview**, not an authenticated API,
+a security sandbox, an autonomous researcher or a production deployment.
+
+Run from an installed KLONE environment:
+
+```bash
+python -m klone.research_cli --root ./research_notes --file notes.md --question "DNA chronology" --database ./research-audit.sqlite --trace-id demo-001
+```
+
+The selected directory must already exist. Only explicitly named UTF-8
+`.md` and `.txt` files are loaded. The output is an evidence-only Markdown
+report printed to stdout, with trace-linked audit events in SQLite.
+
+## Boundaries
+
+- This CLI is restricted to `public-room` and `public` classification.
+- The CLI uses the local `owner` role as a **developer convenience**, not proof
+  of user identity. Never expose it through a network service.
+- Only use a trusted local directory and a trusted database path.
+- There is no automatic source credibility verification, LLM synthesis,
+  web search, authentication, OS sandboxing or hardened filesystem isolation.
+- Do not use this preview for private, medical or otherwise sensitive records.
+- SQLite events track execution; the audit log is not tamper-proof.
+- Each source reference includes a SHA-256 digest of its content.
+- Run a single request at a time until concurrency and filesystem race
+  handling have been hardened.
+
+The goal is to validate the full source → policy → retrieval → report → audit
+path before expanding the feature surface.

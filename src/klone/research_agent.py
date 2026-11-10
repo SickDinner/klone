@@ -29,6 +29,10 @@ class ResearchAgent:
         self, *, sources: Sequence[ResearchSource], audit,
         authorize_output, max_output_bytes: int = 65536,
     ) -> None:
+        if not callable(audit) or not callable(authorize_output):
+            raise ValueError("Audit and output policy callbacks are required")
+        if max_output_bytes < 1:
+            raise ValueError("Output limit must be positive")
         ids = [source.source_id for source in sources]
         if len(ids) != len(set(ids)) or any(
             not s.source_id.strip() or not s.reference.strip()
@@ -45,7 +49,7 @@ class ResearchAgent:
         self, *, question: str, room_id: str, actor_role: str,
         trace_id: str, classification_level: str, limit: int = 5,
     ) -> SafeReadResult:
-        if not question.strip() or len(question) > 500:
+        if not isinstance(question, str) or not question.strip() or len(question) > 500:
             raise ValueError("Question must contain 1-500 characters")
         if not 1 <= limit <= 10:
             raise ValueError("Result limit must be 1-10")

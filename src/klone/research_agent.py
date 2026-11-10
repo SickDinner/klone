@@ -37,14 +37,9 @@ class ResearchAgent:
         ):
             raise ValueError("Sources need unique IDs and complete provenance")
         self._sources = tuple(sources)
-        self._pipeline = SafeReadPipeline(
-            runtime=HypervisorRuntime(),
-            handlers={"research.search": self._search_public},
-            audit=audit,
-            authorize_output=authorize_output,
-            max_output_bytes=max_output_bytes,
-        )
-        self._question = ""
+        self._audit = audit
+        self._authorize_output = authorize_output
+        self._max_output_bytes = max_output_bytes
 
     def search(
         self, *, question: str, room_id: str, actor_role: str,
@@ -54,25 +49,33 @@ class ResearchAgent:
             raise ValueError("Question must contain 1-500 characters")
         if not 1 <= limit <= 10:
             raise ValueError("Result limit must be 1-10")
-        # Query is set for the duration of this synchronous call. Instances are
-        # not thread safe; callers must create one per request.
-        self._question = question
-        self._limit = limit
-        self._classification = classification_level
-        try:
-            return self._pipeline.read(
-                seam="research.search", room_id=room_id,
-                actor_role=actor_role, trace_id=trace_id,
-                classification_level=classification_level,
+        def search_room(allowed_room: str) -> Mapping[str, object]:
+            return self._search_room(
+                question=question, room_id=allowed_room,
+                classification_level=classification_level, limit=limit,
             )
-        finally:
-            self._question = ""
 
-    def _search_public(self, room_id: str) -> Mapping[str, object]:
-        tokens = set(re.findall(r"\w+", self._question.casefold()))
+        pipeline = SafeReadPipeline(
+            runtime=HypervisorRuntime(),
+            handlers={"research.search": search_room},
+            audit=self._audit,
+            authorize_output=self._authorize_output,
+            max_output_bytes=self._max_output_bytes,
+        )
+        return pipeline.read(
+            seam="research.search", room_id=room_id,
+            actor_role=actor_role, trace_id=trace_id,
+            classification_level=classification_level,
+        )
+
+    def _search_room(
+        self, *, question: str, room_id: str,
+        classification_level: str, limit: int,
+    ) -> Mapping[str, object]:
+        tokens = set(re.findall(r"\w+", question.casefold()))
         matches = []
         for source in self._sources:
-            if source.room_id != room_id or source.classification != self._classification:
+            if source.room_id != room_id or source.classification != classification_level:
                 continue
             haystack = (source.title + " " + source.text).casefold()
             score = sum(1 for token in tokens if token in haystack and len(token) > 2)
@@ -83,10 +86,10 @@ class ResearchAgent:
             {"source_id": source.source_id, "title": source.title,
              "reference": source.reference, "excerpt": source.text[:400],
              "matched_terms": score}
-            for score, source in matches[:self._limit]
+            for score, source in matches[:limit]
         ]
         return {
-            "question": self._question,
+            "question": question,
             "results": results,
             "answer": "Evidence excerpts only; no synthesized answer.",
             "source_count": len(results),

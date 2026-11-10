@@ -17,6 +17,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--question", required=True)
     parser.add_argument("--database", type=Path, required=True)
     parser.add_argument("--trace-id", required=True)
+    parser.add_argument("--save-report", action="store_true", help="Store versioned public report")
     parser.add_argument("--room", default="public-room")
     # Do not expose an arbitrary --role flag. This local developer entrypoint
     # deliberately only supports public-room and public classification.
@@ -29,11 +30,14 @@ def main(argv: list[str] | None = None) -> int:
             question=args.question, room_id="public-room",
             actor_role="owner", trace_id=args.trace_id,
             classification_level="public", database_path=args.database,
+            persist_report=args.save_report,
         )
     except Exception as exc:
         print(f"KLONE research failed: {type(exc).__name__}", file=sys.stderr)
         return 1
     print(outcome.report.markdown)
+    if outcome.report_version is not None:
+        print(f"Stored report version: {outcome.report_version}", file=sys.stderr)
     print(f"\nAudit events for trace: {outcome.audit_event_count}", file=sys.stderr)
     return 0
 

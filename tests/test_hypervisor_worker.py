@@ -56,6 +56,33 @@ class WorkerTests(unittest.TestCase):
         with self.assertRaises(WorkerExecutionError):
             runner.run("list")
 
+    @unittest.skipIf(sys.platform == "win32", "POSIX process-group test")
+    def test_child_process_is_killed_on_timeout(self):
+        import os
+        import tempfile
+        import time
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as folder:
+            marker = Path(folder) / "child-marker"
+            child_code = (
+                "import pathlib,time; time.sleep(0.8); "
+                f"pathlib.Path({str(marker)!r}).write_text('escaped')"
+            )
+            parent_code = (
+                "import subprocess,sys,time; "
+                f"subprocess.Popen([sys.executable,'-c',{child_code!r}]); "
+                "time.sleep(5)"
+            )
+            runner = BoundedWorkerRunner(
+                workers={"parent": [sys.executable, "-c", parent_code]},
+                timeout_seconds=0.2,
+            )
+            with self.assertRaises(WorkerExecutionError):
+                runner.run("parent")
+            time.sleep(1.0)
+            self.assertFalse(marker.exists(), "Timed-out child escaped process group")
+
     def test_invalid_configuration(self):
         with self.assertRaises(ValueError):
             BoundedWorkerRunner(workers={"bad": []})

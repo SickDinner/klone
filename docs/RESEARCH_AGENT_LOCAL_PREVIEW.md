@@ -46,3 +46,12 @@ locally under the same account can still access the UI and files; use a
 trusted account and directory. Do not forward or proxy the port.
 
 The UI does not render source Markdown as HTML. No external scripts are loaded.
+
+## Experimental report history (3B.3)
+
+The local browser UI saves completed public-room reports in SQLite and shows
+up to 25 recent report versions at `/history`. Reports are HTML-escaped and
+SHA-256 checked on read. The developer CLI saves only with `--save-report`.
+These records contain source excerpts; do not point the preview at sensitive
+files. History is not authenticated, encrypted, or tamper-proof. No automatic
+retention/deletion policy is implemented.

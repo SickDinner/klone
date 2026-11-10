@@ -5,10 +5,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from klone.research_ui import serve_research_ui
+from klone.research_ui import main, serve_research_ui
 
 
 class ResearchUITests(unittest.TestCase):
+    def test_cli_rejects_privileged_port(self):
+        with self.assertRaises(SystemExit):
+            main(["--root", ".", "--database", "audit.sqlite", "--port", "80"])
+
     def test_rejects_missing_root(self):
         with TemporaryDirectory() as tmp:
             with self.assertRaises(FileNotFoundError):

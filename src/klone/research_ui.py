@@ -97,6 +97,7 @@ button{padding:.6rem 1rem}</style><h1>KLONE Research Preview</h1>
                     question=fields["question"][0], room_id="public-room",
                     actor_role="owner", trace_id=secrets.token_hex(16),
                     classification_level="public", database_path=database_path,
+                    persist_report=True,
                 )
                 self._send(200, self._page("<h2>Raportti</h2><pre>" +
                     html.escape(outcome.report.markdown) + "</pre>"))

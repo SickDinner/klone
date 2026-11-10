@@ -46,6 +46,8 @@ class BoundedWorkerRunner:
         self._limit = max_output_bytes
 
     def run(self, worker: str) -> WorkerResult:
+        if os.name != "posix":
+            raise WorkerExecutionError("Bounded workers require POSIX; Windows is disabled until Job Object isolation is implemented")
         argv = self._workers.get(worker)
         if argv is None:
             raise WorkerExecutionError("Unregistered worker")

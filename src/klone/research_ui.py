@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import html
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -89,3 +90,19 @@ button{padding:.6rem 1rem}</style><h1>KLONE Research Preview</h1>
         server.serve_forever()
     finally:
         server.server_close()
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="KLONE local research browser preview")
+    parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--database", type=Path, required=True)
+    parser.add_argument("--port", type=int, default=8765)
+    args = parser.parse_args(argv)
+    if not 1024 <= args.port <= 65535:
+        parser.error("Port must be between 1024 and 65535")
+    serve_research_ui(root=args.root, database_path=args.database, port=args.port)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

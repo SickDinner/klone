@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
@@ -31,7 +32,8 @@ class ResearchMemory:
     def __init__(self, database_path: Path):
         self.database_path = Path(database_path)
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self):
         connection = sqlite3.connect(self.database_path, timeout=10)
         connection.execute("PRAGMA busy_timeout=10000")
         connection.execute("""
@@ -47,7 +49,14 @@ class ResearchMemory:
                 PRIMARY KEY(trace_id, version)
             )
         """)
-        return connection
+        try:
+            yield connection
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
 
     @staticmethod
     def _digest(report: ResearchReport) -> str:

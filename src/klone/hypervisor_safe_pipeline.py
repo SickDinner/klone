@@ -29,11 +29,15 @@ class SafeReadPipeline:
         handlers: Mapping[str, Callable[[str], Mapping[str, Any]]],
         audit: Callable[[str, RoutingDecision, str], None],
         authorize_output: Callable[[str], str],
+        max_output_bytes: int = 65536,
     ) -> None:
         if not callable(audit) or not callable(authorize_output):
             raise ValueError("Audit and output authorization callbacks are mandatory")
         if not handlers or any(not callable(handler) for handler in handlers.values()):
             raise ValueError("Explicit read handlers are required")
+        if max_output_bytes < 1:
+            raise ValueError("max_output_bytes must be positive")
+        self._max_output_bytes = max_output_bytes
         self._runtime = runtime
         self._handlers = dict(handlers)
         self._audit = audit
@@ -72,7 +76,10 @@ class SafeReadPipeline:
                 raise TypeError("Read handler must return a mapping")
             # Restrict exposed result to JSON-compatible primitives and copies.
             import json
-            safe_payload = json.loads(json.dumps(dict(payload), allow_nan=False))
+            encoded = json.dumps(dict(payload), allow_nan=False)
+            if len(encoded.encode("utf-8")) > self._max_output_bytes:
+                raise ValueError("Read output exceeds configured byte limit")
+            safe_payload = json.loads(encoded)
             if not isinstance(safe_payload, dict):
                 raise TypeError("Invalid handler result")
             # Recheck output policy before releasing data.

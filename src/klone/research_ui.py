@@ -5,7 +5,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import secrets
 from urllib.parse import parse_qs
-import webbrowser
 
 from .research_workflow import run_local_research
 

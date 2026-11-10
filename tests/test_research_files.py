@@ -38,6 +38,10 @@ class ResearchFileTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.load(["note.md"], max_file_bytes=4)
 
+    def test_rejects_non_string_path(self):
+        with self.assertRaises(ValueError):
+            self.load([None])
+
     def test_rejects_duplicate_paths(self):
         with self.assertRaises(ValueError):
             self.load(["note.md", "note.md"])

@@ -29,6 +29,16 @@ class ResearchMemoryTests(unittest.TestCase):
         self.assertEqual(first.content_sha256,
                          self.memory.read(trace_id="trace-a", version=1).content_sha256)
 
+    def test_history_lists_newest_versions(self):
+        self.memory.save(self.report)
+        self.memory.save(ResearchReport("trace-a", "public-room", "Question",
+                            "# Updated", self.report.citations))
+        history = self.memory.list_reports(limit=10)
+        self.assertEqual(len(history), 2)
+        self.assertEqual([item.version for item in history], [2, 1])
+        with self.assertRaises(ValueError):
+            self.memory.list_reports(limit=101)
+
     def test_missing_returns_none(self):
         self.assertIsNone(self.memory.read(trace_id="missing"))
 

@@ -1,0 +1,91 @@
+from __future__ import annotations
+
+import html
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+import secrets
+from urllib.parse import parse_qs
+
+from .research_workflow import run_local_research
+
+
+def serve_research_ui(
+    *, root: Path, database_path: Path, port: int = 8765,
+) -> None:
+    """Developer-only loopback UI for explicitly selected public text files.
+
+    Never bind to a non-loopback address or expose this server on a network.
+    """
+    token = secrets.token_urlsafe(32)
+    allowed_root = root.resolve(strict=True)
+    if not allowed_root.is_dir() or allowed_root.is_symlink():
+        raise ValueError("Root must be a real directory")
+
+    class Handler(BaseHTTPRequestHandler):
+        def _send(self, status: int, body: str) -> None:
+            data = body.encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.end_headers()
+            self.wfile.write(data)
+
+        def _page(self, content: str = "") -> str:
+            return ("""<!doctype html><html lang="fi"><meta charset="utf-8">
+<title>KLONE Research Preview</title>
+<style>body{font:16px system-ui;max-width:760px;margin:4rem auto;padding:1rem}
+textarea,input{display:block;width:100%;margin:.6rem 0;padding:.5rem}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#eee;padding:1rem}
+button{padding:.6rem 1rem}</style><h1>KLONE Research Preview</h1>
+<p>Paikallinen kokeilu. Vain julkinen .txt/.md-aineisto.</p>"""
+                + f'<form method="post" action="/research">'
+                + f'<input type="hidden" name="token" value="{html.escape(token, quote=True)}">'
+                + '<label>Tiedosto (suhteellinen polku)<input name="file" required></label>'
+                + '<label>Tutkimuskysymys<textarea name="question" required maxlength="500"></textarea></label>'
+                + '<button type="submit">Tutki</button></form>' + content + "</html>")
+
+        def do_GET(self) -> None:
+            if self.path != "/":
+                self._send(404, "Not found")
+                return
+            self._send(200, self._page())
+
+        def do_POST(self) -> None:
+            if self.path != "/research":
+                self._send(404, "Not found")
+                return
+            try:
+                size = int(self.headers.get("Content-Length", "0"))
+                if size < 1 or size > 4096:
+                    self._send(413, "Request too large")
+                    return
+                fields = parse_qs(self.rfile.read(size).decode("utf-8"), strict_parsing=True)
+                if (fields.get("token") != [token] or
+                    len(fields.get("file", [])) != 1 or
+                    len(fields.get("question", [])) != 1):
+                    self._send(403, "Forbidden")
+                    return
+                outcome = run_local_research(
+                    root=allowed_root, relative_paths=[fields["file"][0]],
+                    question=fields["question"][0], room_id="public-room",
+                    actor_role="owner", trace_id=secrets.token_hex(16),
+                    classification_level="public", database_path=database_path,
+                )
+                self._send(200, self._page("<h2>Raportti</h2><pre>" +
+                    html.escape(outcome.report.markdown) + "</pre>"))
+            except Exception:
+                self._send(400, self._page("<p>Tutkimus epäonnistui. Tarkista tiedosto ja kysymys.</p>"))
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    print(f"KLONE local research UI: http://127.0.0.1:{server.server_port}/")
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()

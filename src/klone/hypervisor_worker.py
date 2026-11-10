@@ -23,8 +23,7 @@ class WorkerExecutionError(RuntimeError):
 class BoundedWorkerRunner:
     """Run only preconfigured workers in a child process, never through a shell.
 
-    A timeout kills the child process, not necessarily its descendants.
-    This is not a security sandbox or OS resource isolation boundary.
+    On POSIX, timeout attempts to kill the dedicated process group.\n    Windows execution is disabled. This is not an OS security sandbox or\n    a CPU/memory resource isolation boundary.
     """
 
     def __init__(
@@ -52,7 +51,7 @@ class BoundedWorkerRunner:
         if argv is None:
             raise WorkerExecutionError("Unregistered worker")
         # Start a new process group on POSIX so timeout can terminate descendants.
-        # Windows uses process termination; descendants need a Job Object for full isolation.
+        # Windows is intentionally rejected above until Job Object support exists.
         kwargs = {"start_new_session": True} if os.name == "posix" else {}
         try:
             process = subprocess.Popen(

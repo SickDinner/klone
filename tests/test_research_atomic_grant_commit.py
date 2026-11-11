@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 import tempfile
 from pathlib import Path
 import unittest
@@ -30,7 +31,7 @@ class AtomicGrantCommitTests(unittest.TestCase):
             self.assertEqual(AtomicResearchLedger(db).reconcile(), ())
             with self.assertRaises(sqlite3.IntegrityError):
                 commit_claim_with_grant(**kwargs)
-            with sqlite3.connect(db) as conn:
+            with closing(sqlite3.connect(db)) as conn:
                 self.assertEqual(conn.execute(
                     "SELECT COUNT(*) FROM atomic_claims").fetchone()[0], 1)
                 self.assertEqual(conn.execute(

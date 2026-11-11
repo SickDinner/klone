@@ -34,7 +34,9 @@ def normalize_snv(site: VariantSite) -> VariantSite:
     if not isinstance(site.reference, str) or not isinstance(site.alternate, str):
         raise ValueError("Invalid alleles")
     reference, alternate = site.reference.upper(), site.alternate.upper()
-    if (len(reference) != 1 or len(alternate) != 1\n        or reference not in "ACGT" or alternate not in "ACGT"\n        or reference == alternate):
+    if (len(reference) != 1 or len(alternate) != 1
+        or reference not in "ACGT" or alternate not in "ACGT"
+        or reference == alternate):
         raise ValueError("Only non-identical A/C/G/T SNVs supported")
     if not isinstance(site.source_accession, str) or not site.source_accession.strip() or len(site.source_accession) > 256:
         raise ValueError("Missing source provenance")

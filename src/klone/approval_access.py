@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Callable
 
 from .approval_journal import ApprovalJournal
 from .approval_policy import ApprovalProposal

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 from pathlib import Path
 
 from .research_recovery_inspection import inspect_research_recovery
@@ -33,7 +34,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         result = research_health(database_path=args.database)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, sqlite3.DatabaseError) as exc:
         print(json.dumps({"status": "error", "reason": type(exc).__name__}))
         return 2
     print(json.dumps(result, sort_keys=True))

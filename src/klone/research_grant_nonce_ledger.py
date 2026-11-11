@@ -7,6 +7,7 @@ in the same transaction as a nonce claim (or use an idempotent outbox).
 from __future__ import annotations
 
 from pathlib import Path
+from contextlib import closing
 import sqlite3
 
 from .research_signed_grants import SignedResearchGrant, verify_research_grant
@@ -28,7 +29,7 @@ def claim_research_grant_nonce(
         now=now, key=key,
     ):
         return False
-    with sqlite3.connect(database_path, timeout=10) as db:
+    with closing(sqlite3.connect(database_path, timeout=10)) as db, db:
         db.execute("BEGIN IMMEDIATE")
         db.execute(
             "CREATE TABLE IF NOT EXISTS research_grant_nonces "

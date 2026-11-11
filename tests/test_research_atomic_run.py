@@ -1,5 +1,6 @@
 import json
 import tempfile
+from contextlib import closing
 from pathlib import Path
 from unittest import TestCase
 
@@ -65,7 +66,7 @@ class AtomicResearchRunTests(TestCase):
             journal = ResearchRunJournal(path)
             journal.transition(run_id="run-1", state="started",
                                trace_id="trace-1", dossier_id="demo")
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 db.execute("""CREATE TRIGGER deny_terminal BEFORE INSERT
                     ON research_run_journal WHEN NEW.state='completed'
                     BEGIN SELECT RAISE(ABORT, 'forced failure'); END""")

@@ -69,7 +69,14 @@ def verify_checkpoint(
     _validate_key(key)
     if not isinstance(checkpoint, LedgerCheckpoint):
         return False
-    if checkpoint.format_version != 1:
+    if (type(checkpoint.format_version) is not int
+        or checkpoint.format_version != 1
+        or type(checkpoint.row_count) is not int
+        or checkpoint.row_count < 0
+        or not isinstance(checkpoint.snapshot_sha256, str)
+        or len(checkpoint.snapshot_sha256) != 64
+        or not isinstance(checkpoint.signature, str)
+        or len(checkpoint.signature) != 64):
         return False
     count, digest = _snapshot(database_path)
     body = [checkpoint.format_version, checkpoint.row_count,

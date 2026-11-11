@@ -2158,6 +2158,11 @@ class DialogueCorpusService:
         api_key: str,
         payload: dict[str, Any],
     ) -> dict[str, Any]:
+        # S1 containment: clone chat has no trusted per-segment room/classification
+        # manifest. An API key alone cannot authorize external disclosure.
+        # Fail closed at the sole outbound transport sink until the guarded,
+        # authenticated manifest path is implemented and separately approved.
+        raise ValueError("External model egress disabled pending classified manifest and approval.")
         request = urllib_request.Request(
             OPENAI_RESPONSES_URL,
             data=json.dumps(payload).encode("utf-8"),

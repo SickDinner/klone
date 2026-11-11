@@ -92,6 +92,8 @@ class ResearchHealthCLITests(TestCase):
             with closing(sqlite3.connect(db)) as conn, conn:
                 ResearchAuditOutbox.initialize(conn)
                 DossierStore(db)._initialize(conn)
+            journal.transition(run_id="run1", state="started",
+                               trace_id="trace1", dossier_id="dossier1")
             journal.transition(run_id="run1", state="completed",
                                trace_id="trace1", dossier_id="dossier1")
             result = research_health(database_path=db)

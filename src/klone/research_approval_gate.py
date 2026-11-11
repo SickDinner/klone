@@ -9,7 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .research_proposals import ClaimProposal, verify_claim_proposal
-from .research_review_bundle import ReviewBundle
+from .research_review_bundle import ReviewBundle, prepare_review_bundle
+from .genomics_hypotheses import Hypothesis, EvidenceItem
 
 
 @dataclass(frozen=True)
@@ -34,7 +35,7 @@ class ApprovalPreflight:
 
 def check_approval_preflight(
     *, proposal: ClaimProposal, bundle: ReviewBundle,
-    reviewer: TrustedReviewer, memory,
+    reviewer: TrustedReviewer, memory,\n    hypotheses: tuple[Hypothesis, ...], evidence: tuple[EvidenceItem, ...],
 ) -> ApprovalPreflight:
     """Validate integrity and deny unless all external authority gates are met.
 
@@ -55,7 +56,7 @@ def check_approval_preflight(
     if reviewer.authorized_for_public_evidence is not True:
         return ApprovalPreflight(False, "public_evidence_permission_denied", proposal.proposal_id)
     verify_claim_proposal(proposal, memory=memory)
-    if (bundle.proposal_id != proposal.proposal_id
+    expected_bundle = prepare_review_bundle(\n        proposal=proposal, hypotheses=hypotheses, evidence=evidence)\n    if (bundle != expected_bundle\n        or bundle.proposal_id != proposal.proposal_id
         or bundle.report_trace_id != proposal.trace_id
         or bundle.report_version != proposal.report_version
         or bundle.disposition != "human_review_required"

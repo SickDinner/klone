@@ -13,11 +13,17 @@ from .research_audit_consistency import inspect_audit_consistency
 def research_health(*, database_path: Path) -> dict[str, object]:
     recovery = inspect_research_recovery(database_path=database_path)
     integrity = inspect_audit_consistency(database_path=database_path)
+    issues = {
+        "stuck_runs": len(recovery.started_without_terminal),
+        "completed_without_outbox": len(recovery.completed_without_outbox),
+        "completed_missing_snapshot": len(integrity.completed_missing_snapshot),
+        "outbox_missing_completed": len(integrity.outbox_missing_completed),
+        "outbox_version_mismatch": len(integrity.outbox_version_mismatch),
+        "malformed_event_ids": len(integrity.malformed_event_ids),
+    }
     return {
-        "status": "attention" if (
-            recovery.started_without_terminal or
-            recovery.completed_without_outbox or
-            integrity.healthy is False) else "ok",
+        "status": "attention" if any(issues.values()) else "ok",
+        "issue_codes": sorted(key for key, count in issues.items() if count),
         "stuck_runs": len(recovery.started_without_terminal),
         "completed_without_outbox": len(recovery.completed_without_outbox),
         "pending_audit_delivery": len(recovery.pending_audit_delivery),

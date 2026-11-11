@@ -39,7 +39,7 @@ def prepare_claim_proposal(
         or any(not isinstance(ref, str) or not ref.strip() or len(ref) > 512
                for ref in source_refs)):
         raise ValueError("Invalid source references")
-    if requested_status not in {"unverified", "supported", "contested", "retracted"}:
+    if not isinstance(requested_status, str) or requested_status not in {"unverified", "supported", "contested", "retracted"}:
         raise ValueError("Invalid requested status")
     if not isinstance(rationale, str) or len(rationale) > 2000:
         raise ValueError("Invalid rationale")

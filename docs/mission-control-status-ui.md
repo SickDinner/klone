@@ -17,3 +17,5 @@ Tietokanta avataan vain luku -tilassa. HTML-tuloste escapetaan.
 tunnistusta. Se on tarkoitettu vain paikalliseen kehitykseen,
 ei verkkoon, julkiseen palvelimeen tai monikäyttäjäkäyttöön.
 Ei automaattista tutkimuksen palautusta tai julkaisemista.
+
+Edellyttää päähaaraan yhdistettyä 4A.11-palautumisdiagnostiikkaa.

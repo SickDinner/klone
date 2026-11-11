@@ -39,7 +39,9 @@ class ApprovalAccess:
         self._require_actor(actor, proposal.room_id, allowed_roles=frozenset({"owner", "supervisor"}))
         if actor.actor_id != proposal.proposer_id:
             raise PermissionError("proposer_identity_mismatch")
-        return self.journal.propose(\n            proposal, actor_id=actor.actor_id, expires_at=self.expires_at.get(proposal.proposal_id),\n        )
+        return self.journal.propose(
+            proposal, actor_id=actor.actor_id, expires_at=self.expires_at.get(proposal.proposal_id),
+        )
 
     def transition(
         self, proposal_id: str, next_state: str, *, actor: VerifiedActor,

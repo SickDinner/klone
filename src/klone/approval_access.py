@@ -54,6 +54,8 @@ class ApprovalAccess:
         self._require_actor(actor, proposal.room_id, allowed_roles=frozenset({"owner", "supervisor"}))
         if now.tzinfo is None or now.utcoffset() is None:
             raise ValueError("timezone_aware_time_required")
+        if self.journal.is_revoked(proposal_id):
+            raise PermissionError("approval_revoked")
         deadline = self.journal.deadline(proposal_id)
         if next_state in {"approved", "activating", "active"}:
             # Missing expiry is a denial, not unlimited validity.
@@ -69,3 +71,12 @@ class ApprovalAccess:
             current_target_version=current_target_version,
             current_patch_sha256=current_patch_sha256,
         )
+
+    def revoke(
+        self, proposal_id: str, *, actor: VerifiedActor, now: datetime, reason: str,
+    ) -> None:
+        proposal = self.journal.get(proposal_id)
+        if proposal is None:
+            raise ValueError("unknown_proposal")
+        self._require_actor(actor, proposal.room_id, allowed_roles=frozenset({"owner"}))
+        self.journal.revoke(proposal_id, actor_id=actor.actor_id, now=now, reason=reason)

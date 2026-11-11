@@ -81,6 +81,24 @@ class ApprovalAccessTests(unittest.TestCase):
         )
         self.assertEqual(result.state, "approved")
 
+    def test_owner_revocation_blocks_future_transitions(self):
+        self.access.revoke("p1", actor=self.owner, now=self.now, reason="withdrawn")
+        self.assertTrue(self.journal.is_revoked("p1"))
+        with self.assertRaisesRegex(PermissionError, "approval_revoked"):
+            self.access.transition("p1", "validated", actor=self.supervisor, now=self.now)
+        self.assertEqual(self.journal.events("p1")[-1].next_state, "revoked")
+
+    def test_supervisor_cannot_revoke(self):
+        with self.assertRaisesRegex(PermissionError, "approval_access_denied"):
+            self.access.revoke("p1", actor=self.supervisor, now=self.now, reason="test")
+        self.assertFalse(self.journal.is_revoked("p1"))
+
+    def test_revocation_is_irreversible(self):
+        self.access.revoke("p1", actor=self.owner, now=self.now, reason="withdrawn")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.access.revoke("p1", actor=self.owner, now=self.now, reason="again")
+        self.assertEqual(len(self.journal.events("p1")), 2)
+
     def test_naive_time_denied(self):
         with self.assertRaisesRegex(ValueError, "timezone_aware_time_required"):
             self.access.transition("p1", "validated", actor=self.supervisor, now=datetime(2026, 11, 11))

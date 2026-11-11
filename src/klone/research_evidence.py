@@ -71,7 +71,7 @@ class EvidenceLedger:
             raise ValueError("Report trace and version must be provided together")
         if report_trace_id is not None and (
             not isinstance(report_trace_id, str) or not 1 <= len(report_trace_id) <= 128
-            or not isinstance(report_version, int) or report_version < 1
+            or type(report_version) is not int or report_version < 1
         ):
             raise ValueError("Invalid report provenance")
         timestamp = datetime.now(timezone.utc).isoformat()
@@ -102,12 +102,13 @@ class EvidenceLedger:
         This validates provenance membership only; not whether sources prove a claim.
         Caller must authorize report and ledger access and record an audit event.
         """
-        if not isinstance(version, int) or version < 1:
+        if type(version) is not int or version < 1:
             raise ValueError("Invalid report version")
         report = memory.read(trace_id=trace_id, version=version)
         if report is None or report.room_id != "public-room":
             raise ValueError("Public report version not found")
-        if not source_refs or any(ref not in report.citations for ref in source_refs):
+        if (not isinstance(source_refs, tuple) or not source_refs or
+            any(not isinstance(ref, str) or ref not in report.citations for ref in source_refs)):
             raise ValueError("Claim references must belong to the stored report")
         return self.append(
             claim_id=claim_id, statement=statement, source_refs=source_refs,
@@ -118,7 +119,7 @@ class EvidenceLedger:
     def history(self, claim_id: str, *, limit: int = 100) -> tuple[EvidenceClaim, ...]:
         if not isinstance(claim_id, str) or not 1 <= len(claim_id) <= 128:
             raise ValueError("Invalid claim identifier")
-        if not isinstance(limit, int) or not 1 <= limit <= 100:
+        if type(limit) is not int or not 1 <= limit <= 100:
             raise ValueError("Invalid limit")
         with closing(sqlite3.connect(self.database_path, timeout=10)) as connection:
             self._initialize(connection)

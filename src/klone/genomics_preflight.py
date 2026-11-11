@@ -53,13 +53,16 @@ def preflight_vcf(data: bytes, *, reference_build: str) -> VcfPreflight:
             if not contig:
                 raise ValueError("vcf_contig_invalid")
             contigs.add(contig)
+        elif line.startswith("##"):
+            if seen_header:
+                raise ValueError("vcf_metadata_after_header")
         elif line.startswith("#CHROM\t"):
             if not seen_fileformat or seen_header:
                 raise ValueError("vcf_header_invalid")
             columns = line.split("\t")
             if columns[:8] != ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"]:
                 raise ValueError("vcf_columns_invalid")
-            if len(columns) not in (8, 9) and len(columns) < 10:
+            if len(columns) == 0 or len(columns) < 8:
                 raise ValueError("vcf_columns_invalid")
             if len(columns) > 8 and columns[8] != "FORMAT":
                 raise ValueError("vcf_format_invalid")

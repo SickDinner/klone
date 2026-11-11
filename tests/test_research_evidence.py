@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
@@ -33,8 +34,9 @@ class EvidenceLedgerTests(unittest.TestCase):
             path = Path(directory) / "claims.sqlite"
             ledger = EvidenceLedger(path)
             ledger.append(claim_id="c1", statement="Original", source_refs=("source",))
-            with sqlite3.connect(path) as connection:
-                connection.execute(
+            with closing(sqlite3.connect(path)) as connection:
+                with connection:
+                    connection.execute(
                     "UPDATE research_claim_revisions SET statement = 'Altered' WHERE claim_id = 'c1'")
             with self.assertRaises(ValueError):
                 ledger.history("c1")

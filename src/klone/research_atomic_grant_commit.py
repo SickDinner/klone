@@ -11,6 +11,7 @@ import hashlib
 import json
 from pathlib import Path
 import sqlite3
+from typing import Callable
 
 from .research_signed_grants import SignedResearchGrant, verify_research_grant
 from .research_proposals import ClaimProposal, prepare_claim_proposal
@@ -21,6 +22,7 @@ def commit_claim_with_grant(
     *, database_path: Path, proposal: ClaimProposal,
     grant: SignedResearchGrant, principal: str, policy_version: int,
     now: int, key: bytes, decision_reason: str,
+    transaction_guard: Callable[[sqlite3.Connection], None] | None = None,
 ) -> CommitReceipt:
     """All three records commit or roll back together. Replay fails closed."""
     if not isinstance(proposal, ClaimProposal):
@@ -39,10 +41,14 @@ def commit_claim_with_grant(
         report_version=proposal.report_version, policy_version=policy_version,
         now=now, key=key):
         raise PermissionError("Signed grant rejected")
+    if transaction_guard is not None and not callable(transaction_guard):
+        raise TypeError("Transaction guard must be callable")
     timestamp = datetime.fromtimestamp(now, timezone.utc).isoformat()
     with closing(sqlite3.connect(database_path, timeout=10)) as db:
         try:
             db.execute("BEGIN IMMEDIATE")
+            if transaction_guard is not None:
+                transaction_guard(db)
             db.execute("""CREATE TABLE IF NOT EXISTS research_grant_nonces (
                 nonce TEXT PRIMARY KEY, principal TEXT NOT NULL,
                 resource_id TEXT NOT NULL, claimed_at INTEGER NOT NULL)""")

@@ -4,7 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from klone.research_proposals import prepare_claim_proposal, verify_claim_proposal
+from klone.research_proposals import prepare_claim_proposal, verify_claim_proposal, prepare_claim_review
 from klone.research_memory import ResearchMemory
 from klone.research_report import ResearchReport
 
@@ -55,6 +55,27 @@ class ClaimProposalTests(unittest.TestCase):
                 statement="Claim", source_refs=("source:one",))
             with self.assertRaises(ValueError):
                 verify_claim_proposal(missing_version, memory=memory)
+
+    def test_review_decision_is_pure_and_requires_reason(self):
+        proposal = prepare_claim_proposal(
+            trace_id="trace", report_version=1, claim_id="c1",
+            statement="Claim", source_refs=("source:one",))
+        review = prepare_claim_review(
+            proposal, reviewer_id="human-1", decision="reject",
+            reason="Evidence is insufficient")
+        self.assertEqual(review.proposal_id, proposal.proposal_id)
+        self.assertEqual(review.decision, "reject")
+        for kwargs in (
+            {"reviewer_id": "", "decision": "approve", "reason": "Reviewed"},
+            {"reviewer_id": "human-1", "decision": "approve", "reason": ""},
+            {"reviewer_id": "human-1", "decision": "write", "reason": "Reviewed"},
+        ):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                prepare_claim_review(proposal, **kwargs)
+        with self.assertRaises(ValueError):
+            prepare_claim_review(
+                replace(proposal, statement="Modified"),
+                reviewer_id="human-1", decision="approve", reason="Reviewed")
 
     def test_rejects_bad_inputs(self):
         valid = dict(trace_id="trace", report_version=1, claim_id="c1",

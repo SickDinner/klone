@@ -21,3 +21,7 @@ This is a **targeted containment of the identified chat transport**, not proof t
 ## CI regression correction
 
 The initial S1 containment run failed because two legacy clone-chat tests expected GPT-5.4 network rendering. Those tests now assert the intentional local-only behavior and the absence of outbound API calls. Await a complete green matrix before merge; never treat a single successful platform as complete verification.
+
+## I1 bounded ingest fingerprint prototype
+
+`ingest_fingerprint.py` reads binary streams in at most 64 KiB chunks, enforces a 512 MiB absolute object cap (lower per-call limits supported), and emits SHA-256/size/chunk count without retaining file contents. `plan_ingest` makes a read-only duplicate/candidate decision using a caller-supplied hash set. **The caller must derive that set from the authorized room only**. This is not a persistent index, resumable ingestion pipeline, authorization service, OCR, transcription, or vectorization. All associated tests use synthetic bytes.

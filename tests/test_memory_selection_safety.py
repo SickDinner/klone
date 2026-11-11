@@ -35,7 +35,7 @@ class MemorySelectionSafetyTests(unittest.TestCase):
         self.assertIn('document.querySelector("#memory-detail").textContent = "Memory selection unavailable."', source)
 
     def test_event_ids_are_url_encoded(self):
-        self.assertIn("/api/memory/events/${encodeURIComponent(id)}", self.source.replace("${", "${")) if False else self.assertIn("/api/memory/events/${encodeURIComponent(id)}".replace("\\", ""), self.source)
+        self.assertIn("/api/memory/events/${encodeURIComponent(id)}", self.source)
 
     def test_denied_errors_do_not_render_server_message_in_memory_panels(self):
         for message in ("Memory selection unavailable.", "Memory list unavailable.", "Memory answer unavailable.", "Memory context unavailable."):

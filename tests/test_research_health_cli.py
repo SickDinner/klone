@@ -23,12 +23,14 @@ class ResearchHealthCLITests(TestCase):
                 ResearchAuditOutbox.initialize(conn)
                 DossierStore(db)._initialize(conn)
             self.assertEqual(research_health(database_path=db)["status"], "ok")
+            self.assertEqual(research_health(database_path=db)["issue_codes"], [])
             journal.transition(run_id="stuck", state="started",
                                trace_id="t", dossier_id="d")
             before = db.stat().st_mtime_ns
             result = research_health(database_path=db)
             self.assertEqual(result["status"], "attention")
             self.assertEqual(result["stuck_runs"], 1)
+            self.assertEqual(result["issue_codes"], ["stuck_runs"])
             self.assertEqual(db.stat().st_mtime_ns, before)
 
     def test_missing_database_not_created(self):

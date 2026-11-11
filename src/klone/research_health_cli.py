@@ -1,0 +1,44 @@
+"""Read-only KLONE research health command for local Termux/CI checks."""
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+from .research_recovery_inspection import inspect_research_recovery
+from .research_audit_consistency import inspect_audit_consistency
+
+
+def research_health(*, database_path: Path) -> dict[str, object]:
+    recovery = inspect_research_recovery(database_path=database_path)
+    integrity = inspect_audit_consistency(database_path=database_path)
+    return {
+        "status": "attention" if (
+            recovery.started_without_terminal or
+            recovery.completed_without_outbox or
+            integrity.healthy is False) else "ok",
+        "stuck_runs": len(recovery.started_without_terminal),
+        "completed_without_outbox": len(recovery.completed_without_outbox),
+        "pending_audit_delivery": len(recovery.pending_audit_delivery),
+        "completed_missing_snapshot": len(integrity.completed_missing_snapshot),
+        "outbox_missing_completed": len(integrity.outbox_missing_completed),
+        "outbox_version_mismatch": len(integrity.outbox_version_mismatch),
+        "malformed_event_ids": len(integrity.malformed_event_ids),
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="KLONE read-only research health")
+    parser.add_argument("--database", type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        result = research_health(database_path=args.database)
+    except (OSError, ValueError) as exc:
+        print(json.dumps({"status": "error", "reason": type(exc).__name__}))
+        return 2
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result["status"] == "ok" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

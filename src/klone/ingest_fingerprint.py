@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
-from pathlib import Path
 from typing import BinaryIO
 
 CHUNK_BYTES = 64 * 1024
@@ -51,6 +50,7 @@ def plan_ingest(fingerprint: IngestFingerprint, *, existing_hashes: frozenset[st
     """Read-only duplicate decision; caller must scope hashes to one authorized room."""
     if not isinstance(existing_hashes, frozenset):
         raise ValueError("invalid_duplicate_index")
-    if len(fingerprint.sha256) != 64 or fingerprint.byte_length < 0:
+    if (len(fingerprint.sha256) != 64 or any(c not in "0123456789abcdef" for c in fingerprint.sha256)
+            or fingerprint.byte_length < 0 or fingerprint.chunk_count < 0):
         raise ValueError("invalid_fingerprint")
     return IngestPlan("duplicate" if fingerprint.sha256 in existing_hashes else "candidate", fingerprint)

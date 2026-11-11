@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import sqlite3
@@ -22,7 +23,7 @@ class PublicationReconciliationTests(unittest.TestCase):
                     trace_id="trace-1", report_version=1, claim_id="claim-1",
                     statement="Evidence", source_refs=("doi:1",)),
                 reviewer_id="owner", decision_reason="reviewed", authorized=True)
-            with sqlite3.connect(ledger_path) as db:
+            with closing(sqlite3.connect(ledger_path)) as db, db:
                 db.execute("DELETE FROM atomic_claim_audit")
             with self.assertRaisesRegex(ValueError, "inconsistent research ledger"):
                 publish_checkpoint(

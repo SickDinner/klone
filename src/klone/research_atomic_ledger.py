@@ -6,6 +6,7 @@ Callers must validate the report, reviewer and Hypervisor grant beforehand.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from contextlib import closing
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -55,7 +56,7 @@ class AtomicResearchLedger:
             or not decision_reason.strip() or len(decision_reason) > 2000):
             raise ValueError("Reviewer and reason required")
         timestamp = datetime.now(timezone.utc).isoformat()
-        with sqlite3.connect(self.database_path, timeout=10) as db:
+        with closing(sqlite3.connect(self.database_path, timeout=10)) as db, db:
             db.execute("PRAGMA busy_timeout=10000")
             db.execute("""CREATE TABLE IF NOT EXISTS atomic_claims (
                 claim_id TEXT NOT NULL, revision INTEGER NOT NULL,
@@ -94,7 +95,7 @@ class AtomicResearchLedger:
 
     def verify(self, proposal_id: str) -> bool:
         """Verify that a committed claim has a matching audit record and digest."""
-        with sqlite3.connect(self.database_path) as db:
+        with closing(sqlite3.connect(self.database_path)) as db:
             row = db.execute("""SELECT c.claim_id,c.revision,c.proposal_id,
                 c.trace_id,c.report_version,c.statement,c.source_refs_json,
                 c.status,c.rationale,a.reviewer_id,a.decision_reason,

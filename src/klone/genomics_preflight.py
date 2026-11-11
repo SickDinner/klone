@@ -70,7 +70,7 @@ def preflight_vcf(data: bytes, *, reference_build: str) -> VcfPreflight:
             if not seen_header:
                 raise ValueError("vcf_missing_header")
             columns = line.split("\t")
-            if len(columns) != 9 + sample_count if sample_count else len(columns) != 8 and len(columns) != 9:
+            if (sample_count and len(columns) != 9 + sample_count) or (not sample_count and len(columns) not in (8, 9)):
                 raise ValueError("vcf_record_columns_invalid")
             if not columns[0] or not columns[1].isdigit() or int(columns[1]) < 1:
                 raise ValueError("vcf_position_invalid")

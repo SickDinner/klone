@@ -37,6 +37,14 @@ class MemorySelectionSafetyTests(unittest.TestCase):
     def test_event_ids_are_url_encoded(self):
         self.assertIn("/api/memory/events/${encodeURIComponent(id)}", self.source)
 
+    def test_room_change_preview_is_bounded_and_room_scoped(self):
+        source = self.source
+        self.assertIn("/v1/rooms/${encodeURIComponent(roomId)}/changes?limit=24&offset=0", source)
+        self.assertIn("result.room_id !== roomId", source)
+        self.assertIn("generation !== memoryChangesGeneration", source)
+        self.assertIn("escapeHtml(change.summary)", source)
+        self.assertIn("clearMemoryChanges();", source)
+
     def test_denied_errors_do_not_render_server_message_in_memory_panels(self):
         for message in ("Memory selection unavailable.", "Memory list unavailable.", "Memory answer unavailable.", "Memory context unavailable."):
             self.assertIn(message, self.source)

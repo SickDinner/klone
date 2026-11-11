@@ -2564,6 +2564,47 @@ async function runDepthMapFromSelectedAsset() {
   );
 }
 
+let memoryChangesGeneration = 0;
+
+function clearMemoryChanges() {
+  memoryChangesGeneration += 1;
+  const root = document.querySelector("#memory-changes");
+  if (!root) return;
+  root.className = "detail-card empty-state";
+  root.textContent = "No room change preview loaded.";
+}
+
+async function refreshMemoryChanges() {
+  const roomId = document.querySelector("#memory-room-filter").value;
+  const generation = ++memoryChangesGeneration;
+  const root = document.querySelector("#memory-changes");
+  root.className = "detail-card empty-state";
+  root.textContent = "Loading room change preview...";
+  if (!roomId || roomId !== state.memory.roomId) {
+    clearMemoryChanges();
+    return;
+  }
+  try {
+    const result = await fetchJson(`/v1/rooms/${encodeURIComponent(roomId)}/changes?limit=24&offset=0`);
+    if (generation !== memoryChangesGeneration || roomId !== state.memory.roomId) return;
+    if (result.room_id !== roomId || !Array.isArray(result.changes)) throw Error("Invalid change preview");
+    root.className = "detail-card";
+    root.innerHTML = `
+      <h3>Room Change Preview</h3>
+      <p>Room-scoped audit preview. A change is not linked to a memory item without an exact object ID match.</p>
+      <div class="meta">${chips([`room: ${roomId}`, `returned: ${result.changes.length}`, "limit: 24"])}</div>
+      <ul class="detail-list">${result.changes.length ? result.changes.map((change) => `
+        <li><strong>${escapeHtml(change.change_kind)}</strong>:
+        ${escapeHtml(change.object_id)}
+        <span class="detail-token">${escapeHtml(change.recorded_at)}</span>
+        <p>${escapeHtml(change.summary)}</p></li>`).join("") : "<li>No changes in this preview.</li>"}</ul>`;
+  } catch (_error) {
+    if (generation !== memoryChangesGeneration) return;
+    root.className = "detail-card empty-state";
+    root.textContent = "Room change preview unavailable.";
+  }
+}
+
 let memorySelectionGeneration = 0;
 let memoryListGeneration = 0;
 let memoryAnswerGeneration = 0;
@@ -2711,6 +2752,7 @@ async function refreshMemoryExplorer(event) {
 
   const roomId = document.querySelector("#memory-room-filter").value;
   const generation = ++memoryListGeneration;
+  clearMemoryChanges();
   invalidateMemorySelection();
   state.memory.selection = null;
   state.memory.events = [];
@@ -3602,6 +3644,7 @@ function bindEvents() {
   document.querySelector("#memory-filter-form").addEventListener("submit", refreshMemoryExplorer);
   document.querySelector("#memory-room-filter").addEventListener("change", refreshMemoryExplorer);
   document.querySelector("#memory-context-refresh").addEventListener("click", refreshMemoryContextOnly);
+  document.querySelector("#memory-changes-refresh").addEventListener("click", refreshMemoryChanges);
   document.querySelector("#memory-question-form").addEventListener("submit", refreshMemoryAnswer);
   document.querySelector("#memory-events").addEventListener("click", (event) => {
     const button = event.target.closest("[data-memory-kind='event']");

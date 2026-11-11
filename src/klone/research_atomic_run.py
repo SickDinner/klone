@@ -20,6 +20,7 @@ from .research_dossier_review import review_dossier
 from .research_source_manifest import PublicSourceManifest
 from .research_verified_report import publish_verified_dossier_report
 from .research_run_journal import ResearchRunJournal
+from .research_audit_outbox import ResearchAuditOutbox
 from .integrated_research_core import IntegratedResearchResult
 from .research_dossier_workflow import DossierChange
 
@@ -54,6 +55,7 @@ def finalize_verified_run_atomically(
         store = DossierStore(database_path)
         store._initialize(db)
         ResearchRunJournal._schema(db)
+        ResearchAuditOutbox.initialize(db)
         db.commit()
         db.execute("BEGIN IMMEDIATE")
         try:
@@ -91,6 +93,9 @@ def finalize_verified_run_atomically(
             db.execute("INSERT INTO research_run_journal VALUES (?,?,?,?,?,?)",
                        (run_id, 2, "completed", trace_id, dossier_id,
                         "dossier_version=" + str(version)))
+            ResearchAuditOutbox.enqueue_in_transaction(
+                db, run_id=run_id, trace_id=trace_id,
+                dossier_id=dossier_id, dossier_version=version)
             db.commit()
         except Exception:
             db.rollback()

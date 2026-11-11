@@ -36,8 +36,10 @@ class EvidenceLedger:
 
     @staticmethod
     def _digest(claim_id: str, revision: int, statement: str,
-                refs: tuple[str, ...], status: str, reason: str) -> str:
-        payload = json.dumps([claim_id, revision, statement, list(refs), status, reason],
+                refs: tuple[str, ...], status: str, reason: str,
+                report_trace_id: str | None = None,
+                report_version: int | None = None) -> str:
+        payload = json.dumps([claim_id, revision, statement, list(refs), status, reason, report_trace_id, report_version],
                              ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(payload).hexdigest()
 
@@ -80,7 +82,8 @@ class EvidenceLedger:
                 revision = connection.execute(
                     "SELECT COALESCE(MAX(revision), 0) + 1 FROM research_claim_revisions WHERE claim_id = ?",
                     (claim_id,)).fetchone()[0]
-                digest = self._digest(claim_id, revision, statement, source_refs, status, reason)
+                digest = self._digest(claim_id, revision, statement, source_refs, status, reason,
+                                      report_trace_id, report_version)
                 connection.execute("""INSERT INTO research_claim_revisions
                     (claim_id, revision, statement, source_refs_json, status, reason, digest, created_at, report_trace_id, report_version)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -125,7 +128,7 @@ class EvidenceLedger:
         records = []
         for row in rows:
             refs = tuple(json.loads(row[3]))
-            expected = self._digest(row[0], row[1], row[2], refs, row[4], row[5])
+            expected = self._digest(row[0], row[1], row[2], refs, row[4], row[5], row[8], row[9])
             if expected != row[6]:
                 raise ValueError("Claim revision integrity check failed")
             records.append(EvidenceClaim(row[0], row[1], row[2], refs,

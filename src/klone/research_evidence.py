@@ -56,7 +56,7 @@ class EvidenceLedger:
         if (not isinstance(source_refs, tuple) or len(source_refs) > 50 or
             any(not isinstance(ref, str) or not 1 <= len(ref) <= 512 for ref in source_refs)):
             raise ValueError("Invalid source references")
-        if status not in self.STATUSES or not isinstance(reason, str) or len(reason) > 2000:
+        if not isinstance(status, str) or status not in self.STATUSES or not isinstance(reason, str) or len(reason) > 2000:
             raise ValueError("Invalid review status or reason")
         if status != "unverified" and (not source_refs or not reason.strip()):
             raise ValueError("Reviewed status requires sources and reason")

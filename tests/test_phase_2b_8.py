@@ -125,21 +125,14 @@ class Phase2B8Tests(unittest.TestCase):
         self.assertEqual(observed["status_code"], 200)
         payload = observed["json"]
         self.assertEqual(payload["backend_mode"], "bounded_local")
-        self.assertIn("OPENAI_API_KEY is not configured", payload["system_notes"][0])
+        self.assertIn("External model rendering is disabled", payload["system_notes"][0])
 
-    def test_clone_chat_respond_route_uses_openai_when_key_is_configured(self) -> None:
+    def test_clone_chat_respond_route_blocks_openai_when_key_is_configured(self) -> None:
         app = create_app(self._settings_for("phase_2b_8_openai.sqlite"))
         local_app_data = self.root / "localappdata"
         key_dir = local_app_data / "Klone"
         key_dir.mkdir(parents=True, exist_ok=True)
         (key_dir / "openai_api_key.txt").write_text("sk-test-abcdefghijklmnopqrstuvwxyz", encoding="utf-8")
-        captured_payload: dict[str, object] = {}
-
-        def fake_openai_call(*, api_key: str, payload: dict[str, object]) -> dict[str, object]:
-            captured_payload["api_key"] = api_key
-            captured_payload["payload"] = payload
-            return {"output_text": "Tama tuli OpenAI-polun kautta."}
-
         with patch.dict(
             "os.environ",
             {"LOCALAPPDATA": str(local_app_data), "OPENAI_API_KEY": ""},
@@ -147,8 +140,8 @@ class Phase2B8Tests(unittest.TestCase):
         ):
             with patch(
                 "klone.dialogue.DialogueCorpusService._call_openai_responses_api",
-                side_effect=fake_openai_call,
-            ):
+                side_effect=AssertionError("External API must never be called"),
+            ) as outbound:
                 observed = asyncio.run(
                     self._perform_request(
                         app,
@@ -162,17 +155,14 @@ class Phase2B8Tests(unittest.TestCase):
                         },
                     )
                 )
+                outbound.assert_not_called()
 
         self.assertEqual(observed["status_code"], 200)
         payload = observed["json"]
-        self.assertEqual(payload["backend_mode"], "openai_gpt_5_4")
-        self.assertTrue(payload["llm_call_performed"])
-        self.assertEqual(payload["reply"]["content"], "Tama tuli OpenAI-polun kautta.")
-        outbound_payload = captured_payload["payload"]
-        self.assertIn("You are Klone", outbound_payload["instructions"])
-        self.assertIn("first-person phrasing is allowed", outbound_payload["instructions"])
-        self.assertEqual(outbound_payload["input"][-1]["role"], "user")
-        self.assertIsInstance(outbound_payload["input"][-1]["content"], str)
+        self.assertEqual(payload["backend_mode"], "bounded_local")
+        self.assertFalse(payload["llm_call_performed"])
+        self.assertIn("External model rendering is disabled", payload["system_notes"][0])
+        self.assertIn("Alice Example", payload["reply"]["content"])
 
     def test_clone_chat_ui_copy_is_present(self) -> None:
         html = (PROJECT_ROOT / "src" / "klone" / "static" / "chat.html").read_text(encoding="utf-8")

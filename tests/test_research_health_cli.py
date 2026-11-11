@@ -20,6 +20,7 @@ class ResearchHealthCLITests(TestCase):
             db = Path(tmp) / "health.sqlite"
             journal = ResearchRunJournal(db)
             with closing(sqlite3.connect(db)) as conn, conn:
+                ResearchRunJournal._schema(conn)
                 ResearchAuditOutbox.initialize(conn)
                 DossierStore(db)._initialize(conn)
             self.assertEqual(research_health(database_path=db)["status"], "ok")
@@ -81,6 +82,7 @@ class ResearchHealthCLITests(TestCase):
             db = Path(tmp) / "health.sqlite"
             journal = ResearchRunJournal(db)
             with closing(sqlite3.connect(db)) as conn, conn:
+                ResearchRunJournal._schema(conn)
                 ResearchAuditOutbox.initialize(conn)
                 DossierStore(db)._initialize(conn)
             journal.transition(run_id="unfinished", state="started",
@@ -95,6 +97,7 @@ class ResearchHealthCLITests(TestCase):
             db = Path(tmp) / "health.sqlite"
             journal = ResearchRunJournal(db)
             with closing(sqlite3.connect(db)) as conn, conn:
+                ResearchRunJournal._schema(conn)
                 ResearchAuditOutbox.initialize(conn)
                 DossierStore(db)._initialize(conn)
             journal.transition(run_id="run1", state="started",

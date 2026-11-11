@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import difflib
 
-from .research_memory import ResearchMemory, StoredResearchReport
+from .research_memory import ResearchMemory
 
 
 @dataclass(frozen=True)

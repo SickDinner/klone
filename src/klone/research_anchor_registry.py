@@ -10,7 +10,18 @@ from contextlib import closing
 from pathlib import Path
 import sqlite3
 
-from .research_checkpoint_anchor import CheckpointAnchor
+from .research_checkpoint_anchor import CheckpointAnchor, _digest
+
+
+def _validate_stored_anchor(anchor: CheckpointAnchor) -> None:
+    if (type(anchor.sequence) is not int or anchor.sequence < 1
+        or not all(isinstance(value, str) and len(value) == 64 for value in (
+            anchor.checkpoint_digest, anchor.previous_anchor_digest,
+            anchor.anchor_digest))
+        or anchor.anchor_digest != _digest([
+            anchor.sequence, anchor.checkpoint_digest,
+            anchor.previous_anchor_digest])):
+        raise ValueError("Stored anchor integrity failure")
 
 
 class AnchorConflict(RuntimeError):
@@ -37,7 +48,11 @@ class SqliteAnchorRegistry:
             row = db.execute("""SELECT sequence,checkpoint_digest,
                 previous_anchor_digest,anchor_digest FROM checkpoint_anchor
                 WHERE singleton=1""").fetchone()
-        return CheckpointAnchor(*row) if row else None
+        if row is None:
+            return None
+        anchor = CheckpointAnchor(*row)
+        _validate_stored_anchor(anchor)
+        return anchor
 
     def compare_and_swap(
         self, *, expected: CheckpointAnchor | None, next_anchor: CheckpointAnchor,
@@ -45,7 +60,6 @@ class SqliteAnchorRegistry:
         """Persist only a valid successor, under a serialized transaction."""
         if not isinstance(next_anchor, CheckpointAnchor):
             raise ValueError("Invalid next anchor")
-        from .research_checkpoint_anchor import _digest
         if (type(next_anchor.sequence) is not int or next_anchor.sequence < 1
             or next_anchor.anchor_digest != _digest([
                 next_anchor.sequence, next_anchor.checkpoint_digest,
@@ -57,6 +71,8 @@ class SqliteAnchorRegistry:
                 previous_anchor_digest,anchor_digest FROM checkpoint_anchor
                 WHERE singleton=1""").fetchone()
             current = CheckpointAnchor(*row) if row else None
+            if current is not None:
+                _validate_stored_anchor(current)
             if current != expected:
                 raise AnchorConflict("Anchor changed concurrently")
             if current is None:

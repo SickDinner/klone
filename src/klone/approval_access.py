@@ -25,7 +25,7 @@ class ApprovalAccess:
 
     def __init__(self, journal: ApprovalJournal, *, expires_at: dict[str, datetime] | None = None):
         self.journal = journal
-        # Prototype-only expiry registry: restart loses expiry state.
+        # Optional bootstrap deadlines are persisted when proposals are created.
         self.expires_at = expires_at if expires_at is not None else {}
 
     @staticmethod
@@ -39,7 +39,7 @@ class ApprovalAccess:
         self._require_actor(actor, proposal.room_id, allowed_roles=frozenset({"owner", "supervisor"}))
         if actor.actor_id != proposal.proposer_id:
             raise PermissionError("proposer_identity_mismatch")
-        return self.journal.propose(proposal, actor_id=actor.actor_id)
+        return self.journal.propose(\n            proposal, actor_id=actor.actor_id, expires_at=self.expires_at.get(proposal.proposal_id),\n        )
 
     def transition(
         self, proposal_id: str, next_state: str, *, actor: VerifiedActor,
@@ -52,7 +52,7 @@ class ApprovalAccess:
         self._require_actor(actor, proposal.room_id, allowed_roles=frozenset({"owner", "supervisor"}))
         if now.tzinfo is None or now.utcoffset() is None:
             raise ValueError("timezone_aware_time_required")
-        deadline = self.expires_at.get(proposal_id)
+        deadline = self.journal.deadline(proposal_id)
         if next_state in {"approved", "activating", "active"}:
             # Missing expiry is a denial, not unlimited validity.
             if deadline is None or deadline.tzinfo is None or deadline.utcoffset() is None:

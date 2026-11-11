@@ -18,7 +18,11 @@ CREATE TABLE IF NOT EXISTS approval_proposals (
  target_version TEXT NOT NULL, patch_sha256 TEXT NOT NULL,
  state TEXT NOT NULL, approver_id TEXT
 );
-CREATE TABLE IF NOT EXISTS approval_deadlines (\n proposal_id TEXT PRIMARY KEY REFERENCES approval_proposals(proposal_id),\n expires_at_utc TEXT NOT NULL\n);\nCREATE TABLE IF NOT EXISTS approval_events (
+CREATE TABLE IF NOT EXISTS approval_deadlines (
+ proposal_id TEXT PRIMARY KEY REFERENCES approval_proposals(proposal_id),
+ expires_at_utc TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS approval_events (
  event_id INTEGER PRIMARY KEY AUTOINCREMENT,
  proposal_id TEXT NOT NULL, actor_id TEXT NOT NULL,
  previous_state TEXT, next_state TEXT NOT NULL,
@@ -48,7 +52,9 @@ class ApprovalJournal:
                 or len(proposal.patch_sha256) != 64
                 or any(c not in "0123456789abcdef" for c in proposal.patch_sha256)):
             raise ValueError("invalid_proposal")
-        if expires_at is not None and (not isinstance(expires_at, datetime) or expires_at.tzinfo is None or expires_at.utcoffset() is None):\n            raise ValueError("timezone_aware_expiry_required")\n        # Explicit transaction: sqlite3 connection context manager alone does
+        if expires_at is not None and (not isinstance(expires_at, datetime) or expires_at.tzinfo is None or expires_at.utcoffset() is None):
+            raise ValueError("timezone_aware_expiry_required")
+        # Explicit transaction: sqlite3 connection context manager alone does
         # not start a transaction when isolation_level=None (autocommit).
         self.connection.execute("BEGIN IMMEDIATE")
         try:

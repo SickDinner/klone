@@ -7,6 +7,8 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from klone.research_evidence import EvidenceLedger
+from klone.research_memory import ResearchMemory
+from klone.research_report import ResearchReport
 
 
 class EvidenceLedgerTests(unittest.TestCase):
@@ -28,6 +30,24 @@ class EvidenceLedgerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ledger.append(claim_id="c1", statement="Claim", source_refs=(),
                               status="supported", reason="No sources")
+
+    def test_claim_refs_must_match_verified_report(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "reports.sqlite"
+            memory = ResearchMemory(path)
+            memory.save(ResearchReport("trace", "public-room", "Q", "# Evidence",
+                                       ("source:one",)))
+            ledger = EvidenceLedger(path)
+            saved = ledger.append_from_report(
+                memory=memory, trace_id="trace", version=1,
+                claim_id="c1", statement="Test claim",
+                source_refs=("source:one",))
+            self.assertEqual(saved.revision, 1)
+            with self.assertRaises(ValueError):
+                ledger.append_from_report(
+                    memory=memory, trace_id="trace", version=1,
+                    claim_id="c2", statement="Unsupported reference",
+                    source_refs=("source:other",))
 
     def test_tampering_detected(self):
         with TemporaryDirectory() as directory:

@@ -24,6 +24,8 @@ class ResearchHealthCLITests(TestCase):
                 DossierStore(db)._initialize(conn)
             self.assertEqual(research_health(database_path=db)["status"], "ok")
             self.assertEqual(research_health(database_path=db)["issue_codes"], [])
+            self.assertEqual(research_health(database_path=db)["severity"], "none")
+            self.assertEqual(research_health(database_path=db)["delivery_status"], "clear")
             journal.transition(run_id="stuck", state="started",
                                trace_id="t", dossier_id="d")
             before = db.stat().st_mtime_ns
@@ -31,6 +33,7 @@ class ResearchHealthCLITests(TestCase):
             self.assertEqual(result["status"], "attention")
             self.assertEqual(result["stuck_runs"], 1)
             self.assertEqual(result["issue_codes"], ["stuck_runs"])
+            self.assertEqual(result["severity"], "warning")
             self.assertEqual(db.stat().st_mtime_ns, before)
 
     def test_missing_database_not_created(self):
@@ -81,3 +84,17 @@ class ResearchHealthCLITests(TestCase):
             self.assertEqual(result["status"], "attention")
             self.assertEqual(result["stuck_runs"], 1)
             self.assertIn("pending_audit_delivery", result)
+
+    def test_completed_without_outbox_is_critical(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Path(tmp) / "health.sqlite"
+            journal = ResearchRunJournal(db)
+            with closing(sqlite3.connect(db)) as conn, conn:
+                ResearchAuditOutbox.initialize(conn)
+                DossierStore(db)._initialize(conn)
+            journal.transition(run_id="run1", state="completed",
+                               trace_id="trace1", dossier_id="dossier1")
+            result = research_health(database_path=db)
+            self.assertEqual(result["status"], "attention")
+            self.assertEqual(result["severity"], "critical")
+            self.assertIn("completed_without_outbox", result["issue_codes"])

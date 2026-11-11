@@ -40,6 +40,8 @@ def preflight_vcf(data: bytes, *, reference_build: str) -> VcfPreflight:
             line = raw.decode("utf-8").rstrip("\r\n")
         except UnicodeDecodeError as error:
             raise ValueError("vcf_utf8_invalid") from error
+        if not line.strip():
+            raise ValueError("vcf_empty_line")
         if line.startswith("##fileformat=VCFv"):
             if seen_fileformat or seen_header:
                 raise ValueError("vcf_duplicate_fileformat")
@@ -57,8 +59,12 @@ def preflight_vcf(data: bytes, *, reference_build: str) -> VcfPreflight:
             columns = line.split("\t")
             if columns[:8] != ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"]:
                 raise ValueError("vcf_columns_invalid")
+            if len(columns) not in (8, 9) and len(columns) < 10:
+                raise ValueError("vcf_columns_invalid")
             if len(columns) > 8 and columns[8] != "FORMAT":
                 raise ValueError("vcf_format_invalid")
+            if len(columns) == 9:
+                raise ValueError("vcf_format_without_samples")
             sample_count = max(0, len(columns) - 9)
             if sample_count > 1000:
                 raise ValueError("vcf_too_many_samples")

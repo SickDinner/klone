@@ -31,16 +31,16 @@ class GenomicsPreflightTests(unittest.TestCase):
 
     def test_metadata_after_header_denied(self):
         malformed = SYNTHETIC.replace(
-            b"1\\t100\\t.\\tA\\tG",
-            b"##source=late\\n1\\t100\\t.\\tA\\tG",
+            b"1\t100\t.\tA\tG",
+            b"##source=late\n1\t100\t.\tA\tG",
         )
         with self.assertRaisesRegex(ValueError, "vcf_metadata_after_header"):
             preflight_vcf(malformed, reference_build="GRCh38")
 
     def test_format_without_samples_denied(self):
         malformed = SYNTHETIC.replace(
-            b"\\tFORMAT\\tSYNTHETIC\\n",
-            b"\\tFORMAT\\n",
+            b"\tFORMAT\tSYNTHETIC\n",
+            b"\tFORMAT\n",
         )
         with self.assertRaisesRegex(ValueError, "vcf_format_without_samples"):
             preflight_vcf(malformed, reference_build="GRCh38")

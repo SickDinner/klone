@@ -14,6 +14,21 @@ class ClaimProposalTests(unittest.TestCase):
         self.assertEqual(len(first.proposal_id), 64)
         self.assertEqual(first.requested_status, "unverified")
 
+    def test_proposal_id_changes_with_evidence_or_review(self):
+        base = dict(trace_id="trace", report_version=1, claim_id="c1",
+                    statement="A claim", source_refs=("source:one",))
+        original = prepare_claim_proposal(**base)
+        modified = (
+            {"statement": "A different claim"},
+            {"source_refs": ("source:two",)},
+            {"report_version": 2},
+            {"requested_status": "contested", "rationale": "Conflicting source"},
+        )
+        for changes in modified:
+            with self.subTest(changes=changes):
+                candidate = prepare_claim_proposal(**(base | changes))
+                self.assertNotEqual(candidate.proposal_id, original.proposal_id)
+
     def test_rejects_bad_inputs(self):
         valid = dict(trace_id="trace", report_version=1, claim_id="c1",
                      statement="A claim", source_refs=("source:one",))

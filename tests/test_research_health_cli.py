@@ -37,7 +37,7 @@ class ResearchHealthCLITests(TestCase):
             self.assertEqual(len(result["operator_guidance"]), 1)
             self.assertEqual(result["operator_guidance"][0]["code"], "stuck_runs")
             self.assertEqual(result["operator_guidance"][0]["count"], 1)
-            self.assertNotIn("dossier", str(result["operator_guidance"][0]["code"]))
+            self.assertNotIn("trace", json.dumps(result["operator_guidance"]))
             self.assertEqual(result["severity"], "warning")
             self.assertEqual(db.stat().st_mtime_ns, before)
 

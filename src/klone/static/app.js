@@ -2715,6 +2715,8 @@ async function refreshMemoryExplorer(event) {
   state.memory.selection = null;
   state.memory.events = [];
   state.memory.episodes = [];
+  renderMemoryEvents([]);
+  renderMemoryEpisodes([]);
   if (!roomId) {
     state.memory.roomId = "";
     renderMemoryEvents([]);

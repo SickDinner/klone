@@ -38,6 +38,7 @@ class ClaimProposalTests(unittest.TestCase):
             {"source_refs": ["source:one"]},
             {"requested_status": "supported"},
             {"statement": ""},
+            {"requested_status": None},
         ):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 prepare_claim_proposal(**(valid | changes))

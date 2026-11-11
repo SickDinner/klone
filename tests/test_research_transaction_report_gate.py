@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 import tempfile
 from pathlib import Path
 from unittest import TestCase
@@ -41,7 +42,7 @@ class TransactionReportGateTests(TestCase):
                     principal="reviewer", resource_id="claim", report_version=1,
                     policy_version=1, expires_at=200, nonce="unique-nonce-234567",
                     key=key)))
-            with sqlite3.connect(db) as connection:
+            with closing(sqlite3.connect(db)) as connection:
                 count = connection.execute(
                     "SELECT COUNT(*) FROM research_grant_nonces").fetchone()[0]
             self.assertEqual(count, 1)

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import sqlite3
+from datetime import datetime, timezone
 from typing import Literal
 
 from .approval_policy import ApprovalProposal, advance_proposal
@@ -17,7 +18,7 @@ CREATE TABLE IF NOT EXISTS approval_proposals (
  target_version TEXT NOT NULL, patch_sha256 TEXT NOT NULL,
  state TEXT NOT NULL, approver_id TEXT
 );
-CREATE TABLE IF NOT EXISTS approval_events (
+CREATE TABLE IF NOT EXISTS approval_deadlines (\n proposal_id TEXT PRIMARY KEY REFERENCES approval_proposals(proposal_id),\n expires_at_utc TEXT NOT NULL\n);\nCREATE TABLE IF NOT EXISTS approval_events (
  event_id INTEGER PRIMARY KEY AUTOINCREMENT,
  proposal_id TEXT NOT NULL, actor_id TEXT NOT NULL,
  previous_state TEXT, next_state TEXT NOT NULL,
@@ -40,14 +41,14 @@ class ApprovalJournal:
         self.connection.execute("PRAGMA foreign_keys = ON")
         self.connection.executescript(SCHEMA)
 
-    def propose(self, proposal: ApprovalProposal, *, actor_id: str) -> ApprovalProposal:
+    def propose(self, proposal: ApprovalProposal, *, actor_id: str, expires_at: datetime | None = None) -> ApprovalProposal:
         if (not actor_id or actor_id != proposal.proposer_id or proposal.state != "proposed"
                 or proposal.approver_id is not None or not proposal.proposal_id.strip()
                 or not proposal.room_id.strip() or not proposal.target_version.strip()
                 or len(proposal.patch_sha256) != 64
                 or any(c not in "0123456789abcdef" for c in proposal.patch_sha256)):
             raise ValueError("invalid_proposal")
-        # Explicit transaction: sqlite3 connection context manager alone does
+        if expires_at is not None and (not isinstance(expires_at, datetime) or expires_at.tzinfo is None or expires_at.utcoffset() is None):\n            raise ValueError("timezone_aware_expiry_required")\n        # Explicit transaction: sqlite3 connection context manager alone does
         # not start a transaction when isolation_level=None (autocommit).
         self.connection.execute("BEGIN IMMEDIATE")
         try:
@@ -112,3 +113,9 @@ class ApprovalJournal:
             "WHERE proposal_id=? ORDER BY event_id", (proposal_id,),
         ).fetchall()
         return tuple(ApprovalEvent(*row) for row in rows)
+
+    def deadline(self, proposal_id: str) -> datetime | None:
+        row = self.connection.execute(
+            "SELECT expires_at_utc FROM approval_deadlines WHERE proposal_id=?", (proposal_id,),
+        ).fetchone()
+        return datetime.fromisoformat(row[0]) if row else None

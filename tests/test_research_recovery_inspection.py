@@ -1,5 +1,6 @@
 import sqlite3
 import tempfile
+from contextlib import closing
 from pathlib import Path
 from unittest import TestCase
 
@@ -26,7 +27,7 @@ class ResearchRecoveryInspectionTests(TestCase):
                                trace_id="t", dossier_id="d")
             journal.transition(run_id="legacy", state="completed",
                                trace_id="t", dossier_id="d")
-            with sqlite3.connect(db) as conn:
+            with closing(sqlite3.connect(db)) as conn, conn:
                 ResearchAuditOutbox.initialize(conn)
                 conn.execute("INSERT INTO research_audit_outbox "
                              "(event_id,run_id,trace_id,dossier_id,dossier_version) "

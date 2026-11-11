@@ -76,3 +76,39 @@ def verify_claim_proposal(proposal: ClaimProposal, *, memory) -> bool:
     if any(ref not in report.citations for ref in proposal.source_refs):
         raise ValueError("Proposal references absent from report")
     return True
+
+
+@dataclass(frozen=True)
+class ClaimReviewDecision:
+    proposal_id: str
+    decision: str
+    reviewer_id: str
+    reason: str
+
+
+def prepare_claim_review(
+    proposal: ClaimProposal, *, reviewer_id: str,
+    decision: str, reason: str,
+) -> ClaimReviewDecision:
+    """Describe a human review decision without granting any write permission.
+
+    Caller must authenticate reviewer identity and enforce approval policy.
+    This function is deliberately side-effect free and not an authorization.
+    """
+    if not isinstance(proposal, ClaimProposal):
+        raise ValueError("Expected claim proposal")
+    expected = prepare_claim_proposal(
+        trace_id=proposal.trace_id, report_version=proposal.report_version,
+        claim_id=proposal.claim_id, statement=proposal.statement,
+        source_refs=proposal.source_refs, requested_status=proposal.requested_status,
+        rationale=proposal.rationale,
+    )
+    if proposal != expected:
+        raise ValueError("Invalid proposal digest or content")
+    if not isinstance(reviewer_id, str) or not reviewer_id.strip() or len(reviewer_id) > 128:
+        raise ValueError("Invalid reviewer identifier")
+    if decision not in ("approve", "reject"):
+        raise ValueError("Invalid review decision")
+    if not isinstance(reason, str) or not reason.strip() or len(reason) > 2000:
+        raise ValueError("Review decision requires a reason")
+    return ClaimReviewDecision(proposal.proposal_id, decision, reviewer_id, reason)

@@ -27,6 +27,7 @@ def publish_trusted_research_claim(
     grant: SignedResearchGrant, principal: str, actor_role: str,
     policy_version: int, now: int, key: bytes, decision_reason: str,
     authenticate: Callable[[str, str], bool],
+    authorize_commit: Callable[[str, str, str], bool],
     runtime: HypervisorRuntime,
 ) -> CommitReceipt:
     """No state changes until authentication, policy and evidence checks pass.
@@ -35,15 +36,20 @@ def publish_trusted_research_claim(
     copied directly from request parameters. Current policy is rechecked by
     the caller if it may change concurrently with the SQLite transaction.
     """
-    if not callable(authenticate) or not isinstance(runtime, HypervisorRuntime):
+    if (not callable(authenticate) or not callable(authorize_commit)
+            or not isinstance(runtime, HypervisorRuntime)):
         raise PermissionError("Trusted authentication and policy required")
     if not authenticate(principal, actor_role):
         raise PermissionError("Principal authentication failed")
     route = runtime.plan(
-        room_id="public-room", actor_role=actor_role, permission="write",
+        room_id="public-room", actor_role=actor_role, permission="propose",
         trace_id=proposal.trace_id, classification_level="public")
     if route.decision != "allowed":
-        raise PermissionError("Hypervisor denied research publication")
+        raise PermissionError("Hypervisor denied research proposal")
+    # Public-room permits proposals, not writes. A separately privileged
+    # service must authorize the commit under current policy.
+    if not authorize_commit(principal, proposal.claim_id, actor_role):
+        raise PermissionError("Privileged commit authorization denied")
     preflight_publication(
         proposal=proposal, bundle=bundle, hypotheses=hypotheses,
         evidence=evidence, manifests=manifests, source_bytes=source_bytes)

@@ -43,6 +43,9 @@ class EvidenceLedgerTests(unittest.TestCase):
                 claim_id="c1", statement="Test claim",
                 source_refs=("source:one",))
             self.assertEqual(saved.revision, 1)
+            self.assertEqual(saved.report_trace_id, "trace")
+            self.assertEqual(saved.report_version, 1)
+            self.assertEqual(ledger.history("c1")[0].report_version, 1)
             with self.assertRaises(ValueError):
                 ledger.append_from_report(
                     memory=memory, trace_id="trace", version=1,

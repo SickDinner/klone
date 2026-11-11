@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime, timezone
 import unittest
 
 from klone.approval_policy import ApprovalProposal
@@ -39,6 +40,12 @@ class ApprovalJournalTests(unittest.TestCase):
             self.journal.transition("p1", "validated", actor_id="reviewer")
         self.assertEqual(self.journal.get("p1").state, "proposed")
         self.assertEqual(len(self.journal.events("p1")), 1)
+
+    def test_deadline_is_durable_and_utc(self):
+        expires = datetime(2026, 11, 11, 18, 0, tzinfo=timezone.utc)
+        proposal = ApprovalProposal("p3", "agent", "public_room", "v1", "c" * 64)
+        self.journal.propose(proposal, actor_id="agent", expires_at=expires)
+        self.assertEqual(self.journal.deadline("p3"), expires)
 
     def test_valid_approval_audited(self):
         self.journal.transition("p1", "validated", actor_id="reviewer")

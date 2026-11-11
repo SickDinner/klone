@@ -2158,28 +2158,11 @@ class DialogueCorpusService:
         api_key: str,
         payload: dict[str, Any],
     ) -> dict[str, Any]:
-        # S1 containment: clone chat has no trusted per-segment room/classification
-        # manifest. An API key alone cannot authorize external disclosure.
-        # Fail closed at the sole outbound transport sink until the guarded,
-        # authenticated manifest path is implemented and separately approved.
+        # S1 containment: chat payloads have no trusted per-segment
+        # classification/room manifest. API keys do not authorize egress.
+        # Keep this transport closed until the authenticated policy and
+        # final-byte validation are integrated and separately approved.
         raise ValueError("External model egress disabled pending classified manifest and approval.")
-        request = urllib_request.Request(
-            OPENAI_RESPONSES_URL,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        try:
-            with urllib_request.urlopen(request, timeout=90) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except urllib_error.HTTPError as error:
-            detail = error.read().decode("utf-8", errors="replace")
-            raise ValueError(f"OpenAI API error {error.code}: {detail}") from error
-        except urllib_error.URLError as error:
-            raise ValueError(f"OpenAI API request failed: {error.reason}") from error
 
     @staticmethod
     def _extract_openai_text(payload: dict[str, Any]) -> str:

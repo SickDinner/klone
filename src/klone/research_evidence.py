@@ -19,6 +19,8 @@ class EvidenceClaim:
     reason: str
     digest: str
     created_at: str
+    report_trace_id: str | None = None
+    report_version: int | None = None
 
 
 class EvidenceLedger:
@@ -45,10 +47,13 @@ class EvidenceLedger:
             statement TEXT NOT NULL, source_refs_json TEXT NOT NULL,
             status TEXT NOT NULL CHECK(status IN ('unverified','supported','contested','retracted')),
             reason TEXT NOT NULL, digest TEXT NOT NULL, created_at TEXT NOT NULL,
+            report_trace_id TEXT, report_version INTEGER,
             PRIMARY KEY (claim_id, revision))""")
 
     def append(self, *, claim_id: str, statement: str, source_refs: tuple[str, ...],
-               status: str = "unverified", reason: str = "") -> EvidenceClaim:
+               status: str = "unverified", reason: str = "",
+               report_trace_id: str | None = None,
+               report_version: int | None = None) -> EvidenceClaim:
         if not isinstance(claim_id, str) or not 1 <= len(claim_id) <= 128:
             raise ValueError("Invalid claim identifier")
         if not isinstance(statement, str) or not 1 <= len(statement) <= 4000:
@@ -60,6 +65,13 @@ class EvidenceLedger:
             raise ValueError("Invalid review status or reason")
         if status != "unverified" and (not source_refs or not reason.strip()):
             raise ValueError("Reviewed status requires sources and reason")
+        if (report_trace_id is None) != (report_version is None):
+            raise ValueError("Report trace and version must be provided together")
+        if report_trace_id is not None and (
+            not isinstance(report_trace_id, str) or not 1 <= len(report_trace_id) <= 128
+            or not isinstance(report_version, int) or report_version < 1
+        ):
+            raise ValueError("Invalid report provenance")
         timestamp = datetime.now(timezone.utc).isoformat()
         with closing(sqlite3.connect(self.database_path, timeout=10)) as connection:
             self._initialize(connection)
@@ -70,12 +82,12 @@ class EvidenceLedger:
                     (claim_id,)).fetchone()[0]
                 digest = self._digest(claim_id, revision, statement, source_refs, status, reason)
                 connection.execute("""INSERT INTO research_claim_revisions
-                    (claim_id, revision, statement, source_refs_json, status, reason, digest, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (claim_id, revision, statement, source_refs_json, status, reason, digest, created_at, report_trace_id, report_version)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (claim_id, revision, statement, json.dumps(source_refs), status, reason,
-                     digest, timestamp))
+                     digest, timestamp, report_trace_id, report_version))
         return EvidenceClaim(claim_id, revision, statement, source_refs,
-                             status, reason, digest, timestamp)
+                             status, reason, digest, timestamp, report_trace_id, report_version)
 
     def append_from_report(
         self, *, memory, trace_id: str, version: int, claim_id: str,
@@ -97,6 +109,7 @@ class EvidenceLedger:
         return self.append(
             claim_id=claim_id, statement=statement, source_refs=source_refs,
             status=status, reason=reason,
+            report_trace_id=trace_id, report_version=version,
         )
 
     def history(self, claim_id: str, *, limit: int = 100) -> tuple[EvidenceClaim, ...]:
@@ -107,7 +120,7 @@ class EvidenceLedger:
         with closing(sqlite3.connect(self.database_path, timeout=10)) as connection:
             self._initialize(connection)
             rows = connection.execute("""SELECT claim_id, revision, statement, source_refs_json,
-                status, reason, digest, created_at FROM research_claim_revisions
+                status, reason, digest, created_at, report_trace_id, report_version FROM research_claim_revisions
                 WHERE claim_id = ? ORDER BY revision DESC LIMIT ?""", (claim_id, limit)).fetchall()
         records = []
         for row in rows:
@@ -116,5 +129,5 @@ class EvidenceLedger:
             if expected != row[6]:
                 raise ValueError("Claim revision integrity check failed")
             records.append(EvidenceClaim(row[0], row[1], row[2], refs,
-                                         row[4], row[5], row[6], row[7]))
+                                         row[4], row[5], row[6], row[7], row[8], row[9]))
         return tuple(records)

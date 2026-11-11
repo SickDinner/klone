@@ -19,6 +19,27 @@ class ApprovalJournalTests(unittest.TestCase):
         self.assertEqual(self.journal.get("p1"), self.proposal)
         self.assertEqual([event.next_state for event in self.journal.events("p1")], ["proposed"])
 
+    def test_audit_insert_failure_rolls_back_proposal(self):
+        self.connection.execute(
+            "CREATE TRIGGER reject_second_audit BEFORE INSERT ON approval_events "
+            "WHEN NEW.proposal_id='p2' BEGIN SELECT RAISE(ABORT,'audit_unavailable'); END"
+        )
+        second = ApprovalProposal("p2", "agent", "public_room", "v1", "b" * 64)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.journal.propose(second, actor_id="agent")
+        self.assertIsNone(self.journal.get("p2"))
+        self.assertEqual(self.journal.events("p2"), ())
+
+    def test_transition_audit_failure_rolls_back_state(self):
+        self.connection.execute(
+            "CREATE TRIGGER reject_validated_audit BEFORE INSERT ON approval_events "
+            "WHEN NEW.next_state='validated' BEGIN SELECT RAISE(ABORT,'audit_unavailable'); END"
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.journal.transition("p1", "validated", actor_id="reviewer")
+        self.assertEqual(self.journal.get("p1").state, "proposed")
+        self.assertEqual(len(self.journal.events("p1")), 1)
+
     def test_valid_approval_audited(self):
         self.journal.transition("p1", "validated", actor_id="reviewer")
         self.journal.transition("p1", "awaiting_approval", actor_id="reviewer")

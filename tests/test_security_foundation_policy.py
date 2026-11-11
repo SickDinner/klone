@@ -5,6 +5,8 @@ import unittest
 
 from klone.egress_policy import EgressRequest, PayloadPart, evaluate_egress, verify_serialized_payload
 from klone.approval_policy import ApprovalProposal, advance_proposal
+from klone.dialogue import DialogueCorpusService
+from unittest.mock import patch
 
 
 class EgressPolicyTests(unittest.TestCase):
@@ -47,6 +49,18 @@ class EgressPolicyTests(unittest.TestCase):
 
     def test_manifest_hash_deterministic(self):
         self.assertEqual(evaluate_egress(self.request()).manifest_sha256, evaluate_egress(self.request()).manifest_sha256)
+
+
+class ChatTransportContainmentTests(unittest.TestCase):
+    def test_api_key_cannot_enable_unguarded_http_transport(self):
+        service = DialogueCorpusService()
+        with patch("klone.dialogue.urllib_request.urlopen") as network:
+            with self.assertRaisesRegex(ValueError, "egress disabled"):
+                service._call_openai_responses_api(
+                    api_key="synthetic-test-key",
+                    payload={"model": "mock", "input": "synthetic"},
+                )
+            network.assert_not_called()
 
 
 class ApprovalPolicyTests(unittest.TestCase):

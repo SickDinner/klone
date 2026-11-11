@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Callable
+import sqlite3
 
 from .genomics_hypotheses import Hypothesis, EvidenceItem
 from .hypervisor_runtime import HypervisorRuntime
@@ -29,6 +30,7 @@ def publish_trusted_research_claim(
     authenticate: Callable[[str, str], bool],
     authorize_commit: Callable[[str, str, str], bool],
     runtime: HypervisorRuntime,
+    commit_policy_guard: Callable[[sqlite3.Connection, str, str, int], None] | None = None,
 ) -> CommitReceipt:
     """No state changes until authentication, policy and evidence checks pass.
 
@@ -50,10 +52,16 @@ def publish_trusted_research_claim(
     # service must authorize the commit under current policy.
     if not authorize_commit(principal, proposal.claim_id, actor_role):
         raise PermissionError("Privileged commit authorization denied")
+    if commit_policy_guard is not None and not callable(commit_policy_guard):
+        raise PermissionError("Invalid transaction policy guard")
     preflight_publication(
         proposal=proposal, bundle=bundle, hypotheses=hypotheses,
         evidence=evidence, manifests=manifests, source_bytes=source_bytes)
     return commit_claim_with_grant(
         database_path=database_path, proposal=proposal, grant=grant,
         principal=principal, policy_version=policy_version, now=now,
-        key=key, decision_reason=decision_reason)
+        key=key, decision_reason=decision_reason,
+        transaction_guard=(
+            None if commit_policy_guard is None else
+            lambda connection: commit_policy_guard(
+                connection, principal, proposal.claim_id, policy_version)))

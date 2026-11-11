@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS approval_deadlines (
  proposal_id TEXT PRIMARY KEY REFERENCES approval_proposals(proposal_id),
  expires_at_utc TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS approval_events (
+CREATE TABLE IF NOT EXISTS approval_revocations (\n proposal_id TEXT PRIMARY KEY REFERENCES approval_proposals(proposal_id),\n revoked_by TEXT NOT NULL, revoked_at_utc TEXT NOT NULL, reason TEXT NOT NULL\n);\nCREATE TABLE IF NOT EXISTS approval_events (
  event_id INTEGER PRIMARY KEY AUTOINCREMENT,
  proposal_id TEXT NOT NULL, actor_id TEXT NOT NULL,
  previous_state TEXT, next_state TEXT NOT NULL,
@@ -130,3 +130,34 @@ class ApprovalJournal:
             "SELECT expires_at_utc FROM approval_deadlines WHERE proposal_id=?", (proposal_id,),
         ).fetchone()
         return datetime.fromisoformat(row[0]) if row else None
+
+    def revoke(self, proposal_id: str, *, actor_id: str, now: datetime, reason: str) -> None:
+        """Persist a permanent revocation and its audit event atomically."""
+        if (not isinstance(actor_id, str) or not actor_id.strip()
+                or not isinstance(reason, str) or not reason.strip() or len(reason) > 256
+                or not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None):
+            raise ValueError("invalid_revocation")
+        self.connection.execute("BEGIN IMMEDIATE")
+        try:
+            proposal = self.get(proposal_id)
+            if proposal is None:
+                raise ValueError("unknown_proposal")
+            self.connection.execute(
+                "INSERT INTO approval_revocations(proposal_id,revoked_by,revoked_at_utc,reason) "
+                "VALUES (?,?,?,?)",
+                (proposal_id, actor_id, now.astimezone(timezone.utc).isoformat(), reason),
+            )
+            self.connection.execute(
+                "INSERT INTO approval_events(proposal_id,actor_id,previous_state,next_state) "
+                "VALUES (?,?,?,?)",
+                (proposal_id, actor_id, proposal.state, "revoked"),
+            )
+            self.connection.commit()
+        except BaseException:
+            self.connection.rollback()
+            raise
+
+    def is_revoked(self, proposal_id: str) -> bool:
+        return self.connection.execute(
+            "SELECT 1 FROM approval_revocations WHERE proposal_id=?", (proposal_id,),
+        ).fetchone() is not None

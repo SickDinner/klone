@@ -52,3 +52,27 @@ def prepare_claim_proposal(
     proposal_id = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return ClaimProposal(proposal_id, trace_id, report_version, claim_id,
                          statement, source_refs, requested_status, rationale)
+
+
+def verify_claim_proposal(proposal: ClaimProposal, *, memory) -> bool:
+    """Validate immutable proposal identity and public report provenance.
+
+    No authorization, approval, or mutation occurs. A privileged caller must
+    authenticate the reviewer and audit its decision separately.
+    """
+    if not isinstance(proposal, ClaimProposal):
+        raise ValueError("Expected claim proposal")
+    expected = prepare_claim_proposal(
+        trace_id=proposal.trace_id, report_version=proposal.report_version,
+        claim_id=proposal.claim_id, statement=proposal.statement,
+        source_refs=proposal.source_refs, requested_status=proposal.requested_status,
+        rationale=proposal.rationale,
+    )
+    if proposal.proposal_id != expected.proposal_id:
+        raise ValueError("Proposal content digest mismatch")
+    report = memory.read(trace_id=proposal.trace_id, version=proposal.report_version)
+    if report is None or report.room_id != "public-room":
+        raise ValueError("Verified public report not found")
+    if any(ref not in report.citations for ref in proposal.source_refs):
+        raise ValueError("Proposal references absent from report")
+    return True

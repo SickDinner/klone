@@ -5,10 +5,12 @@ import html
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 import secrets
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlsplit
 
 from .research_workflow import run_local_research
 from .research_memory import ResearchMemory
+from .research_compare import compare_research_versions
+from .research_critic import critique_comparison
 
 
 def serve_research_ui(
@@ -70,6 +72,37 @@ button{padding:.6rem 1rem}</style><h1>KLONE Research Preview</h1>
             if not self._trusted_request():
                 self._send(403, "Forbidden")
                 return
+            if self.path.startswith("/compare?"):
+                try:
+                    params = parse_qs(urlsplit(self.path).query)
+                    if set(params) != {"trace", "old", "new"} or any(
+                        len(value) != 1 for value in params.values()
+                    ):
+                        raise ValueError("Invalid parameters")
+                    trace = params["trace"][0]
+                    if not 1 <= len(trace) <= 128:
+                        raise ValueError("Invalid trace")
+                    old, new = int(params["old"][0]), int(params["new"][0])
+                    comparison = compare_research_versions(
+                        ResearchMemory(database_path), trace_id=trace,
+                        old_version=old, new_version=new)
+                    critique = critique_comparison(comparison)
+                    section = ("<h2>Versiovertailu</h2><p>" +
+                        html.escape(critique.status) + "</p><ul>" +
+                        "".join("<li>" + html.escape(item) + "</li>"
+                                for item in critique.observations + critique.limitations) +
+                        "</ul><h3>Lisätyt viitteet</h3><pre>" +
+                        html.escape("\\n".join(comparison.added_citations)) +
+                        "</pre><h3>Poistetut viitteet</h3><pre>" +
+                        html.escape("\\n".join(comparison.removed_citations)) +
+                        "</pre><h3>Tekstimuutokset</h3><pre>" +
+                        html.escape(comparison.unified_diff) + "</pre>")
+                    self._send(200, self._page(section))
+                except (ValueError, OverflowError):
+                    self._send(400, self._page("<p>Virheellinen vertailupyyntö.</p>"))
+                except Exception:
+                    self._send(500, self._page("<p>Vertailu epäonnistui.</p>"))
+                return
             if self.path == "/history":
                 try:
                     reports = ResearchMemory(database_path).list_reports(limit=25)
@@ -80,7 +113,7 @@ button{padding:.6rem 1rem}</style><h1>KLONE Research Preview</h1>
                         "<pre>" + html.escape(item.markdown) + "</pre></li>"
                         for item in reports
                     )
-                    self._send(200, self._page("<h2>Tallennetut raportit</h2><ol>" + rows + "</ol>"))
+                    self._send(200, self._page("<h2>Tallennetut raportit</h2><ol>" + rows + "</ol><h3>Vertaa versioita</h3><form action=\"/compare\" method=\"get\"><label>Jäljitystunniste<input name=\"trace\" required maxlength=\"128\"></label><label>Vanha versio<input name=\"old\" type=\"number\" min=\"1\" required></label><label>Uusi versio<input name=\"new\" type=\"number\" min=\"2\" required></label><button>Vertaa</button></form>"))
                 except Exception:
                     self._send(500, self._page("<p>Historiaa ei voitu lukea.</p>"))
                 return

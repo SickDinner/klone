@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import sqlite3
@@ -54,14 +55,14 @@ class AtomicLedgerTests(unittest.TestCase):
             original = proposal()
             ledger.commit_verified(proposal=original, reviewer_id="r",
                                    decision_reason="x", authorized=True)
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 db.execute("""CREATE TRIGGER deny_audit BEFORE INSERT ON atomic_claim_audit
                               BEGIN SELECT RAISE(ABORT, 'audit blocked'); END""")
             next_proposal = proposal("claim-2")
             with self.assertRaises(sqlite3.IntegrityError):
                 ledger.commit_verified(proposal=next_proposal, reviewer_id="r",
                                        decision_reason="x", authorized=True)
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 self.assertEqual(db.execute(
                     "SELECT COUNT(*) FROM atomic_claims WHERE claim_id='claim-2'"
                 ).fetchone()[0], 0)
@@ -72,7 +73,7 @@ class AtomicLedgerTests(unittest.TestCase):
             ledger = AtomicResearchLedger(path)
             receipt = ledger.commit_verified(proposal=proposal(), reviewer_id="r",
                                              decision_reason="x", authorized=True)
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 db.execute("UPDATE atomic_claim_audit SET reviewer_id='attacker'")
             with self.assertRaises(ValueError):
                 ledger.verify(receipt.proposal_id)

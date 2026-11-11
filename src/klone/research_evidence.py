@@ -77,6 +77,28 @@ class EvidenceLedger:
         return EvidenceClaim(claim_id, revision, statement, source_refs,
                              status, reason, digest, timestamp)
 
+    def append_from_report(
+        self, *, memory, trace_id: str, version: int, claim_id: str,
+        statement: str, source_refs: tuple[str, ...],
+        status: str = "unverified", reason: str = "",
+    ) -> EvidenceClaim:
+        """Bind a claim revision to verified citations of a stored public report.
+
+        This validates provenance membership only; not whether sources prove a claim.
+        Caller must authorize report and ledger access and record an audit event.
+        """
+        if not isinstance(version, int) or version < 1:
+            raise ValueError("Invalid report version")
+        report = memory.read(trace_id=trace_id, version=version)
+        if report is None or report.room_id != "public-room":
+            raise ValueError("Public report version not found")
+        if not source_refs or any(ref not in report.citations for ref in source_refs):
+            raise ValueError("Claim references must belong to the stored report")
+        return self.append(
+            claim_id=claim_id, statement=statement, source_refs=source_refs,
+            status=status, reason=reason,
+        )
+
     def history(self, claim_id: str, *, limit: int = 100) -> tuple[EvidenceClaim, ...]:
         if not isinstance(claim_id, str) or not 1 <= len(claim_id) <= 128:
             raise ValueError("Invalid claim identifier")

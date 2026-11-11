@@ -33,3 +33,7 @@ The initial S1 containment run failed because two legacy clone-chat tests expect
 ## S2 offline approval access prototype
 
 `approval_access.py` adds a deny-by-default **offline adapter** for caller-verified actor identity, room isolation, owner-only human approval and timezone-aware expiry checks. Seven synthetic tests cover the permitted path and denial cases. **This is not an identity provider**: the `authenticated` field is caller-supplied and must never be accepted from a client, agent or model. The deadline map is in-memory and is lost on restart; absent expiry denies activation. No real mutation, external egress, Constitution write, public route or service registration is enabled. Production activation requires durable deadline storage, authenticated session provenance, revocation and atomic audit policy enforcement.
+
+## S2 durable expiry upgrade
+
+Approval proposal creation now optionally stores its timezone-aware expiry in the isolated SQLite journal within the same transaction as proposal and initial audit event. The access adapter reads expiry from SQLite, not its bootstrap dictionary; creating a new adapter does not discard an existing deadline. The journal still has **no real identity attestation**, no authenticated API, no automatic expiry sweep, and no target mutation. The `expires_at` dictionary is only a bootstrap input for creating new proposals. The earlier description of volatile-only deadlines is superseded by this section.

@@ -72,6 +72,23 @@ class EvidenceLedgerTests(unittest.TestCase):
                     source_refs=["source:one"])
             self.assertEqual(ledger.history("c1"), ())
 
+    def test_report_provenance_tampering_detected(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "reports.sqlite"
+            memory = ResearchMemory(path)
+            memory.save(ResearchReport("trace", "public-room", "Q", "# Evidence",
+                                       ("source:one",)))
+            ledger = EvidenceLedger(path)
+            ledger.append_from_report(
+                memory=memory, trace_id="trace", version=1,
+                claim_id="c1", statement="Claim", source_refs=("source:one",))
+            with closing(sqlite3.connect(path)) as connection:
+                with connection:
+                    connection.execute(
+                        "UPDATE research_claim_revisions SET report_version = 99 WHERE claim_id = 'c1'")
+            with self.assertRaises(ValueError):
+                ledger.history("c1")
+
     def test_tampering_detected(self):
         with TemporaryDirectory() as directory:
             path = Path(directory) / "claims.sqlite"

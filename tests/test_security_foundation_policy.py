@@ -52,6 +52,13 @@ class EgressPolicyTests(unittest.TestCase):
 
 
 class ChatTransportContainmentTests(unittest.TestCase):
+    def test_chat_reply_has_no_remote_renderer_call_path(self):
+        from pathlib import Path
+        source = (Path(__file__).resolve().parents[1] / "src" / "klone" / "dialogue.py").read_text(encoding="utf-8")
+        chat_reply = source.split("    def chat_reply(", 1)[1].split("    def _analyze_facebook_export(", 1)[0]
+        self.assertNotIn("self._render_chat_reply_with_openai(", chat_reply)
+        self.assertIn("self._render_local_chat_reply(", chat_reply)
+
     def test_api_key_cannot_enable_unguarded_http_transport(self):
         service = DialogueCorpusService()
         with patch.object(service, "_render_chat_reply_with_openai") as network:

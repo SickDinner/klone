@@ -1,7 +1,12 @@
 from __future__ import annotations
 import unittest
+from dataclasses import replace
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from klone.research_proposals import prepare_claim_proposal
+from klone.research_proposals import prepare_claim_proposal, verify_claim_proposal
+from klone.research_memory import ResearchMemory
+from klone.research_report import ResearchReport
 
 
 class ClaimProposalTests(unittest.TestCase):
@@ -28,6 +33,23 @@ class ClaimProposalTests(unittest.TestCase):
             with self.subTest(changes=changes):
                 candidate = prepare_claim_proposal(**(base | changes))
                 self.assertNotEqual(candidate.proposal_id, original.proposal_id)
+
+    def test_verify_proposal_against_stored_public_report(self):
+        with TemporaryDirectory() as directory:
+            memory = ResearchMemory(Path(directory) / "reports.sqlite")
+            memory.save(ResearchReport("trace", "public-room", "Question",
+                                       "# Report", ("source:one",)))
+            proposal = prepare_claim_proposal(
+                trace_id="trace", report_version=1, claim_id="c1",
+                statement="Claim", source_refs=("source:one",))
+            self.assertTrue(verify_claim_proposal(proposal, memory=memory))
+            with self.assertRaises(ValueError):
+                verify_claim_proposal(replace(proposal, statement="Tampered"), memory=memory)
+            absent = prepare_claim_proposal(
+                trace_id="trace", report_version=1, claim_id="c1",
+                statement="Claim", source_refs=("source:absent",))
+            with self.assertRaises(ValueError):
+                verify_claim_proposal(absent, memory=memory)
 
     def test_rejects_bad_inputs(self):
         valid = dict(trace_id="trace", report_version=1, claim_id="c1",

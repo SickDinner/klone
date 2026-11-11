@@ -35,7 +35,8 @@ class ApprovalPreflight:
 
 def check_approval_preflight(
     *, proposal: ClaimProposal, bundle: ReviewBundle,
-    reviewer: TrustedReviewer, memory,\n    hypotheses: tuple[Hypothesis, ...], evidence: tuple[EvidenceItem, ...],
+    reviewer: TrustedReviewer, memory,
+    hypotheses: tuple[Hypothesis, ...], evidence: tuple[EvidenceItem, ...],
 ) -> ApprovalPreflight:
     """Validate integrity and deny unless all external authority gates are met.
 
@@ -56,7 +57,10 @@ def check_approval_preflight(
     if reviewer.authorized_for_public_evidence is not True:
         return ApprovalPreflight(False, "public_evidence_permission_denied", proposal.proposal_id)
     verify_claim_proposal(proposal, memory=memory)
-    expected_bundle = prepare_review_bundle(\n        proposal=proposal, hypotheses=hypotheses, evidence=evidence)\n    if (bundle != expected_bundle\n        or bundle.proposal_id != proposal.proposal_id
+    expected_bundle = prepare_review_bundle(
+        proposal=proposal, hypotheses=hypotheses, evidence=evidence)
+    if (bundle != expected_bundle
+        or bundle.proposal_id != proposal.proposal_id
         or bundle.report_trace_id != proposal.trace_id
         or bundle.report_version != proposal.report_version
         or bundle.disposition != "human_review_required"

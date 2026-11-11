@@ -50,6 +50,11 @@ class ClaimProposalTests(unittest.TestCase):
                 statement="Claim", source_refs=("source:absent",))
             with self.assertRaises(ValueError):
                 verify_claim_proposal(absent, memory=memory)
+            missing_version = prepare_claim_proposal(
+                trace_id="trace", report_version=2, claim_id="c1",
+                statement="Claim", source_refs=("source:one",))
+            with self.assertRaises(ValueError):
+                verify_claim_proposal(missing_version, memory=memory)
 
     def test_rejects_bad_inputs(self):
         valid = dict(trace_id="trace", report_version=1, claim_id="c1",

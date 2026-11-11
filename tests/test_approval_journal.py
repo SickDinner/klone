@@ -83,7 +83,7 @@ class ApprovalJournalTests(unittest.TestCase):
             self.connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
             ).fetchall(),
-            [("approval_proposals",), ("approval_deadlines",), ("approval_events",)],
+            [("approval_proposals",), ("approval_deadlines",), ("approval_revocations",), ("approval_events",)],
         )
 
 

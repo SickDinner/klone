@@ -63,6 +63,11 @@ class ApprovalJournal:
                 (proposal.proposal_id, proposal.proposer_id, proposal.room_id,
                  proposal.target_version, proposal.patch_sha256, proposal.state, None),
             )
+            if expires_at is not None:
+                self.connection.execute(
+                    "INSERT INTO approval_deadlines(proposal_id,expires_at_utc) VALUES (?,?)",
+                    (proposal.proposal_id, expires_at.astimezone(timezone.utc).isoformat()),
+                )
             self.connection.execute(
                 "INSERT INTO approval_events(proposal_id,actor_id,previous_state,next_state) VALUES (?,?,?,?)",
                 (proposal.proposal_id, actor_id, None, "proposed"),

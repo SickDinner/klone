@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .research_anchor_registry import SqliteAnchorRegistry
+from .research_atomic_ledger import AtomicResearchLedger
 from .research_checkpoint import make_checkpoint, verify_checkpoint, LedgerCheckpoint
 from .research_checkpoint_anchor import (
     advance_anchor, CheckpointAnchor, check_anchored_checkpoint,
@@ -30,6 +31,10 @@ def publish_checkpoint(
     A concurrent ledger write between snapshot and registry CAS may make the
     checkpoint immediately stale; readers must verify against live ledger.
     """
+    problems = AtomicResearchLedger(ledger_path).reconcile()
+    if problems:
+        raise ValueError("Cannot publish inconsistent research ledger: "
+                         + ", ".join(problems))
     previous = registry.read()
     checkpoint = make_checkpoint(database_path=ledger_path, key=key)
     if not verify_checkpoint(

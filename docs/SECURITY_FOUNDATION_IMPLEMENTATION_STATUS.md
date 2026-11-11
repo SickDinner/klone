@@ -25,3 +25,7 @@ The initial S1 containment run failed because two legacy clone-chat tests expect
 ## I1 bounded ingest fingerprint prototype
 
 `ingest_fingerprint.py` reads binary streams in at most 64 KiB chunks, enforces a 512 MiB absolute object cap (lower per-call limits supported), and emits SHA-256/size/chunk count without retaining file contents. `plan_ingest` makes a read-only duplicate/candidate decision using a caller-supplied hash set. **The caller must derive that set from the authorized room only**. This is not a persistent index, resumable ingestion pipeline, authorization service, OCR, transcription, or vectorization. All associated tests use synthetic bytes.
+
+## S2 offline SQLite approval journal
+
+`approval_journal.py` adds an isolated SQLite-backed proposal/event journal with `BEGIN IMMEDIATE` transactional transitions and audit-event inserts in the same transaction. It is **not wired into the application's repository or public API** and cannot mutate Constitution parameters. The journal is deliberately append-only for events but the database is not tamper-evident against a privileged SQLite administrator. A caller-supplied `human_approved=True` is **not trustworthy authentication**: a future authenticated service must derive this server-side from verified human identity, capability and room policy. The current prototype does not enforce time expiry, roles, policy revocation, cryptographic signatures, audit log immutability or crash recovery beyond SQLite transactions. Never expose this object directly to an LLM or network client.

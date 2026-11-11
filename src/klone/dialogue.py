@@ -282,7 +282,7 @@ class DialogueCorpusService:
                 "Analyzes local conversation exports without writing them into memory rows.",
                 "Current detectors support extracted Facebook/Messenger exports and ChatGPT conversation export JSON files.",
                 "Bounded question answering stays aggregate-only and does not expose raw semantic retrieval.",
-                "Clone chat can optionally use OpenAI Responses API when OPENAI_API_KEY is configured, but falls back to bounded local replies.",
+                "External OpenAI rendering is disabled pending classified egress approval; clone chat uses bounded local replies.",
             ],
         )
 
@@ -490,9 +490,9 @@ class DialogueCorpusService:
             key_source=key_source,
             preferred_model=self._preferred_openai_model(),
             note=(
-                "OpenAI API key configured for clone chat. GPT-5.4 can now be used in auto mode."
+                "OpenAI API key stored. External model rendering remains disabled pending classified egress approval."
                 if persisted
-                else "OpenAI API key configured for this server process."
+                else "OpenAI API key stored for this process. External rendering remains disabled."
             ),
         )
 

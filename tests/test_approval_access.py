@@ -59,12 +59,27 @@ class ApprovalAccessTests(unittest.TestCase):
 
     def test_missing_expiry_denied(self):
         self._awaiting()
+        # The in-memory bootstrap map cannot revoke a persisted deadline.
         self.access.expires_at.clear()
+        self.assertIsNotNone(self.journal.deadline("p1"))
+        no_expiry = ApprovalProposal("p2", "supervisor-1", "public_room", "v1", "b" * 64)
+        self.access.propose(no_expiry, actor=self.supervisor)
+        self.access.transition("p2", "validated", actor=self.supervisor, now=self.now)
+        self.access.transition("p2", "awaiting_approval", actor=self.supervisor, now=self.now)
         with self.assertRaisesRegex(PermissionError, "approval_expiry_missing"):
             self.access.transition(
-                "p1", "approved", actor=self.owner, now=self.now,
-                current_target_version="v1", current_patch_sha256="a" * 64,
+                "p2", "approved", actor=self.owner, now=self.now,
+                current_target_version="v1", current_patch_sha256="b" * 64,
             )
+
+    def test_expiry_survives_new_adapter(self):
+        self._awaiting()
+        restarted = ApprovalAccess(self.journal)
+        result = restarted.transition(
+            "p1", "approved", actor=self.owner, now=self.now,
+            current_target_version="v1", current_patch_sha256="a" * 64,
+        )
+        self.assertEqual(result.state, "approved")
 
     def test_naive_time_denied(self):
         with self.assertRaisesRegex(ValueError, "timezone_aware_time_required"):

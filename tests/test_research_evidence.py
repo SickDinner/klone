@@ -52,6 +52,26 @@ class EvidenceLedgerTests(unittest.TestCase):
                     claim_id="c2", statement="Unsupported reference",
                     source_refs=("source:other",))
 
+    def test_invalid_report_version_and_reference_type(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "reports.sqlite"
+            memory = ResearchMemory(path)
+            memory.save(ResearchReport("trace", "public-room", "Q", "# Evidence",
+                                       ("source:one",)))
+            ledger = EvidenceLedger(path)
+            for bad_version in (True, 0, -1):
+                with self.subTest(version=bad_version), self.assertRaises(ValueError):
+                    ledger.append_from_report(
+                        memory=memory, trace_id="trace", version=bad_version,
+                        claim_id="c1", statement="Claim",
+                        source_refs=("source:one",))
+            with self.assertRaises(ValueError):
+                ledger.append_from_report(
+                    memory=memory, trace_id="trace", version=1,
+                    claim_id="c1", statement="Claim",
+                    source_refs=["source:one"])
+            self.assertEqual(ledger.history("c1"), ())
+
     def test_tampering_detected(self):
         with TemporaryDirectory() as directory:
             path = Path(directory) / "claims.sqlite"

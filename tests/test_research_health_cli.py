@@ -24,6 +24,7 @@ class ResearchHealthCLITests(TestCase):
                 DossierStore(db)._initialize(conn)
             self.assertEqual(research_health(database_path=db)["status"], "ok")
             self.assertEqual(research_health(database_path=db)["issue_codes"], [])
+            self.assertEqual(research_health(database_path=db)["operator_guidance"], [])
             self.assertEqual(research_health(database_path=db)["severity"], "none")
             self.assertEqual(research_health(database_path=db)["delivery_status"], "clear")
             journal.transition(run_id="stuck", state="started",
@@ -33,6 +34,10 @@ class ResearchHealthCLITests(TestCase):
             self.assertEqual(result["status"], "attention")
             self.assertEqual(result["stuck_runs"], 1)
             self.assertEqual(result["issue_codes"], ["stuck_runs"])
+            self.assertEqual(len(result["operator_guidance"]), 1)
+            self.assertEqual(result["operator_guidance"][0]["code"], "stuck_runs")
+            self.assertEqual(result["operator_guidance"][0]["count"], 1)
+            self.assertNotIn("dossier", str(result["operator_guidance"][0]["code"]))
             self.assertEqual(result["severity"], "warning")
             self.assertEqual(db.stat().st_mtime_ns, before)
 
@@ -100,3 +105,6 @@ class ResearchHealthCLITests(TestCase):
             self.assertEqual(result["status"], "attention")
             self.assertEqual(result["severity"], "critical")
             self.assertIn("completed_without_outbox", result["issue_codes"])
+            self.assertIn("completed_without_outbox", [
+                item["code"] for item in result["operator_guidance"]
+            ])

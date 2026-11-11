@@ -2564,13 +2564,35 @@ async function runDepthMapFromSelectedAsset() {
   );
 }
 
+let memorySelectionGeneration = 0;
+let memoryListGeneration = 0;
+let memoryAnswerGeneration = 0;
+let memoryContextGeneration = 0;
+
+function clearMemorySelectionPanels() {
+  state.memory.detail = null;
+  state.memory.provenanceDetail = null;
+  state.memory.contextPayload = null;
+  state.memory.answer = null;
+  renderMemoryDetail(null, null);
+  renderMemoryProvenance(null, null);
+  renderMemoryContext(null);
+  renderMemoryAnswer(null);
+}
+
+function invalidateMemorySelection() {
+  memorySelectionGeneration += 1;
+  memoryAnswerGeneration += 1;
+  memoryContextGeneration += 1;
+  clearMemorySelectionPanels();
+}
+
 async function loadMemorySelection(kind, id, options = {}) {
   const { refreshAnswer = true } = options;
-  const roomId = state.memory.roomId || document.querySelector("#memory-room-filter").value;
-  if (!roomId) {
-    return;
-  }
-
+  const roomId = document.querySelector("#memory-room-filter").value;
+  if (!roomId || roomId !== state.memory.roomId) return;
+  invalidateMemorySelection();
+  const generation = memorySelectionGeneration;
   state.memory.selection = { kind, id: String(id) };
   renderMemoryEvents(state.memory.events);
   renderMemoryEpisodes(state.memory.episodes);
@@ -2584,11 +2606,11 @@ async function loadMemorySelection(kind, id, options = {}) {
 
   const detailUrl =
     kind === "event"
-      ? `/api/memory/events/${id}?room_id=${encodeURIComponent(roomId)}`
+      ? `/api/memory/events/${encodeURIComponent(id)}?room_id=${encodeURIComponent(roomId)}`
       : `/api/memory/episodes/${encodeURIComponent(id)}?room_id=${encodeURIComponent(roomId)}`;
   const provenanceUrl =
     kind === "event"
-      ? `/api/memory/events/${id}/provenance?room_id=${encodeURIComponent(roomId)}`
+      ? `/api/memory/events/${encodeURIComponent(id)}/provenance?room_id=${encodeURIComponent(roomId)}`
       : `/api/memory/episodes/${encodeURIComponent(id)}/provenance?room_id=${encodeURIComponent(roomId)}`;
 
   try {
@@ -2597,6 +2619,7 @@ async function loadMemorySelection(kind, id, options = {}) {
       fetchJson(provenanceUrl),
       fetchJson(`/api/memory/context/payload?${scopeParams.toString()}`),
     ]);
+    if (generation !== memorySelectionGeneration || roomId !== state.memory.roomId) return;
     state.memory.detail = detail;
     state.memory.provenanceDetail = provenanceDetail;
     state.memory.contextPayload = contextPayload;
@@ -2607,9 +2630,9 @@ async function loadMemorySelection(kind, id, options = {}) {
       await refreshMemoryAnswer();
     }
   } catch (error) {
-    document.querySelector("#memory-detail").className = "detail-card empty-state";
-    document.querySelector("#memory-detail").textContent = error.message;
-    renderMemoryProvenance(null, null);
+    if (generation !== memorySelectionGeneration) return;
+    clearMemorySelectionPanels();
+    document.querySelector("#memory-detail").textContent = "Memory selection unavailable.";
   }
 }
 
@@ -2622,32 +2645,42 @@ async function refreshMemoryAnswer(event) {
     renderMemoryAnswer(null);
     return;
   }
+  const generation = ++memoryAnswerGeneration;
+  const selectionGeneration = memorySelectionGeneration;
   const questionInput = document.querySelector("#memory-question");
   const question = questionInput.value.trim() || "Summarize this context";
   params.set("question", question);
   try {
     const answer = await fetchJson(`/api/memory/context/answer?${params.toString()}`);
+    if (generation !== memoryAnswerGeneration || selectionGeneration !== memorySelectionGeneration) return;
     state.memory.answer = answer;
     renderMemoryAnswer(answer);
   } catch (error) {
-    document.querySelector("#memory-answer").className = "detail-card empty-state";
-    document.querySelector("#memory-answer").textContent = error.message;
+    if (generation !== memoryAnswerGeneration || selectionGeneration !== memorySelectionGeneration) return;
+    state.memory.answer = null;
+    renderMemoryAnswer(null);
+    document.querySelector("#memory-answer").textContent = "Memory answer unavailable.";
   }
 }
 
 async function refreshMemoryContextOnly() {
   const params = selectedMemoryScopeParams();
+  const generation = ++memoryContextGeneration;
+  const selectionGeneration = memorySelectionGeneration;
   if (!params) {
     renderMemoryContext(null);
     return;
   }
   try {
     const payload = await fetchJson(`/api/memory/context/payload?${params.toString()}`);
+    if (generation !== memoryContextGeneration || selectionGeneration !== memorySelectionGeneration) return;
     state.memory.contextPayload = payload;
     renderMemoryContext(payload);
   } catch (error) {
-    document.querySelector("#memory-context").className = "detail-card empty-state";
-    document.querySelector("#memory-context").textContent = error.message;
+    if (generation !== memoryContextGeneration || selectionGeneration !== memorySelectionGeneration) return;
+    state.memory.contextPayload = null;
+    renderMemoryContext(null);
+    document.querySelector("#memory-context").textContent = "Memory context unavailable.";
   }
 }
 
@@ -2677,7 +2710,13 @@ async function refreshMemoryExplorer(event) {
   }
 
   const roomId = document.querySelector("#memory-room-filter").value;
+  const generation = ++memoryListGeneration;
+  invalidateMemorySelection();
+  state.memory.selection = null;
+  state.memory.events = [];
+  state.memory.episodes = [];
   if (!roomId) {
+    state.memory.roomId = "";
     renderMemoryEvents([]);
     renderMemoryEpisodes([]);
     renderMemoryDetail(null, null);
@@ -2729,6 +2768,7 @@ async function refreshMemoryExplorer(event) {
       fetchJson(`/api/memory/events?${eventParams.toString()}`),
       fetchJson(`/api/memory/episodes?${episodeParams.toString()}`),
     ]);
+    if (generation !== memoryListGeneration || roomId !== state.memory.roomId) return;
     state.memory.events = events;
     state.memory.episodes = episodes;
     renderMemoryEvents(events);
@@ -2749,9 +2789,14 @@ async function refreshMemoryExplorer(event) {
       renderMemoryAnswer(null);
     }
   } catch (error) {
-    document.querySelector("#memory-detail").className = "detail-card empty-state";
-    document.querySelector("#memory-detail").textContent = error.message;
-    renderMemoryProvenance(null, null);
+    if (generation !== memoryListGeneration) return;
+    state.memory.events = [];
+    state.memory.episodes = [];
+    state.memory.selection = null;
+    invalidateMemorySelection();
+    renderMemoryEvents([]);
+    renderMemoryEpisodes([]);
+    document.querySelector("#memory-detail").textContent = "Memory list unavailable.";
   }
 }
 

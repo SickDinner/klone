@@ -47,7 +47,10 @@ class ApprovalJournal:
                 or len(proposal.patch_sha256) != 64
                 or any(c not in "0123456789abcdef" for c in proposal.patch_sha256)):
             raise ValueError("invalid_proposal")
-        with self.connection:
+        # Explicit transaction: sqlite3 connection context manager alone does
+        # not start a transaction when isolation_level=None (autocommit).
+        self.connection.execute("BEGIN IMMEDIATE")
+        try:
             self.connection.execute(
                 "INSERT INTO approval_proposals VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (proposal.proposal_id, proposal.proposer_id, proposal.room_id,
@@ -57,6 +60,10 @@ class ApprovalJournal:
                 "INSERT INTO approval_events(proposal_id,actor_id,previous_state,next_state) VALUES (?,?,?,?)",
                 (proposal.proposal_id, actor_id, None, "proposed"),
             )
+            self.connection.commit()
+        except BaseException:
+            self.connection.rollback()
+            raise
         return proposal
 
     def get(self, proposal_id: str) -> ApprovalProposal | None:

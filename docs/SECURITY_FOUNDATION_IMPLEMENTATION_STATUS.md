@@ -37,3 +37,7 @@ The initial S1 containment run failed because two legacy clone-chat tests expect
 ## S2 durable expiry upgrade
 
 Approval proposal creation now optionally stores its timezone-aware expiry in the isolated SQLite journal within the same transaction as proposal and initial audit event. The access adapter reads expiry from SQLite, not its bootstrap dictionary; creating a new adapter does not discard an existing deadline. The journal still has **no real identity attestation**, no authenticated API, no automatic expiry sweep, and no target mutation. The `expires_at` dictionary is only a bootstrap input for creating new proposals. The earlier description of volatile-only deadlines is superseded by this section.
+
+## S2 signed actor assertion verification
+
+`approval_identity.py` now verifies short-lived HMAC-SHA256 actor assertions using a server-injected secret of at least 32 bytes. It checks signature in constant time, room, role, identity, issued-at and a maximum five-minute lifetime; it then constructs the `VerifiedActor` context used by the offline access adapter. This **does not authenticate a human by itself**: only an independently authenticated, trusted server issuer may mint these assertions. There is currently no issuer, API middleware, session binding, token revocation, nonce replay registry, key rotation or production secret management. Never expose a signing key to a client or model. Tests use a synthetic fixed secret. No mutation activation is wired.

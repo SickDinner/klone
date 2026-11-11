@@ -7,8 +7,6 @@ import json
 import os
 from pathlib import Path
 import re
-from urllib import error as urllib_error
-from urllib import request as urllib_request
 from typing import Any
 
 from .schemas import (
@@ -522,36 +520,20 @@ class DialogueCorpusService:
         model: str | None = None
         system_notes: list[str] = []
 
-        if requested_mode == "gpt-5.4" and not openai_configured:
-            system_notes.append(
-                "GPT-5.4 rendering was requested, but OPENAI_API_KEY is not configured, so the room fell back to bounded local mode."
-            )
-
+        # The chat API has no authenticated, classified outbound payload manifest.
+        # Never construct a remote prompt or attempt transport in this phase.
         if requested_mode in {"auto", "gpt-5.4"} and openai_configured:
-            model = self._preferred_openai_model()
-            try:
-                reply_text = self._render_chat_reply_with_openai(
-                    message=normalized_message,
-                    bounded_answer=bounded_answer,
-                    history=history or [],
-                    owner_name=owner_name or bounded_answer.owner_name,
-                    model=model,
-                )
-                backend_mode = "openai_gpt_5_4"
-                llm_call_performed = True
-            except ValueError as error:
-                system_notes.append(f"OpenAI rendering failed, so the room fell back to bounded local mode: {error}")
-                reply_text = self._render_local_chat_reply(
-                    message=normalized_message,
-                    bounded_answer=bounded_answer,
-                )
-                backend_mode = "bounded_fallback"
-                llm_call_performed = False
-        else:
-            reply_text = self._render_local_chat_reply(
-                message=normalized_message,
-                bounded_answer=bounded_answer,
+            system_notes.append(
+                "External model rendering is disabled until classified egress is approved; using bounded local mode."
             )
+        elif requested_mode == "gpt-5.4":
+            system_notes.append(
+                "External model rendering is disabled; using bounded local mode."
+            )
+        reply_text = self._render_local_chat_reply(
+            message=normalized_message,
+            bounded_answer=bounded_answer,
+        )
 
         reply = CloneChatMessageRecord(
             role="assistant",

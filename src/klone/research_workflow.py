@@ -12,6 +12,7 @@ from .hypervisor_dispatch import DispatchDenied
 from .research_agent import ResearchAgent
 from .research_files import load_research_texts
 from .research_report import ResearchReport, build_research_report
+from .research_memory import ResearchMemory
 from .repository import KloneRepository
 
 
@@ -19,12 +20,14 @@ from .repository import KloneRepository
 class ResearchRun:
     report: ResearchReport
     audit_event_count: int
+    report_version: int | None = None
 
 
 def run_local_research(
     *, root: Path, relative_paths: Sequence[str], question: str,
     room_id: str, actor_role: str, trace_id: str,
     classification_level: str, database_path: Path,
+    persist_report: bool = False,
 ) -> ResearchRun:
     """Synchronous local-only research with persistent SQLite audit.
 
@@ -72,6 +75,18 @@ def run_local_research(
     except Exception:
         audit("failed", decision, "research.report")
         raise
+    report_version = None
+    if persist_report:
+        if room_id != "public-room" or classification_level != "public":
+            raise DispatchDenied("Research persistence is public-room only")
+        audit("delegated", decision, "research.memory")
+        try:
+            saved = ResearchMemory(database_path).save(report)
+            report_version = saved.version
+            audit("completed", decision, "research.memory")
+        except Exception:
+            audit("failed", decision, "research.memory")
+            raise
     events = repository.list_audit_events(
         room_id=room_id, target_type="service_seam", limit=100,
     )
@@ -80,4 +95,4 @@ def run_local_research(
         if event.get("metadata_json") and
         json.loads(event["metadata_json"]).get("trace_id") == trace_id
     )
-    return ResearchRun(report=report, audit_event_count=count)
+    return ResearchRun(report=report, audit_event_count=count, report_version=report_version)

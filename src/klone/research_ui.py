@@ -8,6 +8,7 @@ import secrets
 from urllib.parse import parse_qs
 
 from .research_workflow import run_local_research
+from .research_memory import ResearchMemory
 
 
 def serve_research_ui(
@@ -63,11 +64,25 @@ button{padding:.6rem 1rem}</style><h1>KLONE Research Preview</h1>
                 + f'<input type="hidden" name="token" value="{html.escape(token, quote=True)}">'
                 + '<label>Tiedosto (suhteellinen polku)<input name="file" required></label>'
                 + '<label>Tutkimuskysymys<textarea name="question" required maxlength="500"></textarea></label>'
-                + '<button type="submit">Tutki</button></form>' + content + "</html>")
+                + '<button type="submit">Tutki</button></form><p><a href="/history">Raporttihistoria</a></p>' + content + "</html>")
 
         def do_GET(self) -> None:
             if not self._trusted_request():
                 self._send(403, "Forbidden")
+                return
+            if self.path == "/history":
+                try:
+                    reports = ResearchMemory(database_path).list_reports(limit=25)
+                    rows = "".join(
+                        "<li><strong>" + html.escape(item.title) +
+                        "</strong> | versio " + str(item.version) +
+                        " | " + html.escape(item.created_at) +
+                        "<pre>" + html.escape(item.markdown) + "</pre></li>"
+                        for item in reports
+                    )
+                    self._send(200, self._page("<h2>Tallennetut raportit</h2><ol>" + rows + "</ol>"))
+                except Exception:
+                    self._send(500, self._page("<p>Historiaa ei voitu lukea.</p>"))
                 return
             if self.path != "/":
                 self._send(404, "Not found")
@@ -97,6 +112,7 @@ button{padding:.6rem 1rem}</style><h1>KLONE Research Preview</h1>
                     question=fields["question"][0], room_id="public-room",
                     actor_role="owner", trace_id=secrets.token_hex(16),
                     classification_level="public", database_path=database_path,
+                    persist_report=True,
                 )
                 self._send(200, self._page("<h2>Raportti</h2><pre>" +
                     html.escape(outcome.report.markdown) + "</pre>"))

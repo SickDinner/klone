@@ -6,6 +6,7 @@ import unittest
 
 from klone.hypervisor_dispatch import DispatchDenied
 from klone.repository import KloneRepository
+from klone.research_memory import ResearchMemory
 from klone.research_workflow import run_local_research
 
 
@@ -25,6 +26,17 @@ class ResearchWorkflowTests(unittest.TestCase):
                     database_path=self.db)
         args.update(overrides)
         return run_local_research(**args)
+
+    def test_persist_report_roundtrip_and_audit(self):
+        outcome = self.run_research(persist_report=True)
+        self.assertEqual(outcome.report_version, 1)
+        saved = ResearchMemory(self.db).read(trace_id="research-e2e")
+        self.assertIsNotNone(saved)
+        self.assertEqual(saved.markdown, outcome.report.markdown)
+        self.assertEqual(outcome.audit_event_count, 7)
+        events = KloneRepository(self.db).list_audit_events(
+            room_id="public-room", target_type="service_seam", limit=100)
+        self.assertIn("research.memory", [event["target_id"] for event in events])
 
     def test_real_sqlite_audit_and_cited_report(self):
         outcome = self.run_research()

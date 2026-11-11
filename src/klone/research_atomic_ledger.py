@@ -118,3 +118,56 @@ class AtomicResearchLedger:
         if digest != row[11]:
             raise ValueError("Audit integrity failure")
         return True
+
+
+    def reconcile(self) -> tuple[str, ...]:
+        """Read-only full-ledger integrity scan; fail closed on anomalies.
+
+        Detects orphan claims, orphan audit rows, revision gaps, modified
+        proposal content and modified audit digests. A local administrator
+        who can rewrite the entire SQLite database remains out of scope.
+        """
+        with closing(sqlite3.connect(self.database_path)) as db:
+            claims = db.execute("""SELECT claim_id,revision,proposal_id,trace_id,
+                report_version,statement,source_refs_json,status,rationale
+                FROM atomic_claims ORDER BY claim_id,revision""").fetchall()
+            audits = db.execute("""SELECT proposal_id,claim_id,revision,
+                reviewer_id,decision_reason,audit_digest,created_at
+                FROM atomic_claim_audit ORDER BY proposal_id""").fetchall()
+        problems: list[str] = []
+        audit_map = {row[0]: row for row in audits}
+        claim_ids = {row[2] for row in claims}
+        for row in claims:
+            claim_id, revision, proposal_id = row[:3]
+            try:
+                expected = prepare_claim_proposal(
+                    trace_id=row[3], report_version=row[4], claim_id=claim_id,
+                    statement=row[5], source_refs=tuple(json.loads(row[6])),
+                    requested_status=row[7], rationale=row[8])
+                if expected.proposal_id != proposal_id:
+                    problems.append(f"claim_digest:{proposal_id}")
+            except (ValueError, TypeError, KeyError):
+                problems.append(f"claim_invalid:{proposal_id}")
+            audit = audit_map.get(proposal_id)
+            if audit is None:
+                problems.append(f"missing_audit:{proposal_id}")
+            else:
+                if audit[1:3] != (claim_id, revision):
+                    problems.append(f"audit_binding:{proposal_id}")
+                payload = [proposal_id, claim_id, revision,
+                           audit[3], audit[4], audit[6]]
+                digest = hashlib.sha256(json.dumps(
+                    payload, ensure_ascii=False, separators=(",", ":")
+                ).encode("utf-8")).hexdigest()
+                if digest != audit[5]:
+                    problems.append(f"audit_digest:{proposal_id}")
+        for audit in audits:
+            if audit[0] not in claim_ids:
+                problems.append(f"orphan_audit:{audit[0]}")
+        revisions: dict[str, list[int]] = {}
+        for claim in claims:
+            revisions.setdefault(claim[0], []).append(claim[1])
+        for claim_id, numbers in revisions.items():
+            if numbers != list(range(1, len(numbers) + 1)):
+                problems.append(f"revision_gap:{claim_id}")
+        return tuple(sorted(problems))

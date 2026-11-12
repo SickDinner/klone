@@ -199,9 +199,9 @@ def _analyze_image_file(path: Path) -> dict[str, Any]:
         _resampling_lanczos(),
     )
 
-    gray_pixels = list(grayscale.getdata())
-    edge_pixels = list(edge_map.getdata())
-    rgb_pixels = list(sampled.getdata())
+    gray_pixels = list(grayscale.get_flattened_data())
+    edge_pixels = list(edge_map.get_flattened_data())
+    rgb_pixels = list(sampled.get_flattened_data())
     total_pixels = max(len(gray_pixels), 1)
 
     brightness_stat = ImageStat.Stat(grayscale)
@@ -308,9 +308,9 @@ def _render_depth_map_from_image(image, *, source_name: str) -> dict[str, Any]:
     )
     saturation_map = preview.convert("HSV").getchannel("S").filter(ImageFilter.GaussianBlur(radius=1.2))
 
-    blurred_pixels = list(blurred_luma.getdata())
-    edge_pixels = list(edge_map.getdata())
-    saturation_pixels = list(saturation_map.getdata())
+    blurred_pixels = list(blurred_luma.get_flattened_data())
+    edge_pixels = list(edge_map.get_flattened_data())
+    saturation_pixels = list(saturation_map.get_flattened_data())
 
     depth_pixels: list[int] = []
     width_denominator = max(preview_width_px - 1, 1)
@@ -355,7 +355,7 @@ def _render_depth_map_from_image(image, *, source_name: str) -> dict[str, Any]:
         white="#f1f0da",
     )
 
-    normalized_depth_pixels = list(depth_map.getdata())
+    normalized_depth_pixels = list(depth_map.get_flattened_data())
     depth_mean, near_ratio, far_ratio = _normalized_depth_statistics(normalized_depth_pixels)
 
     return {

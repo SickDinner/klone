@@ -45,7 +45,10 @@ def evaluate_quality_gate(*, repository: str, commit: str,
         "android": android,
         "matrix": matrix,
         "ready_for_manual_review": bool(
-            android is not None and matrix["all_checks_passed"]
+            android is not None and all(
+                states[name] == "passed" for name in DOMAINS
+                if name != "deployment"
+            )
         ),
         "deployment_approval": False,
     }

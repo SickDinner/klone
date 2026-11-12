@@ -34,7 +34,7 @@ def inspect(directory: Path) -> dict:
                 if type(manifest.get("schema_version")) is not int:
                     raise ValueError("invalid manifest version")
                 validate_run(manifest)
-            except (ValueError, KeyError, TypeError, UnicodeError, RecursionError) as exc:
+            except (ValueError, KeyError, TypeError, AttributeError, UnicodeError, RecursionError) as exc:
                 errors.append("run.json:invalid:" + type(exc).__name__)
                 manifest = None
     return {"schema_version": 1, "run_name": directory.name,

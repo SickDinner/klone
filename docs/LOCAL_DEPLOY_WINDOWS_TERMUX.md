@@ -81,3 +81,21 @@ The probe uses a five-second timeout, limits the response to 64 KiB, and
 requires a JSON `status: ok` plus nonempty `app_version`. It only connects
 to `127.0.0.1`. This is a basic liveness/identity check, not authentication,
 end-to-end security attestation or a test of remote reachability.
+
+## Android-first secure profile (recommended)
+
+Instead of calling the generic launcher directly, use `bash tools/start-termux.sh`.
+This wrapper sets `KLONE_ENV=local`, disables owner debug mode, applies a
+private-file umask and places its SQLite data under
+`~/.local/share/klone/`. This directory is separate from the repository.
+It **does not migrate** a previous `./data/` database. If an older Termux
+installation has data, identify and back it up before choosing which database
+to use; do not overwrite or silently merge databases.
+
+In another Termux session, run `python tools/local_deploy.py healthcheck`.
+For a consistent local database backup, run `python tools/backup_local.py`
+with the same `KLONE_DATA_DIR` and `KLONE_DB_PATH` settings as the running
+profile, or stop KLONE and set these explicitly. Backups stay in the private
+`backups/` subdirectory. Do not upload backups to GitHub.
+
+No Android device has been remotely accessed or configured by these commits.

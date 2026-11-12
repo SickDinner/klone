@@ -8,6 +8,7 @@ from .cognition_core import CognitionCore, compare_ablations
 from .api import get_repository
 from .repository import KloneRepository
 from .cognition_memory import probe_memory
+from .cognition_planner import DEFAULT_ACTIONS, plan
 
 router = APIRouter(prefix="/api/cognition", tags=["experimental cognition"])
 
@@ -68,3 +69,18 @@ def memory_probe(
 ) -> dict:
     """Authorized bounded summary; no raw memory content is returned."""
     return probe_memory(repository, room_id=room_id, limit=limit).public_summary()
+
+
+class PlanRequest(BaseModel):
+    energy: float = Field(default=1.0, ge=0, le=1, allow_inf_nan=False)
+    uncertainty: float = Field(default=0.5, ge=0, le=1, allow_inf_nan=False)
+    horizon: int = Field(default=3, ge=1, le=5)
+    risk_weight: float = Field(default=1.0, ge=0, le=10, allow_inf_nan=False)
+
+
+@router.post("/plan")
+def planning_experiment(request: PlanRequest) -> dict:
+    """Pure planning only: returns suggestions, never executes actions."""
+    return plan(energy=request.energy, uncertainty=request.uncertainty,
+                actions=DEFAULT_ACTIONS, horizon=request.horizon,
+                risk_weight=request.risk_weight)

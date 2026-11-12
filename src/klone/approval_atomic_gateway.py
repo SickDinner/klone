@@ -29,9 +29,12 @@ class AtomicApprovalGateway:
 
     def _run(self, key_id: str, assertion: SignedActorAssertion, now: datetime, action):
         actor = self.keyring.verify(key_id, assertion, now=now)
+        return self._run_verified(key_id, assertion.payload, assertion.signature_hex, actor, action)
+
+    def _run_verified(self, key_id: str, payload: bytes, signature_hex: str, actor, action):
         digest = sha256(
-            key_id.encode("utf-8") + b"\x00" + assertion.payload
-            + bytes.fromhex(assertion.signature_hex)
+            key_id.encode("utf-8") + b"\x00" + payload
+            + bytes.fromhex(signature_hex)
         ).hexdigest()
         self.connection.execute("BEGIN IMMEDIATE")
         try:

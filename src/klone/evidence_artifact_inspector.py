@@ -6,41 +6,35 @@ import hashlib
 import json
 from pathlib import Path
 
-from klone.evidence_network import STAGES, MAX_LOG, _read_json, validate_run
+from klone.evidence_io import (EvidenceIOError, checked_path, json_object,
+                               output_path, read_bounded, write_report)
+from klone.evidence_network import STAGES, MAX_LOG, validate_run
 
 MAX_MANIFEST = 65536
 
 
 def inspect(directory: Path) -> dict:
-    if directory.is_symlink() or not directory.is_dir():
-        raise ValueError("unsafe or missing run directory")
-    artifacts = {}
-    errors = []
-    manifest = None
+    directory = checked_path(directory, directory=True)
+    artifacts, errors, manifest = {}, [], None
     for name in ("run.json", *(stage + ".log" for stage in STAGES)):
-        path = directory / name
-        if path.is_symlink():
-            artifacts[name] = {"state": "symlink_rejected"}
-            errors.append(name + ":symlink")
-            continue
-        if not path.is_file():
-            artifacts[name] = {"state": "missing"}
-            errors.append(name + ":missing")
-            continue
         limit = MAX_MANIFEST if name == "run.json" else MAX_LOG
-        size = path.stat().st_size
-        if size > limit:
-            artifacts[name] = {"state": "oversized", "bytes": size}
-            errors.append(name + ":oversized")
+        try:
+            raw = read_bounded(directory / name, limit)
+        except EvidenceIOError as exc:
+            artifacts[name] = {"state": exc.code}
+            if exc.size is not None:
+                artifacts[name]["bytes"] = exc.size
+            errors.append(name + ":" + ("symlink" if exc.code == "symlink_rejected" else exc.code))
             continue
-        raw = path.read_bytes()
         artifacts[name] = {"state": "present", "bytes": len(raw),
                            "sha256": hashlib.sha256(raw).hexdigest()}
         if name == "run.json":
             try:
-                manifest = _read_json(path, MAX_MANIFEST)
+                manifest = json_object(raw)
+                if type(manifest.get("schema_version")) is not int:
+                    raise ValueError("invalid manifest version")
                 validate_run(manifest)
-            except (ValueError, KeyError, TypeError, OSError, json.JSONDecodeError) as exc:
+            except (ValueError, KeyError, TypeError, UnicodeError, RecursionError) as exc:
                 errors.append("run.json:invalid:" + type(exc).__name__)
                 manifest = None
     return {"schema_version": 1, "run_name": directory.name,
@@ -59,16 +53,13 @@ def main(argv=None) -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        root = args.runs_root.resolve(strict=True)
+        root = checked_path(args.runs_root, directory=True)
+        output_path(args.output, root)
         items = [inspect(path) for path in sorted(root.iterdir())
                  if path.is_dir() and not path.is_symlink()]
-        if args.output.is_symlink():
-            raise ValueError("symlink output rejected")
-        args.output.parent.mkdir(parents=True, exist_ok=True)
         result = {"schema_version": 1, "runs": items,
                   "origin_authenticated": False, "deployment_approval": False}
-        args.output.write_text(json.dumps(result, sort_keys=True, indent=2) + "\n",
-                               encoding="utf-8")
+        write_report(args.output, json.dumps(result, sort_keys=True, indent=2) + "\n", root)
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
     print(json.dumps({"runs": len(items), "valid_manifests": sum(

@@ -83,6 +83,7 @@ class HypervisorRuntimeContractTests(unittest.TestCase):
                 all(capability.read_only for capability in public_v1),
                 msg="The current public /v1 seam must remain read-only.",
             )
+
     def test_core_control_plane_seams_remain_explicit(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repository = KloneRepository(Path(tempdir) / "hypervisor_contract_seams.sqlite")
@@ -96,7 +97,6 @@ class HypervisorRuntimeContractTests(unittest.TestCase):
                 [],
                 msg=f"Hypervisor routing depends on missing core seams: {missing}",
             )
-
 
 
 if __name__ == "__main__":

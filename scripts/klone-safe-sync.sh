@@ -27,8 +27,12 @@ fi
 if [[ ! -e "$TEST_ROOT/.venv" ]]; then
   ln -s "$ROOT/.venv" "$TEST_ROOT/.venv"
 fi
+EXCLUDE="$(git -C "$TEST_ROOT" rev-parse --git-path info/exclude)"
+if ! grep -qxF "/.venv/" "$EXCLUDE" 2>/dev/null; then
+  printf "\\n/.venv/\\n" >> "$EXCLUDE"
+fi
 if [[ -n "$(git -C "$TEST_ROOT" status --porcelain)" ]]; then
-  echo "Test worktree dirty after setup; add local venv to worktree exclude manually" >&2
+  echo "Test worktree dirty after setup; refusing to run" >&2
   exit 2
 fi
 RUN_DIR="$RUN_BASE/sync-$(date +%Y%m%d-%H%M%S)-${TARGET:0:12}"

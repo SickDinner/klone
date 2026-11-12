@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
 import html
 import json
 from pathlib import Path
 
 from klone.evidence_status import inspect
+from klone.evidence_network import REQUIRED
 
 
 def collect(root: Path) -> list[dict]:
@@ -28,6 +28,29 @@ def collect(root: Path) -> list[dict]:
     return runs
 
 
+
+
+def compare_history(runs: list[dict]) -> list[dict]:
+    """Compare consecutive run statuses; names are ordering hints, not proof of time."""
+    changes = []
+    for previous, current in zip(runs, runs[1:]):
+        before = previous["stage_statuses"]
+        after = current["stage_statuses"]
+        regressions = [name for name in REQUIRED
+                       if before.get(name) == "passed" and after.get(name) != "passed"]
+        recoveries = [name for name in REQUIRED
+                      if before.get(name) != "passed" and after.get(name) == "passed"]
+        changes.append({
+            "from_run": previous["run_name"], "to_run": current["run_name"],
+            "from_commit": previous["commit"], "to_commit": current["commit"],
+            "regressed_stages": regressions, "recovered_stages": recoveries,
+            "integrity_changed": previous["integrity_ok"] != current["integrity_ok"],
+            "comparable": previous["integrity_ok"] and current["integrity_ok"],
+            "manual_review_required": True,
+            "note": "Directory order is not causal or chronological proof.",
+        })
+    return changes
+
 def render(runs: list[dict]) -> str:
     rows = []
     for run in runs:
@@ -43,6 +66,14 @@ def render(runs: list[dict]) -> str:
                     "</td>" for value in cells) + "</tr>")
     headings = ["Run", "Commit", "Integrity", "Required tests", "Stages",
                 "Errors", "Decision"]
+    diff_rows = []
+    for change in compare_history(runs):
+        values = [change["from_run"], change["to_run"],
+                  ", ".join(change["regressed_stages"]) or "none",
+                  ", ".join(change["recovered_stages"]) or "none",
+                  "yes" if change["comparable"] else "NO"]
+        diff_rows.append("<tr>" + "".join("<td>" + html.escape(str(value)) +
+                         "</td>" for value in values) + "</tr>")
     return ("""<!doctype html><html lang="fi"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KLONE Evidence Observatory</title>
@@ -54,7 +85,9 @@ small{color:#9ca3af}</style></head><body><h1>KLONE Evidence Observatory</h1>
 <table><thead><tr>""" +
             "".join("<th>" + html.escape(x) + "</th>" for x in headings) +
             "</tr></thead><tbody>" + "".join(rows) +
-            "</tbody></table><p><small>Reports describe local file integrity only.</small></p>"
+            "</tbody></table><h2>Adjacent run comparisons</h2><p>Directory ordering is not proof of time or causality.</p>" +
+            "<table><thead><tr><th>From</th><th>To</th><th>Regressed</th><th>Recovered</th><th>Comparable</th></tr></thead><tbody>" +
+            "".join(diff_rows) + "</tbody></table><p><small>Reports describe local file integrity only.</small></p>"
             "</body></html>")
 
 
@@ -72,7 +105,7 @@ def main(argv=None) -> int:
     args.html_output.write_text(render(runs), encoding="utf-8")
     if args.json_output is not None:
         args.json_output.parent.mkdir(parents=True, exist_ok=True)
-        args.json_output.write_text(json.dumps(runs, sort_keys=True, indent=2) + "\n",
+        args.json_output.write_text(json.dumps({"runs": runs, "comparisons": compare_history(runs)}, sort_keys=True, indent=2) + "\n",
                                     encoding="utf-8")
     print(json.dumps({"runs": len(runs), "html": str(args.html_output),
                       "blocked": sum(x["decision"] == "blocked" for x in runs)}))

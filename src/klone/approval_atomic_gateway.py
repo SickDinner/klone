@@ -14,6 +14,7 @@ from .approval_identity import SignedActorAssertion
 from .approval_keyring import ApprovalKeyring
 from .approval_policy import ApprovalProposal
 from .approval_session import SessionAssertion
+from .approval_session_revocation import SessionRevocationRegistry
 
 
 class AtomicApprovalGateway:
@@ -23,6 +24,7 @@ class AtomicApprovalGateway:
         self.connection = access.journal.connection
         if self.connection.isolation_level is not None:
             raise ValueError("autocommit_connection_required")
+        self.session_revocations = SessionRevocationRegistry(self.connection)
         self.connection.execute(
             "CREATE TABLE IF NOT EXISTS approval_atomic_replay ("
             "assertion_sha256 TEXT PRIMARY KEY)"
@@ -32,13 +34,15 @@ class AtomicApprovalGateway:
         actor = self.keyring.verify(key_id, assertion, now=now)
         return self._run_verified(key_id, assertion.payload, assertion.signature_hex, actor, action)
 
-    def _run_verified(self, key_id: str, payload: bytes, signature_hex: str, actor, action):
+    def _run_verified(self, key_id: str, payload: bytes, signature_hex: str, actor, action, *, session_id: str | None = None):
         digest = sha256(
             key_id.encode("utf-8") + b"\x00" + payload
             + bytes.fromhex(signature_hex)
         ).hexdigest()
         self.connection.execute("BEGIN IMMEDIATE")
         try:
+            if session_id is not None:
+                self.session_revocations.require_active(session_id)
             self.connection.execute(
                 "INSERT INTO approval_atomic_replay(assertion_sha256) VALUES (?)",
                 (digest,),
@@ -95,6 +99,7 @@ class AtomicApprovalGateway:
         return self._run_verified(
             assertion.key_id, assertion.payload, assertion.signature_hex, actor,
             lambda verified: self.access.propose(proposal, actor=verified),
+            session_id=expected_session_id,
         )
 
     def session_transition(
@@ -113,6 +118,7 @@ class AtomicApprovalGateway:
                 current_target_version=current_target_version,
                 current_patch_sha256=current_patch_sha256,
             ),
+            session_id=expected_session_id,
         )
 
     def session_revoke(
@@ -127,4 +133,5 @@ class AtomicApprovalGateway:
             lambda verified: self.access.revoke(
                 proposal_id, actor=verified, now=now, reason=reason,
             ),
+            session_id=expected_session_id,
         )

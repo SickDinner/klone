@@ -47,6 +47,17 @@ class TermuxBridgeTests(unittest.TestCase):
         run.assert_called_once_with("status")
         self.assertEqual(len([x for x in calls if x[0] == "POST"]), 1)
 
+    def test_result_summary_and_token_redaction(self):
+        with patch.dict("os.environ", {"KLONE_GITHUB_TOKEN": "super-secret-token"}):
+            message = bridge.format_result("tests", {
+                "exit_code": 0,
+                "output": "super-secret-token\\nRan 531 tests in 34.257s\\n\\nOK (skipped=1)",
+            })
+        self.assertIn("Tests: 531 in 34.257s; OK (skipped=1)", message)
+        self.assertIn("[REDACTED]", message)
+        self.assertNotIn("super-secret-token", message)
+        self.assertIn("Exit code: 0", message)
+
     def test_state_file_is_json_and_persists(self):
         with tempfile.TemporaryDirectory() as folder:
             with patch.object(bridge, "STATE", Path(folder) / "state.json"):

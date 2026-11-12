@@ -1355,7 +1355,7 @@ class WorldMemoryDepthService:
             preview.save(preview_path)
 
             raw16 = Image.new("I;16", preview.size)
-            raw_values = array("H", (int(pixel) * 257 for pixel in preview.getdata()))
+            raw_values = array("H", (int(pixel) * 257 for pixel in preview.get_flattened_data()))
             raw16.frombytes(raw_values.tobytes())
             raw16.save(raw_path)
             return rgb.width, rgb.height

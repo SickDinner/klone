@@ -42,6 +42,18 @@ class HypervisorAuditAdapterTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.adapter("surprise", self.route, "MemoryFacade")
 
+    def test_unrecognized_event_does_not_write_audit_record(self):
+        with self.assertRaises(ValueError):
+            self.adapter("unexpected_event", self.route, "MemoryFacade")
+        self.assertEqual(self.service.calls, [])
+
+    def test_audit_records_do_not_include_raw_route_payload(self):
+        self.adapter("delegated", self.route, "MemoryFacade")
+        record = self.service.calls[0]
+        self.assertNotIn("payload", record)
+        self.assertNotIn("evidence_text", record["metadata"])
+        self.assertNotIn("raw_content", record["metadata"])
+
     def test_public_output_policy_allowed(self):
         self.assertEqual(authorize_hypervisor_raw_output("public"), "allowed")
 

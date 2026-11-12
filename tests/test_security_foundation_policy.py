@@ -47,6 +47,25 @@ class EgressPolicyTests(unittest.TestCase):
     def test_empty_manifest_denied(self):
         self.assertEqual(evaluate_egress(replace(self.request(), parts=())).reason_code, "invalid_manifest")
 
+    def test_denied_egress_is_deterministic_and_never_permitted(self):
+        for classification, source_room in (
+            ("public_knowledge", "public_room"),
+            ("sensitive_cognition", "public_room"),
+            ("restricted_bio", "public_room"),
+            ("public_knowledge", "sealed_room"),
+        ):
+            with self.subTest(classification=classification, room=source_room):
+                request = self.request(classification, source_room)
+                first = evaluate_egress(request)
+                second = evaluate_egress(request)
+                self.assertEqual(first, second)
+                self.assertFalse(first.permitted)
+
+    def test_approval_required_does_not_grant_transport(self):
+        decision = evaluate_egress(self.request("personal_knowledge"))
+        self.assertEqual(decision.decision, "require_approval")
+        self.assertFalse(decision.permitted)
+
     def test_manifest_hash_deterministic(self):
         self.assertEqual(evaluate_egress(self.request()).manifest_sha256, evaluate_egress(self.request()).manifest_sha256)
 

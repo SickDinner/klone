@@ -44,6 +44,20 @@ class EvidenceDashboardTests(unittest.TestCase):
         ])
         self.assertEqual(comparison["review_state"], "manual_review_required")
 
+    def test_html_report_escapes_untrusted_environment_names(self):
+        import importlib.util
+        module_path = Path(__file__).resolve().parents[1] / "tools" / "test_evidence_dashboard.py"
+        spec = importlib.util.spec_from_file_location("evidence_html", module_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.ledger.append(record(self.old, "github_actions", "success", "<script>alert(1)</script>", "old"))
+        self.ledger.append(record(self.new, "github_actions", "failure", "<script>alert(1)</script>", "new"))
+        html = module.render(summarize(self.ledger, self.new),
+                             compare_commits(self.ledger, self.old, self.new))
+        self.assertIn("&lt;script&gt;", html)
+        self.assertNotIn("<script>", html)
+        self.assertIn("success_to_failure", html)
+
     def test_missing_device_evidence_never_counts_as_approval(self):
         self.ledger.append(record(self.new, "github_actions", "success", "linux", "ci-1"))
         summary = summarize(self.ledger, self.new)

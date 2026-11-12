@@ -14,22 +14,19 @@ import json
 from pathlib import Path
 import re
 
-SHA = re.compile(r"^[0-9a-f]{40}$")
-HEX = re.compile(r"^[0-9a-f]{64}$")
+from klone.evidence_io import json_object, read_bounded
+from klone.evidence_network import SHA, HEX, canonical
 
-
-def canonical(value: dict) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"),
-                      ensure_ascii=False, allow_nan=False).encode("utf-8")
+MAX_JSON = 131072
 
 
 def _crypto():
     try:
-        from cryptography.exceptions import InvalidSignature
+        from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
     except ImportError as exc:
         raise RuntimeError("Install optional dependency: pip install cryptography") from exc
-    return InvalidSignature, Ed25519PublicKey
+    return InvalidSignature, Ed25519PublicKey, UnsupportedAlgorithm
 
 
 def _timestamp(value: str) -> None:
@@ -41,7 +38,8 @@ def _timestamp(value: str) -> None:
 
 
 def validate_packet(packet: dict) -> str:
-    if not isinstance(packet, dict) or packet.get("schema_version") != 1:
+    if (not isinstance(packet, dict) or type(packet.get("schema_version")) is not int
+            or packet["schema_version"] != 1):
         raise ValueError("invalid packet schema")
     if packet.get("kind") != "klone-evidence-packet":
         raise ValueError("invalid packet kind")
@@ -57,6 +55,8 @@ def validate_packet(packet: dict) -> str:
         raise ValueError("packet digest mismatch")
     if packet.get("device_identity_verified") is not False or packet.get("deployment_approval") is not False:
         raise ValueError("unsupported approval claims")
+    if packet.get("origin_authentication", "not_provided") != "not_provided":
+        raise ValueError("unsupported origin claim")
     _timestamp(packet["observed_at"])
     return digest
 
@@ -72,10 +72,15 @@ def message(packet: dict, witness_id: str) -> bytes:
 
 def verify(packet: dict, attestation: dict, trusted_keys: dict[str, str]) -> dict:
     result = {"signature_valid": False, "trusted_witness": False,
-              "origin_authenticated": False, "deployment_approval": False,
+              "witness_authenticated": False, "key_in_trust_map": False,
+              "origin_authenticated": False, "device_identity_verified": False,
+              "test_execution_authenticated": False, "deployment_approval": False,
+              "verification_scope": "packet_digest_commit_and_witness_only",
               "reason": "unverified"}
     try:
-        if not isinstance(attestation, dict) or attestation.get("schema_version") != 1:
+        if (not isinstance(attestation, dict) or type(attestation.get("schema_version")) is not int
+                or attestation["schema_version"] != 1
+                or set(attestation) != {"schema_version", "algorithm", "witness_id", "packet_sha256", "signature_b64"}):
             raise ValueError("invalid attestation")
         if attestation.get("algorithm") != "Ed25519":
             raise ValueError("unsupported signature algorithm")
@@ -83,24 +88,36 @@ def verify(packet: dict, attestation: dict, trusted_keys: dict[str, str]) -> dic
         msg = message(packet, witness)
         if attestation.get("packet_sha256") != packet["packet_sha256"]:
             raise ValueError("packet reference mismatch")
+        if not isinstance(trusted_keys, dict):
+            raise ValueError("explicit trust map required")
         key_hex = trusted_keys.get(witness)
         if not isinstance(key_hex, str):
             result["reason"] = "untrusted_witness"
             return result
         if not re.fullmatch(r"[0-9a-f]{64}", key_hex):
             raise ValueError("invalid trusted public key")
-        signature = base64.b64decode(attestation["signature_b64"], validate=True)
+        result["key_in_trust_map"] = True
+        result["public_key_sha256"] = hashlib.sha256(bytes.fromhex(key_hex)).hexdigest()
+        encoded = attestation["signature_b64"]
+        if not isinstance(encoded, str) or len(encoded) != 88:
+            raise ValueError("invalid encoded signature length")
+        signature = base64.b64decode(encoded, validate=True)
         if len(signature) != 64:
             raise ValueError("invalid signature length")
-        InvalidSignature, Ed25519PublicKey = _crypto()
+        InvalidSignature, Ed25519PublicKey, UnsupportedAlgorithm = _crypto()
         try:
             Ed25519PublicKey.from_public_bytes(bytes.fromhex(key_hex)).verify(signature, msg)
         except InvalidSignature:
             result["reason"] = "bad_signature"
             return result
+        except UnsupportedAlgorithm:
+            result["reason"] = "crypto_unavailable"
+            return result
         result.update(signature_valid=True, trusted_witness=True,
-                      origin_authenticated=True, reason="valid_signature")
-    except (ValueError, KeyError, TypeError, UnicodeError) as exc:
+                      witness_authenticated=True, reason="valid_signature")
+    except RuntimeError:
+        result["reason"] = "crypto_unavailable"
+    except (ValueError, KeyError, TypeError, UnicodeError, RecursionError) as exc:
         result["reason"] = type(exc).__name__
     return result
 
@@ -110,7 +127,7 @@ def sign(packet: dict, witness_id: str, private_key_bytes: bytes) -> dict:
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     except ImportError as exc:
         raise RuntimeError("Install optional dependency: pip install cryptography") from exc
-    if len(private_key_bytes) != 32:
+    if not isinstance(private_key_bytes, bytes) or len(private_key_bytes) != 32:
         raise ValueError("Ed25519 raw private key must be 32 bytes")
     signature = Ed25519PrivateKey.from_private_bytes(private_key_bytes).sign(
         message(packet, witness_id))
@@ -120,12 +137,7 @@ def sign(packet: dict, witness_id: str, private_key_bytes: bytes) -> dict:
 
 
 def _load(path: Path) -> dict:
-    if not path.is_file() or path.stat().st_size > 131072:
-        raise ValueError("missing or oversized JSON")
-    result = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(result, dict):
-        raise ValueError("JSON object expected")
-    return result
+    return json_object(read_bounded(path, MAX_JSON))
 
 
 def main(argv=None) -> int:
@@ -135,7 +147,10 @@ def main(argv=None) -> int:
     parser.add_argument("--trusted-keys", required=True, type=Path,
                         help="JSON map of witness IDs to hex Ed25519 public keys")
     args = parser.parse_args(argv)
-    result = verify(_load(args.packet), _load(args.attestation), _load(args.trusted_keys))
+    try:
+        result = verify(_load(args.packet), _load(args.attestation), _load(args.trusted_keys))
+    except (OSError, ValueError, UnicodeError, RecursionError) as exc:
+        parser.error(str(exc))
     print(json.dumps(result, sort_keys=True))
     return 0 if result["signature_valid"] and result["trusted_witness"] else 2
 

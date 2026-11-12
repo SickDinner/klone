@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>KLONE | Todisteet</title>
+<style>
+*{box-sizing:border-box}summary,p{overflow-wrap:anywhere}
+body{font:16px system-ui;background:#101827;color:#e5e7eb;margin:0 auto;padding:1.2rem;max-width:1100px}
+h1,h2{color:#bfdbfe}p{line-height:1.5}a{color:#93c5fd}
+section{border:1px solid #334155;border-radius:12px;padding:1rem;margin:1rem 0}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:.6rem;border-bottom:1px solid #334155;overflow-wrap:anywhere}
+input,select{max-width:100%;font:inherit;padding:.55rem;color:#e5e7eb;background:#1f2937;border:1px solid #475569;border-radius:6px}label{display:inline-flex;flex-direction:column;gap:.4rem;margin:.4rem 1rem .4rem 0}section{min-width:0}.scroll{overflow-x:auto;max-width:100%}.forensic-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.7rem}.forensic-card{background:#1f2937;padding:.9rem;border-radius:8px}.forensic-card strong{display:block;font-size:1.6rem}.forensic-card span{font-size:.85rem;color:#cbd5e1}summary{cursor:pointer;padding:.65rem 0;color:#bfdbfe}details{margin:.8rem 0;padding:.6rem;border:1px solid #334155;border-radius:7px}.compare-pickers{display:flex;flex-wrap:wrap;gap:.5rem}td{min-width:90px}code{overflow-wrap:anywhere}button{font:inherit} @media(max-width:600px){body{padding:.8rem}section{padding:.8rem}h1{font-size:1.55rem}table{font-size:.82rem}td,th{padding:.45rem}.compare-pickers label{width:100%;margin-right:0}}small{color:#cbd5e1}
+</style></head><body>
+<nav><a href="/">Mission Control</a></nav>
+<h1>KLONE: Todisteiden valvomo · Evidence Forensics</h1>
+<p>Vain luku. Valitse omalta laitteeltasi Evidence Forensicsin, Evidence Observatoryn, Evidence Qualityn, regressioverkoston JSON tai päätösraportti. Tiedostoa ei lähetetä palvelimelle.</p>
+<section><label for="evidence-file">Avaa paikallinen JSON-raportti</label>
+<input id="evidence-file" type="file" accept=".json,application/json">
+<p id="status" role="status">Ei raporttia valittuna.</p></section>
+<section id="forensics-controls" hidden><h2>Rajaa tutkimusta</h2>
+<label>Hae ajosta tai commitista <input id="forensics-search" type="search" placeholder="Ajon tunniste tai commit"></label>
+<label>Laatuluokka <select id="forensics-quality"><option value="all">Kaikki luokat</option><option value="verified">Eheä paikallinen aineisto</option><option value="incomplete">Puutteellinen</option><option value="contradictory">Ristiriitainen</option><option value="unexamined">Tutkimaton</option></select></label>
+<label>CI-väite <select id="forensics-ci"><option value="all">Kaikki</option><option value="unavailable">Ei saatavilla</option><option value="reported_success">Ilmoitettu läpimeno</option><option value="reported_failure">Ilmoitettu epäonnistuminen</option></select></label>
+</section>
+<section><h2>Yhteenveto</h2><div id="summary">Odottaa raporttia.</div></section>
+<section><h2>Testiajot ja toimenpiteet</h2><div id="details">Odottaa raporttia.</div></section>
+<section id="forensics-comparison" hidden><h2>Vertaa kahta ajoa</h2><p>Valitut raporttikentät rinnakkain. Uutta tiedostojen tarkistusta ei tehdä selaimessa.</p><div class="compare-pickers"><label>Lähtöajo <select id="forensics-before"></select></label><label>Vertailuajo <select id="forensics-after"></select></label></div><div id="forensics-pair"></div></section><section id="forensics-history-section" hidden><h2>Siirtymät ja tutkimustoimet</h2><div id="forensics-history"></div></section>
+<p><small>Raporttien alkuperää ei ole varmennettu. Tämä näkymä ei hyväksy käyttöönottoja eikä suorita komentoja.</small></p>
+<script src="/static/evidence-view.js" defer></script>
+</body></html>

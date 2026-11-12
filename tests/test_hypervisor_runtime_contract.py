@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -68,8 +69,8 @@ class HypervisorRuntimeContractTests(unittest.TestCase):
             )
 
     def test_public_v1_capabilities_remain_read_only(self) -> None:
-        repository = KloneRepository(PROJECT_ROOT / ".hypervisor_contract_test.sqlite")
-        try:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repository = KloneRepository(Path(tempdir) / "hypervisor_contract_test.sqlite")
             repository.initialize()
             services = ServiceContainer.build(repository)
             public_v1 = [
@@ -82,16 +83,10 @@ class HypervisorRuntimeContractTests(unittest.TestCase):
                 all(capability.read_only for capability in public_v1),
                 msg="The current public /v1 seam must remain read-only.",
             )
-        finally:
-            db_path = repository.db_path
-            for suffix in ("", "-wal", "-shm"):
-                candidate = Path(str(db_path) + suffix)
-                if candidate.exists():
-                    candidate.unlink()
 
     def test_core_control_plane_seams_remain_explicit(self) -> None:
-        repository = KloneRepository(PROJECT_ROOT / ".hypervisor_contract_seams.sqlite")
-        try:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repository = KloneRepository(Path(tempdir) / "hypervisor_contract_seams.sqlite")
             repository.initialize()
             services = ServiceContainer.build(repository)
             seam_names = {descriptor.name for descriptor in services.seam_descriptors()}
@@ -102,12 +97,6 @@ class HypervisorRuntimeContractTests(unittest.TestCase):
                 [],
                 msg=f"Hypervisor routing depends on missing core seams: {missing}",
             )
-        finally:
-            db_path = repository.db_path
-            for suffix in ("", "-wal", "-shm"):
-                candidate = Path(str(db_path) + suffix)
-                if candidate.exists():
-                    candidate.unlink()
 
 
 if __name__ == "__main__":

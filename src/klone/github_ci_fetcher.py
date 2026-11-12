@@ -16,7 +16,8 @@ REPO_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 def fetch_ci_run_and_jobs(repository: str, run_id: int, *,
                           token: str | None = None,
                           opener=None) -> tuple[dict, list[dict]]:
-    if (not isinstance(repository, str) or not REPO_PATTERN.fullmatch(repository)\n            or any(part in {".", ".."} for part in repository.split("/"))):
+    if (not isinstance(repository, str) or not REPO_PATTERN.fullmatch(repository)
+            or any(part in {".", ".."} for part in repository.split("/"))):
         raise ValueError("invalid repository")
     if type(run_id) is not int or run_id < 1:
         raise ValueError("invalid run ID")

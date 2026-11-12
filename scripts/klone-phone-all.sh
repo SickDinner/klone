@@ -3,7 +3,7 @@ set -Eeuo pipefail
 ROOT="${KLONE_ROOT:-$HOME/klone-next}"
 BRANCH="feat/web-os-cognition-lab-20261112"
 PORT="${KLONE_PORT:-8001}"
-FILES=(src/klone/main.py src/klone/cognition_core.py src/klone/cognition_api.py src/klone/cognition_memory.py src/klone/cognition_metrics.py src/klone/cognition_planner.py src/klone/cognition_learning.py src/klone/cognition_sweep.py src/klone/cognition_neurocortex.py src/klone/cognition_layers.py src/klone/cognition_local_model.py src/klone/static/web_os_10.html src/klone/static/web_os_10.js tests/test_cognition_core.py tests/test_cognition_api.py tests/test_cognition_memory.py tests/test_cognition_metrics.py tests/test_cognition_planner.py tests/test_cognition_learning.py tests/test_cognition_sweep.py tests/test_cognition_neurocortex.py tests/test_cognition_layers.py tests/test_cognition_local_model.py)
+FILES=(src/klone/main.py src/klone/cognition_core.py src/klone/cognition_api.py src/klone/cognition_memory.py src/klone/cognition_metrics.py src/klone/cognition_planner.py src/klone/cognition_learning.py src/klone/cognition_sweep.py src/klone/cognition_neurocortex.py src/klone/cognition_layers.py src/klone/cognition_local_model.py src/klone/static/web_os_10.html src/klone/static/web_os_10.js tests/test_cognition_core.py tests/test_cognition_api.py tests/test_cognition_memory.py tests/test_cognition_metrics.py tests/test_cognition_planner.py tests/test_cognition_learning.py tests/test_cognition_sweep.py tests/test_cognition_neurocortex.py tests/test_cognition_layers.py tests/test_cognition_local_model.py scripts/klone-local-torch-demo.py)
 say(){ printf '\n[KLONE] %s\n' "$*"; }
 die(){ echo "VIRHE: $*" >&2; exit 1; }
 [[ -d "$ROOT/.git" && -x "$ROOT/.venv/bin/python" ]] || die "Asennusta ei löydy: $ROOT"
@@ -48,5 +48,8 @@ done
 BASE="http://127.0.0.1:$PORT"
 curl -fsS --max-time 10 -X POST "$BASE/api/cognition/learn" -H 'Content-Type: application/json' -d '{"steps":64,"seed":72}' > "$HOME/klone-var/learning-result.json" || die "API:n oppimiskoe epäonnistui"
 curl -fsS --max-time 10 -X POST "$BASE/api/cognition/plan" -H 'Content-Type: application/json' -d '{"energy":0.8,"uncertainty":0.7}' > "$HOME/klone-var/planning-result.json" || die "API:n suunnittelukoe epäonnistui"
+curl -fsS --max-time 10 -X POST "$BASE/api/cognition/neurocortex" -H 'Content-Type: application/json' -d '{"steps":32,"seed":72}' > "$HOME/klone-var/neurocortex-result.json" || die "NeuroCortex API epäonnistui"
+curl -fsS --max-time 10 -X POST "$BASE/api/cognition/layer-probe" -H 'Content-Type: application/json' -d '{"inputs":[0.2,0.4,0.6]}' > "$HOME/klone-var/layers-result.json" || die "Kerrosmittaus API epäonnistui"
+PYTHONPATH=src .venv/bin/python scripts/klone-local-torch-demo.py > "$HOME/klone-var/torch-demo-result.json" || die "PyTorch-demo epäonnistui"
 say "VALMIS: $BASE/static/web_os_10.html"
 printf 'API: %s/docs\nTulokset: %s/klone-var/\nVarmuuskopio: %s\n' "$BASE" "$HOME" "$BACKUP"

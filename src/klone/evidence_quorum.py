@@ -41,7 +41,7 @@ def assess(records: list[dict], candidate: str, required: tuple[str, ...] = (
         if record.get("status") != "success":
             issues.append(f"record_{index}:not_success")
             continue
-                accepted[source] = digest
+        accepted[source] = digest
     missing = sorted(set(required) - set(accepted))
     if missing:
         issues.append("missing_sources:" + ",".join(missing))

@@ -1,10 +1,13 @@
 """Stateless experimental cognition endpoints, isolated from KLONE memory writes."""
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from .cognition_core import CognitionCore, compare_ablations
+from .api import get_repository
+from .repository import KloneRepository
+from .cognition_memory import probe_memory
 
 router = APIRouter(prefix="/api/cognition", tags=["experimental cognition"])
 
@@ -55,3 +58,13 @@ def ablations(request: SimulationRequest) -> dict:
     if request.steps < 1:
         return {"experimental": True, "results": {}}
     return {"experimental": True, "results": compare_ablations(request.steps)}
+
+
+@router.get("/memory-probe")
+def memory_probe(
+    room_id: str = Query(..., min_length=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    repository: KloneRepository = Depends(get_repository),
+) -> dict:
+    """Authorized bounded summary; no raw memory content is returned."""
+    return probe_memory(repository, room_id=room_id, limit=limit).public_summary()

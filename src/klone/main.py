@@ -113,7 +113,7 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     @app.get("/evidence", include_in_schema=False)
     def evidence_dashboard() -> FileResponse:
         return FileResponse(STATIC_DIR / "evidence.html")
-\n    return app
+    return app
 
 
 app = create_app(settings)

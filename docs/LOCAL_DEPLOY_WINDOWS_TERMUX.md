@@ -1,0 +1,101 @@
+# KLONE local deployment: Windows 11 + Android Termux
+
+Both platforms run their **own** local KLONE instance and SQLite data. This
+does **not** implement synchronization, replication, shared secrets or a remote
+control channel. There is no implicit data sharing between devices.
+
+## Windows 11 (PowerShell)
+
+Install Python 3.11 or 3.12 and Git. Clone the reviewed branch:
+
+```powershell
+git clone --branch feat/security-s1-deny-default-core https://github.com/SickDinner/klone.git
+cd klone
+python tools/local_deploy.py doctor
+python tools/local_deploy.py install
+python tools/local_deploy.py start
+```
+
+Alternatively run `powershell -File tools/start-windows.ps1`.
+Open http://127.0.0.1:8000/ on **that same PC**.
+
+## Android Termux
+
+Use Termux from a maintained distribution, install Python and Git, then:
+
+```sh
+pkg update
+pkg install python git
+git clone --branch feat/security-s1-deny-default-core https://github.com/SickDinner/klone.git
+cd klone
+python tools/local_deploy.py doctor
+python tools/local_deploy.py install
+python tools/local_deploy.py start
+```
+
+Alternatively run `bash tools/start-termux.sh`.
+Open http://127.0.0.1:8000/ in the **same phone** browser.
+
+**Android compatibility caveat:** `pip install -e .` may fail to build
+dependencies such as Pillow or Pydantic on some Termux/Python versions. This
+launcher intentionally reports that failure rather than bypassing dependencies.
+Resolve from package-specific Termux build guidance before proceeding.
+
+## Operational safeguards
+
+- The server binds to `127.0.0.1` only, never `0.0.0.0`.
+- `--port 8001` can be supplied if port 8000 is occupied.
+- Stop using Ctrl+C. No service is installed or started on boot.
+- Do not run `--reload` for normal operation.
+- Do not copy live SQLite database files between devices.
+- Do not expose the development server with port forwarding, tunnels or public
+  reverse proxies. No production identity gateway is installed.
+- Keep sensitive genomic exports and authentication secrets outside Git.
+- Approval and audit modules remain experimental. Constitution writes and
+  sensitive external egress are not activated by this deployment.
+- Before upgrading, stop the app, back up local data, inspect migration notes,
+  then update the checked-out branch and reinstall.
+- Run `python -m unittest discover -s tests` from the activated environment
+  for regression checks. On Windows, use `.venv\\Scripts\\python.exe`;
+  on Termux, `.venv/bin/python`.
+
+## Acceptance criteria
+
+1. Doctor passes and virtualenv installation succeeds.
+2. The UI responds on the local loopback URL on each device.
+3. Regression tests pass on each actual device.
+4. A second start on the same port fails clearly.
+5. No remote interface is bound, and no cross-device sync is assumed.
+6. Local user data remains isolated on each device.
+
+## Verify the running server
+
+After starting KLONE, use another terminal on the **same device**:
+
+```sh
+python tools/local_deploy.py healthcheck
+```
+
+For an alternative port: `python tools/local_deploy.py healthcheck --port 8001`.
+The probe uses a five-second timeout, limits the response to 64 KiB, and
+requires a JSON `status: ok` plus nonempty `app_version`. It only connects
+to `127.0.0.1`. This is a basic liveness/identity check, not authentication,
+end-to-end security attestation or a test of remote reachability.
+
+## Android-first secure profile (recommended)
+
+Instead of calling the generic launcher directly, use `bash tools/start-termux.sh`.
+This wrapper sets `KLONE_ENV=local`, disables owner debug mode, applies a
+private-file umask and places its SQLite data under
+`~/.local/share/klone/`. This directory is separate from the repository.
+It **does not migrate** a previous `./data/` database. If an older Termux
+installation has data, identify and back it up before choosing which database
+to use; do not overwrite or silently merge databases.
+
+In another Termux session, run `python tools/local_deploy.py healthcheck`.
+For a consistent local database backup, run `python tools/backup_local.py`
+with the same `KLONE_DATA_DIR` and `KLONE_DB_PATH` settings as the running
+profile, or stop KLONE and set these explicitly. Backups stay in the private
+`backups/` subdirectory. Do not upload backups to GitHub.
+
+No Android device has been remotely accessed or configured by these commits.

@@ -7,8 +7,6 @@ import json
 import os
 from pathlib import Path
 import re
-from urllib import error as urllib_error
-from urllib import request as urllib_request
 from typing import Any
 
 from .schemas import (
@@ -282,7 +280,7 @@ class DialogueCorpusService:
                 "Analyzes local conversation exports without writing them into memory rows.",
                 "Current detectors support extracted Facebook/Messenger exports and ChatGPT conversation export JSON files.",
                 "Bounded question answering stays aggregate-only and does not expose raw semantic retrieval.",
-                "Clone chat can optionally use OpenAI Responses API when OPENAI_API_KEY is configured, but falls back to bounded local replies.",
+                "External OpenAI rendering is disabled pending classified egress approval; clone chat uses bounded local replies.",
             ],
         )
 
@@ -490,9 +488,9 @@ class DialogueCorpusService:
             key_source=key_source,
             preferred_model=self._preferred_openai_model(),
             note=(
-                "OpenAI API key configured for clone chat. GPT-5.4 can now be used in auto mode."
+                "OpenAI API key stored. External model rendering remains disabled pending classified egress approval."
                 if persisted
-                else "OpenAI API key configured for this server process."
+                else "OpenAI API key stored for this process. External rendering remains disabled."
             ),
         )
 
@@ -522,36 +520,20 @@ class DialogueCorpusService:
         model: str | None = None
         system_notes: list[str] = []
 
-        if requested_mode == "gpt-5.4" and not openai_configured:
-            system_notes.append(
-                "GPT-5.4 rendering was requested, but OPENAI_API_KEY is not configured, so the room fell back to bounded local mode."
-            )
-
+        # The chat API has no authenticated, classified outbound payload manifest.
+        # Never construct a remote prompt or attempt transport in this phase.
         if requested_mode in {"auto", "gpt-5.4"} and openai_configured:
-            model = self._preferred_openai_model()
-            try:
-                reply_text = self._render_chat_reply_with_openai(
-                    message=normalized_message,
-                    bounded_answer=bounded_answer,
-                    history=history or [],
-                    owner_name=owner_name or bounded_answer.owner_name,
-                    model=model,
-                )
-                backend_mode = "openai_gpt_5_4"
-                llm_call_performed = True
-            except ValueError as error:
-                system_notes.append(f"OpenAI rendering failed, so the room fell back to bounded local mode: {error}")
-                reply_text = self._render_local_chat_reply(
-                    message=normalized_message,
-                    bounded_answer=bounded_answer,
-                )
-                backend_mode = "bounded_fallback"
-                llm_call_performed = False
-        else:
-            reply_text = self._render_local_chat_reply(
-                message=normalized_message,
-                bounded_answer=bounded_answer,
+            system_notes.append(
+                "External model rendering is disabled until classified egress is approved; using bounded local mode."
             )
+        elif requested_mode == "gpt-5.4":
+            system_notes.append(
+                "External model rendering is disabled; using bounded local mode."
+            )
+        reply_text = self._render_local_chat_reply(
+            message=normalized_message,
+            bounded_answer=bounded_answer,
+        )
 
         reply = CloneChatMessageRecord(
             role="assistant",
@@ -2158,23 +2140,11 @@ class DialogueCorpusService:
         api_key: str,
         payload: dict[str, Any],
     ) -> dict[str, Any]:
-        request = urllib_request.Request(
-            OPENAI_RESPONSES_URL,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        try:
-            with urllib_request.urlopen(request, timeout=90) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except urllib_error.HTTPError as error:
-            detail = error.read().decode("utf-8", errors="replace")
-            raise ValueError(f"OpenAI API error {error.code}: {detail}") from error
-        except urllib_error.URLError as error:
-            raise ValueError(f"OpenAI API request failed: {error.reason}") from error
+        # S1 containment: chat payloads have no trusted per-segment
+        # classification/room manifest. API keys do not authorize egress.
+        # Keep this transport closed until the authenticated policy and
+        # final-byte validation are integrated and separately approved.
+        raise ValueError("External model egress disabled pending classified manifest and approval.")
 
     @staticmethod
     def _extract_openai_text(payload: dict[str, Any]) -> str:

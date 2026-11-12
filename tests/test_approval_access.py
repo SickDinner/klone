@@ -1,0 +1,108 @@
+from datetime import datetime, timedelta, timezone
+import sqlite3
+import unittest
+
+from klone.approval_access import ApprovalAccess, VerifiedActor
+from klone.approval_journal import ApprovalJournal
+from klone.approval_policy import ApprovalProposal
+
+
+class ApprovalAccessTests(unittest.TestCase):
+    def setUp(self):
+        self.conn = sqlite3.connect(":memory:", isolation_level=None)
+        self.journal = ApprovalJournal(self.conn)
+        self.now = datetime(2026, 11, 11, tzinfo=timezone.utc)
+        self.proposal = ApprovalProposal("p1", "supervisor-1", "public_room", "v1", "a" * 64)
+        self.supervisor = VerifiedActor("supervisor-1", "supervisor", "public_room", True)
+        self.owner = VerifiedActor("owner-1", "owner", "public_room", True)
+        self.access = ApprovalAccess(self.journal, expires_at={"p1": self.now + timedelta(hours=1)})
+        self.access.propose(self.proposal, actor=self.supervisor)
+
+    def tearDown(self):
+        self.conn.close()
+
+    def _awaiting(self):
+        self.access.transition("p1", "validated", actor=self.supervisor, now=self.now)
+        self.access.transition("p1", "awaiting_approval", actor=self.supervisor, now=self.now)
+
+    def test_owner_can_approve_after_independent_proposal(self):
+        self._awaiting()
+        result = self.access.transition(
+            "p1", "approved", actor=self.owner, now=self.now,
+            current_target_version="v1", current_patch_sha256="a" * 64,
+        )
+        self.assertEqual(result.approver_id, "owner-1")
+
+    def test_supervisor_cannot_approve(self):
+        self._awaiting()
+        with self.assertRaises(PermissionError):
+            self.access.transition(
+                "p1", "approved", actor=self.supervisor, now=self.now,
+                current_target_version="v1", current_patch_sha256="a" * 64,
+            )
+
+    def test_unauthenticated_actor_denied(self):
+        with self.assertRaises(PermissionError):
+            self.access.transition("p1", "validated", actor=VerifiedActor("x", "owner", "public_room", False), now=self.now)
+
+    def test_cross_room_denied(self):
+        with self.assertRaises(PermissionError):
+            self.access.transition("p1", "validated", actor=VerifiedActor("x", "owner", "sealed_room", True), now=self.now)
+
+    def test_expired_approval_denied(self):
+        self._awaiting()
+        with self.assertRaisesRegex(PermissionError, "approval_expired"):
+            self.access.transition(
+                "p1", "approved", actor=self.owner, now=self.now + timedelta(hours=2),
+                current_target_version="v1", current_patch_sha256="a" * 64,
+            )
+
+    def test_missing_expiry_denied(self):
+        self._awaiting()
+        # The in-memory bootstrap map cannot revoke a persisted deadline.
+        self.access.expires_at.clear()
+        self.assertIsNotNone(self.journal.deadline("p1"))
+        no_expiry = ApprovalProposal("p2", "supervisor-1", "public_room", "v1", "b" * 64)
+        self.access.propose(no_expiry, actor=self.supervisor)
+        self.access.transition("p2", "validated", actor=self.supervisor, now=self.now)
+        self.access.transition("p2", "awaiting_approval", actor=self.supervisor, now=self.now)
+        with self.assertRaisesRegex(PermissionError, "approval_expiry_missing"):
+            self.access.transition(
+                "p2", "approved", actor=self.owner, now=self.now,
+                current_target_version="v1", current_patch_sha256="b" * 64,
+            )
+
+    def test_expiry_survives_new_adapter(self):
+        self._awaiting()
+        restarted = ApprovalAccess(self.journal)
+        result = restarted.transition(
+            "p1", "approved", actor=self.owner, now=self.now,
+            current_target_version="v1", current_patch_sha256="a" * 64,
+        )
+        self.assertEqual(result.state, "approved")
+
+    def test_owner_revocation_blocks_future_transitions(self):
+        self.access.revoke("p1", actor=self.owner, now=self.now, reason="withdrawn")
+        self.assertTrue(self.journal.is_revoked("p1"))
+        with self.assertRaisesRegex(PermissionError, "approval_revoked"):
+            self.access.transition("p1", "validated", actor=self.supervisor, now=self.now)
+        self.assertEqual(self.journal.events("p1")[-1].next_state, "revoked")
+
+    def test_supervisor_cannot_revoke(self):
+        with self.assertRaisesRegex(PermissionError, "approval_access_denied"):
+            self.access.revoke("p1", actor=self.supervisor, now=self.now, reason="test")
+        self.assertFalse(self.journal.is_revoked("p1"))
+
+    def test_revocation_is_irreversible(self):
+        self.access.revoke("p1", actor=self.owner, now=self.now, reason="withdrawn")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.access.revoke("p1", actor=self.owner, now=self.now, reason="again")
+        self.assertEqual(len(self.journal.events("p1")), 2)
+
+    def test_naive_time_denied(self):
+        with self.assertRaisesRegex(ValueError, "timezone_aware_time_required"):
+            self.access.transition("p1", "validated", actor=self.supervisor, now=datetime(2026, 11, 11))
+
+
+if __name__ == "__main__":
+    unittest.main()

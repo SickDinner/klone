@@ -92,7 +92,7 @@ def run_battery(root: Path, output: Path, timeout: int = 240) -> dict:
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.home() / "klone-next")
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", "--output-dir", dest="output", type=Path, required=True)
     parser.add_argument("--timeout", type=int, default=240)
     args = parser.parse_args(argv)
     if args.timeout < 1 or args.timeout > 3600:

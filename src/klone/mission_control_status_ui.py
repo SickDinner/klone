@@ -11,10 +11,12 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 from .research_recovery_inspection import inspect_research_recovery
+from .research_audit_consistency import inspect_audit_consistency
 
 
 def render_research_status(*, database_path: Path) -> str:
     status = inspect_research_recovery(database_path=database_path)
+    integrity = inspect_audit_consistency(database_path=database_path)
 
     def section(title: str, values: tuple[str, ...]) -> str:
         items = "".join("<li>" + html.escape(value, quote=True) + "</li>"
@@ -38,6 +40,16 @@ small{color:#aebccc}</style></head><body><h1>KLONE Mission Control</h1>
                       status.completed_without_outbox)
             + section("Auditointitoimitusta odottavat",
                       status.pending_audit_delivery)
+            + "<h2>Tietokannan eheys: " +
+              ("OK" if integrity.healthy else "TARKISTETTAVA") + "</h2>"
+            + section("Valmistuneet ilman tallennettua versiota",
+                      integrity.completed_missing_snapshot)
+            + section("Auditointitapahtumat ilman valmistunutta ajoa",
+                      integrity.outbox_missing_completed)
+            + section("Auditointitapahtumien versioristiriidat",
+                      integrity.outbox_version_mismatch)
+            + section("Virheelliset tapahtumatunnukset",
+                      integrity.malformed_event_ids)
             + "</body></html>")
 
 

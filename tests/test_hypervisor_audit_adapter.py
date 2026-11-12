@@ -54,6 +54,21 @@ class HypervisorAuditAdapterTests(unittest.TestCase):
         self.assertNotIn("evidence_text", record["metadata"])
         self.assertNotIn("raw_content", record["metadata"])
 
+    def test_audit_persistence_failure_propagates_without_retry(self):
+        class FailingAudit:
+            def __init__(self):
+                self.attempts = 0
+
+            def log_event(self, **kwargs):
+                self.attempts += 1
+                raise OSError("synthetic audit storage failure")
+
+        failing = FailingAudit()
+        adapter = DurableHypervisorAudit(failing)
+        with self.assertRaisesRegex(OSError, "synthetic audit storage failure"):
+            adapter("delegated", self.route, "MemoryFacade")
+        self.assertEqual(failing.attempts, 1)
+
     def test_public_output_policy_allowed(self):
         self.assertEqual(authorize_hypervisor_raw_output("public"), "allowed")
 

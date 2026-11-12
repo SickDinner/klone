@@ -53,6 +53,34 @@ class GovernedWorkerTests(unittest.TestCase):
             self.read(room_id="nonexistent-room")
         self.assertEqual(self.runner.calls, [])
 
+    def test_repeated_unknown_room_attempts_never_execute_worker(self):
+        for attempt in range(3):
+            with self.subTest(attempt=attempt):
+                with self.assertRaises(DispatchDenied):
+                    self.read(room_id="nonexistent-room")
+        self.assertEqual(self.runner.calls, [])
+
+    def test_preexecution_audit_error_never_executes_worker(self):
+        attempts = []
+
+        def broken_audit(event, route, seam):
+            attempts.append(event)
+            raise OSError("synthetic audit persistence error")
+
+        service = GovernedWorkerReads(
+            runner=self.runner,
+            seams={"worker.read": "fixed-worker"},
+            audit=broken_audit,
+            authorize_output=lambda _: "allowed",
+        )
+        with self.assertRaisesRegex(OSError, "synthetic audit persistence error"):
+            service.read(
+                seam="worker.read", room_id="public-room", actor_role="owner",
+                trace_id="trace-audit-failure", classification_level="public",
+            )
+        self.assertEqual(self.runner.calls, [])
+        self.assertEqual(attempts, ["delegated"])
+
     def test_audit_failure_never_runs(self):
         service = GovernedWorkerReads(
             runner=self.runner,

@@ -29,7 +29,7 @@ def prioritize_quality_work(domain_states: Mapping[str, str]) -> list[dict]:
         {
             "domain": domain,
             "state": domain_states[domain],
-            "priority_score": IMPACT[domain] * STATUS_WEIGHT[domain],
+            "priority_score": IMPACT[domain] * STATUS_WEIGHT[domain_states[domain]],
             "reason": "impact x unresolved-status weight",
             "recommended_action": (
                 "repair failing regression" if domain_states[domain] == "failed"

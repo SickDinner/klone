@@ -10,6 +10,8 @@ from .repository import KloneRepository
 from .cognition_memory import probe_memory
 from .cognition_planner import DEFAULT_ACTIONS, plan
 from .cognition_learning import LearningConfig, compare_learning
+from .cognition_neurocortex import CortexConfig, compare_cortex
+from .cognition_layers import probe_layers
 
 router = APIRouter(prefix="/api/cognition", tags=["experimental cognition"])
 
@@ -98,3 +100,25 @@ class LearningRequest(BaseModel):
 def learning_experiment(request: LearningRequest) -> dict:
     """Stateless seeded prediction experiment with a no-learning baseline."""
     return compare_learning(LearningConfig(**request.model_dump()))
+
+
+class NeuroCortexRequest(BaseModel):
+    steps: int = Field(default=32, ge=1, le=200)
+    seed: int = Field(default=72, ge=0, le=4294967295)
+    learning_rate: float = Field(default=0.2, ge=0, le=1, allow_inf_nan=False)
+    snapshot_interval: int = Field(default=16, ge=1, le=200)
+
+
+@router.post("/neurocortex")
+def neurocortex_experiment(request: NeuroCortexRequest) -> dict:
+    return compare_cortex(CortexConfig(**request.model_dump()))
+
+
+class LayerProbeRequest(BaseModel):
+    inputs: list[float] = Field(min_length=1, max_length=32)
+    seed: int = Field(default=72, ge=0, le=4294967295)
+
+
+@router.post("/layer-probe")
+def layer_probe_experiment(request: LayerProbeRequest) -> dict:
+    return probe_layers(request.inputs, seed=request.seed)

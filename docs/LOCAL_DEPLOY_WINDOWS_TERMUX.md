@@ -67,3 +67,17 @@ Resolve from package-specific Termux build guidance before proceeding.
 4. A second start on the same port fails clearly.
 5. No remote interface is bound, and no cross-device sync is assumed.
 6. Local user data remains isolated on each device.
+
+## Verify the running server
+
+After starting KLONE, use another terminal on the **same device**:
+
+```sh
+python tools/local_deploy.py healthcheck
+```
+
+For an alternative port: `python tools/local_deploy.py healthcheck --port 8001`.
+The probe uses a five-second timeout, limits the response to 64 KiB, and
+requires a JSON `status: ok` plus nonempty `app_version`. It only connects
+to `127.0.0.1`. This is a basic liveness/identity check, not authentication,
+end-to-end security attestation or a test of remote reachability.

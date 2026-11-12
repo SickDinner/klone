@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from io import BytesIO
 
 SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "local_deploy.py"
 SPEC = importlib.util.spec_from_file_location("klone_local_deploy", SCRIPT)
@@ -26,6 +27,30 @@ class LocalDeployTests(unittest.TestCase):
 
     def test_loopback_only(self):
         self.assertEqual(deploy.HOST, "127.0.0.1")
+
+    def test_healthcheck_rejects_wrong_service(self):
+        class Response:
+            status = 200
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self, count):
+                return b'{"status":"ok","app_version":null}'
+        with patch.object(deploy.urllib.request, "urlopen", return_value=Response()):
+            self.assertEqual(deploy.healthcheck(), 1)
+
+    def test_healthcheck_accepts_valid_klone_response(self):
+        class Response:
+            status = 200
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self, count):
+                return b'{"status":"ok","app_version":"0.2.0"}'
+        with patch.object(deploy.urllib.request, "urlopen", return_value=Response()):
+            self.assertEqual(deploy.healthcheck(), 0)
 
     def test_parser_rejects_unknown_action(self):
         with self.assertRaises(SystemExit):

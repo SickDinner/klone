@@ -54,3 +54,23 @@ class ApprovalKeyring:
         if not key.not_before_epoch <= epoch < key.not_after_epoch:
             raise PermissionError("signing_key_inactive")
         return verify_actor_assertion(assertion, secret=key.secret, now=now)
+
+    def verify_session(
+        self, assertion: SessionAssertion, *, now: datetime,
+        expected_session_id: str, expected_audience: str = "klone-approval",
+    ) -> VerifiedActor:
+        if not isinstance(assertion, SessionAssertion):
+            raise PermissionError("invalid_session_assertion")
+        key = self._keys.get(assertion.key_id)
+        if key is None:
+            raise PermissionError("unknown_signing_key")
+        if not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None:
+            raise PermissionError("invalid_verification_time")
+        epoch = int(now.timestamp())
+        if not key.not_before_epoch <= epoch < key.not_after_epoch:
+            raise PermissionError("signing_key_inactive")
+        return verify_session_assertion(
+            assertion, secret=key.secret, now=now,
+            expected_session_id=expected_session_id,
+            expected_audience=expected_audience,
+        )

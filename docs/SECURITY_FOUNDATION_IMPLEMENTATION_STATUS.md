@@ -65,3 +65,7 @@ The atomic gateway now offers `session_propose`, `session_transition` and `sessi
 ## S2 deterministic audit checkpoint
 
 `approval_audit_digest.py` computes a canonical SHA-256 digest over a consistent approval proposal, persisted deadline, revocation flag and ordered audit events. It refuses structurally inconsistent histories. The digest is intended for **future independently signed/external anchoring**; by itself it is not tamper-proof and is not a substitute for a trusted append-only ledger. Tests cover determinism, inconsistent history rejection and state transition sensitivity. No external storage or outbound traffic is enabled.
+
+## S2 persistent session revocation
+
+`approval_session_revocation.py` provides a persistent SQLite session denylist. Session-bound atomic gateway calls check this denylist **inside the same BEGIN IMMEDIATE transaction** as replay consumption and approval journal changes, preventing a same-database revocation race at the transaction boundary. Tests cover denial of a valid signed request after revocation, persistence and duplicate rejection. This is not a session issuer or an authenticated logout endpoint: revocation administration and authoritative session issuance remain production dependencies. Existing legacy non-session assertions are not covered by this session denylist and must not be exposed as a production bypass.

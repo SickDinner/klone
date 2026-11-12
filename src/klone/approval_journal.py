@@ -22,7 +22,11 @@ CREATE TABLE IF NOT EXISTS approval_deadlines (
  proposal_id TEXT PRIMARY KEY REFERENCES approval_proposals(proposal_id),
  expires_at_utc TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS approval_revocations (\n proposal_id TEXT PRIMARY KEY REFERENCES approval_proposals(proposal_id),\n revoked_by TEXT NOT NULL, revoked_at_utc TEXT NOT NULL, reason TEXT NOT NULL\n);\nCREATE TABLE IF NOT EXISTS approval_events (
+CREATE TABLE IF NOT EXISTS approval_revocations (
+ proposal_id TEXT PRIMARY KEY REFERENCES approval_proposals(proposal_id),
+ revoked_by TEXT NOT NULL, revoked_at_utc TEXT NOT NULL, reason TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS approval_events (
  event_id INTEGER PRIMARY KEY AUTOINCREMENT,
  proposal_id TEXT NOT NULL, actor_id TEXT NOT NULL,
  previous_state TEXT, next_state TEXT NOT NULL,
@@ -111,6 +115,8 @@ class ApprovalJournal:
             proposal = self.get(proposal_id)
             if proposal is None:
                 raise ValueError("unknown_proposal")
+            if self.is_revoked(proposal_id):
+                raise PermissionError("approval_revoked")
             updated = advance_proposal(
                 proposal, next_state, actor_id=actor_id, human_approved=human_approved,
                 current_target_version=current_target_version,

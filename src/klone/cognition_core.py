@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
 from hashlib import sha256
+from math import isfinite
 import json
 from typing import Any
 
@@ -24,7 +25,7 @@ class Observation:
     def __post_init__(self) -> None:
         if self.step < 1 or self.source != "simulation":
             raise ValueError("Only positive simulation steps are accepted")
-        if not 0.0 <= self.signal <= 1.0:
+        if not isfinite(self.signal) or not 0.0 <= self.signal <= 1.0:
             raise ValueError("Signal must be in [0, 1]")
 
 

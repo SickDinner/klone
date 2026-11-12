@@ -20,6 +20,21 @@ class BackupLocalTests(unittest.TestCase):
                 self.assertEqual(backup.main(), 2)
             self.assertFalse((Path(folder) / "backups").exists())
 
+    def test_backup_does_not_modify_source_database(self):
+        with tempfile.TemporaryDirectory() as folder:
+            database = Path(folder) / "source.sqlite"
+            with closing(sqlite3.connect(database)) as conn:
+                with conn:
+                    conn.execute("CREATE TABLE records (id INTEGER PRIMARY KEY, value TEXT)")
+                    conn.execute("INSERT INTO records (value) VALUES ('preserve')")
+            original = database.read_bytes()
+            with patch.dict(os.environ, {"KLONE_DATA_DIR": folder, "KLONE_DB_PATH": str(database)}):
+                self.assertEqual(backup.main(), 0)
+            with closing(sqlite3.connect(database)) as conn:
+                self.assertEqual(conn.execute("SELECT value FROM records").fetchone(), ("preserve",))
+                self.assertEqual(conn.execute("PRAGMA quick_check").fetchone()[0], "ok")
+            self.assertEqual(database.read_bytes(), original)
+
     def test_backup_is_integrity_checked_and_contains_records(self):
         with tempfile.TemporaryDirectory() as folder:
             database = Path(folder) / "klone_mission_control.db"

@@ -51,7 +51,7 @@ class TermuxBridgeTests(unittest.TestCase):
         with patch.dict("os.environ", {"KLONE_GITHUB_TOKEN": "super-secret-token"}):
             message = bridge.format_result("tests", {
                 "exit_code": 0,
-                "output": "super-secret-token\\nRan 531 tests in 34.257s\\n\\nOK (skipped=1)",
+                "output": "super-secret-token\nRan 531 tests in 34.257s\n\nOK (skipped=1)",
             })
         self.assertIn("Tests: 531 in 34.257s; OK (skipped=1)", message)
         self.assertIn("[REDACTED]", message)

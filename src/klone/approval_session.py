@@ -35,7 +35,8 @@ def verify_session_assertion(
             or not 0 < max_age_seconds <= 120
             or not isinstance(assertion.payload, bytes) or len(assertion.payload) > 2048
             or not isinstance(assertion.signature_hex, str) or len(assertion.signature_hex) != 64
-            or not isinstance(assertion.key_id, str) or not assertion.key_id\n            or len(assertion.key_id) > 64 or not assertion.key_id.isascii()):
+            or not isinstance(assertion.key_id, str) or not assertion.key_id
+            or len(assertion.key_id) > 64 or not assertion.key_id.isascii()):
         raise PermissionError("invalid_session_assertion")
     expected = hmac.new(
         secret, b"klone-approval-session-v1\x00" + assertion.key_id.encode()

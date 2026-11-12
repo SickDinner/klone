@@ -6,7 +6,6 @@ label until verified by a separately configured trusted verification service.
 from __future__ import annotations
 
 import argparse
-from collections import Counter
 import json
 from pathlib import Path
 
@@ -42,20 +41,17 @@ def assess(records: list[dict], candidate: str, required: tuple[str, ...] = (
         if record.get("status") != "success":
             issues.append(f"record_{index}:not_success")
             continue
-        if record.get("verified_by_trusted_verifier") is not True:
-            issues.append(f"record_{index}:unverified_origin")
-            continue
-        accepted[source] = digest
+                accepted[source] = digest
     missing = sorted(set(required) - set(accepted))
     if missing:
         issues.append("missing_sources:" + ",".join(missing))
     return {
         "schema_version": 1, "candidate": candidate,
-        "required_sources": sorted(required), "verified_sources": sorted(accepted),
+        "required_sources": sorted(required), "present_sources": sorted(accepted), "origin_authenticated": False,
         "evidence_digests": accepted, "issues": issues,
         "decision": "manual_review_required" if not issues else "blocked",
         "deployment_approval": False,
-        "note": "Trusted verifier is an external prerequisite; this tool never verifies signatures",
+        "note": "Source labels are untrusted claims. No cryptographic or independent origin verification is performed.",
     }
 
 

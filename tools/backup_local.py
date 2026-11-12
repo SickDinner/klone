@@ -5,6 +5,7 @@ also supports a consistent snapshot while the application is running.
 """
 from __future__ import annotations
 
+from contextlib import closing
 from datetime import datetime, timezone
 import os
 from pathlib import Path
@@ -29,8 +30,8 @@ def main() -> int:
         return 2
     old_umask = os.umask(0o077)
     try:
-        with sqlite3.connect(f"file:{source}?mode=ro", uri=True, timeout=10) as original:
-            with sqlite3.connect(target, timeout=10) as destination:
+        with closing(sqlite3.connect(f"file:{source}?mode=ro", uri=True, timeout=10)) as original:
+            with closing(sqlite3.connect(target, timeout=10)) as destination:
                 original.backup(destination)
                 check = destination.execute("PRAGMA quick_check").fetchone()[0]
                 if check != "ok":

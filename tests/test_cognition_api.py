@@ -24,6 +24,17 @@ class CognitionApiTests(unittest.TestCase):
         response = self.client.post("/api/cognition/simulate", json={"steps": 10000})
         self.assertEqual(response.status_code, 422)
 
+    def test_learning_endpoint(self):
+        first = self.client.post("/api/cognition/learn", json={"steps": 16, "seed": 72})
+        second = self.client.post("/api/cognition/learn", json={"steps": 16, "seed": 72})
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.json(), second.json())
+        self.assertIn("baseline", first.json())
+
+    def test_learning_rejects_invalid(self):
+        response = self.client.post("/api/cognition/learn", json={"steps": 501})
+        self.assertEqual(response.status_code, 422)
+
     def test_ablation(self):
         response = self.client.post("/api/cognition/ablations", json={"steps": 8})
         self.assertEqual(response.status_code, 200)

@@ -75,11 +75,11 @@ def install() -> int:
 def start(port: int) -> int:
     if doctor():
         return 1
-    if not dependencies_ready():
-        print("Run install first, then retry start", file=sys.stderr)
-        return 2
     if not 1024 <= port <= 65535:
         print("Port must be 1024..65535", file=sys.stderr)
+        return 2
+    if not dependencies_ready():
+        print("Run install first, then retry start", file=sys.stderr)
         return 2
     with socket.socket() as sock:
         try:

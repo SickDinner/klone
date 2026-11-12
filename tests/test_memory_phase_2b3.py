@@ -250,6 +250,14 @@ class MemoryPhase2B3Tests(unittest.TestCase):
             event_id=restricted_completed["id"],
             reason="room_isolation_reject",
         )
+        restricted_started_before = self.memory_service.get_event_detail(
+            room_id=restricted_room_id,
+            event_id=restricted_started["id"],
+        )
+        public_started_before = self.memory_service.get_event_detail(
+            room_id=public_room_id,
+            event_id=public_started["id"],
+        )
         with self.assertRaises(ValueError):
             self.memory_service.supersede_event(
                 room_id=restricted_room_id,
@@ -257,6 +265,21 @@ class MemoryPhase2B3Tests(unittest.TestCase):
                 superseded_by_event_id=public_started["id"],
                 reason="cross_room_supersede",
             )
+
+        self.assertEqual(
+            self.memory_service.get_event_detail(
+                room_id=restricted_room_id, event_id=restricted_started["id"]
+            ),
+            restricted_started_before,
+            msg="Denied cross-room correction must not mutate the source event.",
+        )
+        self.assertEqual(
+            self.memory_service.get_event_detail(
+                room_id=public_room_id, event_id=public_started["id"]
+            ),
+            public_started_before,
+            msg="Denied cross-room correction must not mutate the target event.",
+        )
 
         restricted_detail = self.memory_service.get_event_detail(
             room_id=restricted_room_id,

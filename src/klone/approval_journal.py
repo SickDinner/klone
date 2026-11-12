@@ -45,6 +45,21 @@ class ApprovalJournal:
         self.connection.execute("PRAGMA foreign_keys = ON")
         self.connection.executescript(SCHEMA)
 
+    def _begin_write(self) -> bool:
+        nested = self.connection.in_transaction
+        self.connection.execute("SAVEPOINT approval_journal_write" if nested else "BEGIN IMMEDIATE")
+        return nested
+
+    def _finish_write(self, nested: bool, *, success: bool) -> None:
+        if nested:
+            if not success:
+                self.connection.execute("ROLLBACK TO SAVEPOINT approval_journal_write")
+            self.connection.execute("RELEASE SAVEPOINT approval_journal_write")
+        elif success:
+            self.connection.commit()
+        else:
+            self.connection.rollback()
+
     def propose(self, proposal: ApprovalProposal, *, actor_id: str, expires_at: datetime | None = None) -> ApprovalProposal:
         if (not actor_id or actor_id != proposal.proposer_id or proposal.state != "proposed"
                 or proposal.approver_id is not None or not proposal.proposal_id.strip()
@@ -56,7 +71,7 @@ class ApprovalJournal:
             raise ValueError("timezone_aware_expiry_required")
         # Explicit transaction: sqlite3 connection context manager alone does
         # not start a transaction when isolation_level=None (autocommit).
-        self.connection.execute("BEGIN IMMEDIATE")
+        nested = self._begin_write()
         try:
             self.connection.execute(
                 "INSERT INTO approval_proposals VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -72,9 +87,9 @@ class ApprovalJournal:
                 "INSERT INTO approval_events(proposal_id,actor_id,previous_state,next_state) VALUES (?,?,?,?)",
                 (proposal.proposal_id, actor_id, None, "proposed"),
             )
-            self.connection.commit()
+            self._finish_write(nested, success=True)
         except BaseException:
-            self.connection.rollback()
+            self._finish_write(nested, success=False)
             raise
         return proposal
 
@@ -91,7 +106,7 @@ class ApprovalJournal:
         current_patch_sha256: str | None = None,
     ) -> ApprovalProposal:
         # BEGIN IMMEDIATE serializes competing writers and prevents stale reads.
-        self.connection.execute("BEGIN IMMEDIATE")
+        nested = self._begin_write()
         try:
             proposal = self.get(proposal_id)
             if proposal is None:
@@ -112,10 +127,10 @@ class ApprovalJournal:
                 "INSERT INTO approval_events(proposal_id,actor_id,previous_state,next_state) VALUES (?,?,?,?)",
                 (proposal_id, actor_id, proposal.state, updated.state),
             )
-            self.connection.commit()
+            self._finish_write(nested, success=True)
             return updated
         except BaseException:
-            self.connection.rollback()
+            self._finish_write(nested, success=False)
             raise
 
     def events(self, proposal_id: str) -> tuple[ApprovalEvent, ...]:
@@ -137,7 +152,7 @@ class ApprovalJournal:
                 or not isinstance(reason, str) or not reason.strip() or len(reason) > 256
                 or not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None):
             raise ValueError("invalid_revocation")
-        self.connection.execute("BEGIN IMMEDIATE")
+        nested = self._begin_write()
         try:
             proposal = self.get(proposal_id)
             if proposal is None:
@@ -152,9 +167,9 @@ class ApprovalJournal:
                 "VALUES (?,?,?,?)",
                 (proposal_id, actor_id, proposal.state, "revoked"),
             )
-            self.connection.commit()
+            self._finish_write(nested, success=True)
         except BaseException:
-            self.connection.rollback()
+            self._finish_write(nested, success=False)
             raise
 
     def is_revoked(self, proposal_id: str) -> bool:

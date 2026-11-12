@@ -6,11 +6,14 @@ No LAN binding, secret upload, remote deployment, or background daemon.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 import socket
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 import venv
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -75,15 +78,41 @@ def start(port: int) -> int:
     ], cwd=ROOT)
 
 
+def healthcheck(port: int = PORT) -> int:
+    if not 1024 <= port <= 65535:
+        print("Invalid port", file=sys.stderr)
+        return 2
+    url = f"http://{HOST}:{port}/api/health"
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:
+            if response.status != 200:
+                raise ValueError("unexpected_http_status")
+            body = response.read(65537)
+            if len(body) > 65536:
+                raise ValueError("oversized_health_response")
+        data = json.loads(body)
+        if (not isinstance(data, dict) or data.get("status") != "ok"
+                or not isinstance(data.get("app_version"), str)
+                or not data["app_version"]):
+            raise ValueError("not_klone_health")
+    except (OSError, ValueError, urllib.error.URLError) as error:
+        print(f"KLONE healthcheck failed: {error}", file=sys.stderr)
+        return 1
+    print(f"KLONE healthy at {url}, version={data['app_version']}")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("doctor", "install", "start"))
+    parser.add_argument("command", choices=("doctor", "install", "start", "healthcheck"))
     parser.add_argument("--port", type=int, default=PORT)
     args = parser.parse_args(argv)
     if args.command == "doctor":
         return doctor()
     if args.command == "install":
         return install()
+    if args.command == "healthcheck":
+        return healthcheck(args.port)
     return start(args.port)
 
 

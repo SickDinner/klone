@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="fi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>KLONE | Todisteet</title>
+<style>
+body{font:16px system-ui;background:#101827;color:#e5e7eb;margin:0 auto;padding:1.2rem;max-width:1100px}
+h1,h2{color:#bfdbfe}p{line-height:1.5}a{color:#93c5fd}
+section{border:1px solid #334155;border-radius:12px;padding:1rem;margin:1rem 0}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:.6rem;border-bottom:1px solid #334155;overflow-wrap:anywhere}
+input{max-width:100%}small{color:#cbd5e1}
+</style></head><body>
+<nav><a href="/">Mission Control</a></nav>
+<h1>KLONE: Todisteiden valvomo</h1>
+<p>Vain luku. Valitse omalta laitteeltasi Evidence Observatoryn JSON tai päätösraportti. Tiedostoa ei lähetetä palvelimelle.</p>
+<section><label for="evidence-file">Avaa paikallinen JSON-raportti</label>
+<input id="evidence-file" type="file" accept=".json,application/json">
+<p id="status" role="status">Ei raporttia valittuna.</p></section>
+<section><h2>Yhteenveto</h2><div id="summary">Odottaa raporttia.</div></section>
+<section><h2>Testiajot ja toimenpiteet</h2><div id="details">Odottaa raporttia.</div></section>
+<p><small>Raporttien alkuperää ei ole varmennettu. Tämä näkymä ei hyväksy käyttöönottoja eikä suorita komentoja.</small></p>
+<script src="/static/evidence-view.js" defer></script>
+</body></html>

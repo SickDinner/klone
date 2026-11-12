@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -85,6 +86,27 @@ def save_state(done):
         pass
 
 
+def format_result(action: str, result: dict) -> str:
+    """Create a bounded, readable issue comment without leaking the API token."""
+    output = str(result["output"])
+    token = os.environ.get("KLONE_GITHUB_TOKEN", "")
+    if token:
+        output = output.replace(token, "[REDACTED]")
+    summary = ""
+    if action == "tests":
+        match = re.search(r"Ran (\d+) tests? in ([\d.]+)s", output)
+        verdict = re.search(r"^(OK(?: \(skipped=\d+\))?|FAILED \(.*\))$", output, re.MULTILINE)
+        if match:
+            summary = f"Tests: {match.group(1)} in {match.group(2)}s"
+            if verdict:
+                summary += f"; {verdict.group(1)}"
+            summary += "\n\n"
+    fence = chr(96) * 3
+    return ("KLONE Termux bridge result for " + chr(96) + action + chr(96) + "\n\n"
+            + summary + fence + "text\n" + output.replace(fence, "[fence]")[-5000:]
+            + "\n" + fence + "\nExit code: " + str(result["exit_code"]))
+
+
 def once():
     trusted = os.environ.get("KLONE_TRUSTED_ACTOR", "").strip()
     if not trusted:
@@ -114,9 +136,7 @@ def once():
             result = run_action(action)
         except Exception as exc:
             result = {"exit_code": 1, "output": f"{type(exc).__name__}: {exc}"}
-        message = ("KLONE Termux bridge result for `" + action + "`\n\n"
-                   + "```text\n" + str(result["output"]).replace("```", "[fence]") +
-                   "\n```\nExit code: " + str(result["exit_code"]))
+        message = format_result(action, result)
         api("POST", f"/repos/{REPO}/issues/{number}/comments", {"body": message})
         print(f"Completed issue #{number}: {action} exit={result['exit_code']}")
 

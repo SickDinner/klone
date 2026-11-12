@@ -9,6 +9,7 @@ from .api import get_repository
 from .repository import KloneRepository
 from .cognition_memory import probe_memory
 from .cognition_planner import DEFAULT_ACTIONS, plan
+from .cognition_learning import LearningConfig, compare_learning
 
 router = APIRouter(prefix="/api/cognition", tags=["experimental cognition"])
 
@@ -84,3 +85,16 @@ def planning_experiment(request: PlanRequest) -> dict:
     return plan(energy=request.energy, uncertainty=request.uncertainty,
                 actions=DEFAULT_ACTIONS, horizon=request.horizon,
                 risk_weight=request.risk_weight)
+
+
+class LearningRequest(BaseModel):
+    steps: int = Field(default=64, ge=1, le=500)
+    seed: int = Field(default=72, ge=0, le=4294967295)
+    learning_rate: float = Field(default=0.2, ge=0, le=1, allow_inf_nan=False)
+    initial_prediction: float = Field(default=0.5, ge=0, le=1, allow_inf_nan=False)
+
+
+@router.post("/learn")
+def learning_experiment(request: LearningRequest) -> dict:
+    """Stateless seeded prediction experiment with a no-learning baseline."""
+    return compare_learning(LearningConfig(**request.model_dump()))

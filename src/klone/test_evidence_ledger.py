@@ -6,6 +6,7 @@ explicitly supplied SQLite database path.
 from __future__ import annotations
 
 import hashlib
+from contextlib import closing
 import json
 from pathlib import Path
 import sqlite3
@@ -60,7 +61,7 @@ class EvidenceLedger:
         self.database = str(database)
 
     def initialize(self):
-        with sqlite3.connect(self.database) as db:
+        with closing(sqlite3.connect(self.database)) as db:
             db.execute("""CREATE TABLE IF NOT EXISTS test_evidence (
                 fingerprint TEXT PRIMARY KEY,
                 source TEXT NOT NULL,
@@ -72,12 +73,13 @@ class EvidenceLedger:
                 inserted_at TEXT NOT NULL
             )""")
             db.execute("CREATE INDEX IF NOT EXISTS idx_evidence_commit ON test_evidence(commit_sha, source)")
+            db.commit()
 
     def append(self, record: dict) -> tuple[str, bool]:
         payload = canonical(validate(record))
         fingerprint = hashlib.sha256(payload.encode("utf-8")).hexdigest()
         now = datetime.now(timezone.utc).isoformat()
-        with sqlite3.connect(self.database) as db:
+        with closing(sqlite3.connect(self.database)) as db:
             existing = db.execute("SELECT payload_json FROM test_evidence WHERE fingerprint=?", (fingerprint,)).fetchone()
             if existing:
                 if existing[0] != payload:
@@ -86,10 +88,11 @@ class EvidenceLedger:
             db.execute("INSERT INTO test_evidence VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                        (fingerprint, record["source"], record["run_id"], record["commit"],
                         record["status"], record["observed_at"], payload, now))
+            db.commit()
         return fingerprint, True
 
     def list_for_commit(self, commit: str) -> list[dict]:
-        with sqlite3.connect(self.database) as db:
+        with closing(sqlite3.connect(self.database)) as db:
             rows = db.execute(
                 "SELECT payload_json FROM test_evidence WHERE commit_sha=? ORDER BY observed_at, fingerprint",
                 (commit,),

@@ -76,7 +76,7 @@ fixed and do not accept command arguments.
 
 ```sh
 cd ~/klone-next
-.venv/bin/python -m pip install mcp
+.venv/bin/python -m pip install 'mcp<2'
 . ~/.config/klone/bridge.env
 .venv/bin/python tools/klone_mcp.py
 ```
@@ -98,3 +98,25 @@ deployment.
   might include sensitive paths or information. Review what tests print.
 - Local token never belongs in GitHub issue text.
 - No unattended destructive actions, root privileges, or LAN listener.
+
+## Termux MCP compatibility (Android Python 3.13)
+
+The bridge MCP module currently uses the MCP SDK **1.x** FastMCP API.
+The SDK 2.x intentionally removed this import, so use `mcp<2` until
+`tools/klone_mcp.py` is migrated and tested against 2.x.
+
+On Termux, use its native `cryptography` package to avoid incompatible
+pip-built Rust extension wheels:
+
+```sh
+pkg install -y python-cryptography
+cd ~/klone-next
+python -m venv --system-site-packages .venv-mcp
+.venv-mcp/bin/python -m pip install 'mcp<2'
+.venv-mcp/bin/python -c 'from cryptography.exceptions import InvalidTag; print("Crypto OK")'
+.venv-mcp/bin/python -c 'from mcp.server.fastmcp import FastMCP; print("MCP OK")'
+```
+
+If the Python environment already has a broken pip-built cryptography,
+remove it from that environment first. Do not uninstall the Termux
+system package. Keep `.venv-mcp` separate from the KLONE application venv.

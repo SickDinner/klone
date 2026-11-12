@@ -87,6 +87,18 @@ def build_packet(directory: Path) -> dict:
             raise ValueError("missing or oversized stage log: " + stage)
         files[path.name] = {"sha256": sha256(path.read_bytes()), "bytes": path.stat().st_size}
     raw = run_path.read_bytes()
+    return assemble_packet(run, sha256(raw), files)
+
+
+def assemble_packet(run: dict, run_json_sha256: str, files: dict) -> dict:
+    """Assemble expected packet from a captured snapshot; performs no I/O."""
+    validate_run(run)
+    if not HEX.fullmatch(run_json_sha256) or set(files) != {n + ".log" for n in STAGES}:
+        raise ValueError("invalid captured artifact set")
+    for item in files.values():
+        if (not isinstance(item, dict) or not HEX.fullmatch(item.get("sha256", ""))
+                or type(item.get("bytes")) is not int or not 0 <= item["bytes"] <= MAX_LOG):
+            raise ValueError("invalid captured artifact metadata")
     packet = {
         "schema_version": 1,
         "kind": "klone-evidence-packet",
@@ -94,7 +106,7 @@ def build_packet(directory: Path) -> dict:
         "observed_at": run["completed_at"],
         "overall": run["overall"],
         "stages": {name: run["stages"][name]["status"] for name in STAGES},
-        "run_json_sha256": sha256(raw),
+        "run_json_sha256": run_json_sha256,
         "files": files,
         "device_identity_verified": False,
         "deployment_approval": False,

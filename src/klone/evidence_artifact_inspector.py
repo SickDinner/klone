@@ -13,19 +13,26 @@ from klone.evidence_network import STAGES, MAX_LOG, validate_run
 MAX_MANIFEST = 65536
 
 
-def inspect(directory: Path) -> dict:
+def snapshot(directory: Path, *, byte_budget: int | None = None) -> tuple[dict, dict[str, bytes]]:
     directory = checked_path(directory, directory=True)
     artifacts, errors, manifest = {}, [], None
+    contents: dict[str, bytes] = {}
+    consumed = 0
     for name in ("run.json", *(stage + ".log" for stage in STAGES)):
         limit = MAX_MANIFEST if name == "run.json" else MAX_LOG
         try:
-            raw = read_bounded(directory / name, limit)
+            raw = read_bounded(directory / name, min(limit, max(0, byte_budget - consumed))
+                               if byte_budget is not None else limit)
         except EvidenceIOError as exc:
-            artifacts[name] = {"state": exc.code}
+            state = ("budget_exceeded" if exc.code == "oversized" and byte_budget is not None
+                     and exc.size is not None and exc.size <= limit else exc.code)
+            artifacts[name] = {"state": state}
             if exc.size is not None:
                 artifacts[name]["bytes"] = exc.size
-            errors.append(name + ":" + ("symlink" if exc.code == "symlink_rejected" else exc.code))
+            errors.append(name + ":" + ("symlink" if exc.code == "symlink_rejected" else state))
             continue
+        contents[name] = raw
+        consumed += len(raw)
         artifacts[name] = {"state": "present", "bytes": len(raw),
                            "sha256": hashlib.sha256(raw).hexdigest()}
         if name == "run.json":
@@ -37,7 +44,7 @@ def inspect(directory: Path) -> dict:
             except (ValueError, KeyError, TypeError, AttributeError, UnicodeError, RecursionError) as exc:
                 errors.append("run.json:invalid:" + type(exc).__name__)
                 manifest = None
-    return {"schema_version": 1, "run_name": directory.name,
+    result = {"schema_version": 1, "run_name": directory.name,
             "artifacts": artifacts, "manifest_valid": manifest is not None,
             "commit": manifest["before"]["commit"] if manifest else None,
             "errors": errors, "original_packet_present": (
@@ -45,6 +52,11 @@ def inspect(directory: Path) -> dict:
                 not (directory / "evidence-packet.json").is_symlink()),
             "origin_authenticated": False, "deployment_approval": False,
             "note": "Hashes document current bytes, not historical authenticity."}
+    return result, contents
+
+
+def inspect(directory: Path) -> dict:
+    return snapshot(directory)[0]
 
 
 def main(argv=None) -> int:

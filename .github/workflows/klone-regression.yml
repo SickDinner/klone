@@ -12,6 +12,22 @@ permissions:
   contents: read
 
 jobs:
+  evidence-signatures:
+    name: Evidence signatures / ubuntu-latest / Python 3.12
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install optional signature backend
+        run: python -m pip install -e '.[evidence]'
+      - name: Require backend and test signature boundaries
+        run: |
+          python -c "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey"
+          python -m unittest discover -s tests -p "test_evidence_attestation.py" -v
+
   test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15

@@ -16,6 +16,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+evidence = [
+  "cryptography>=44,<51",
+]
 test = [
   "httpx>=0.27,<1",
 ]

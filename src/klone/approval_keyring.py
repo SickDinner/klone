@@ -10,6 +10,7 @@ from datetime import datetime
 
 from .approval_access import VerifiedActor
 from .approval_identity import SignedActorAssertion, verify_actor_assertion
+from .approval_session import SessionAssertion, verify_session_assertion
 
 
 @dataclass(frozen=True)

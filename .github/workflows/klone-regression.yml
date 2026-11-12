@@ -50,3 +50,25 @@ jobs:
 
       - name: Full unittest suite
         run: python -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Write CI evidence manifest
+        if: always()
+        shell: bash
+        env:
+          CI_RUN_ID: ${{ github.run_id }}
+          CI_RUN_ATTEMPT: ${{ github.run_attempt }}
+          CI_SHA: ${{ github.sha }}
+          CI_REF: ${{ github.ref }}
+          CI_JOB_STATUS: ${{ job.status }}
+          CI_OS: ${{ matrix.os }}
+          CI_PYTHON: ${{ matrix.python-version }}
+        run: |
+          python -c 'import json, os, pathlib; pathlib.Path("ci-evidence.json").write_text(json.dumps({"schema_version": 1, "source": "github_actions", "run_id": os.environ["CI_RUN_ID"], "run_attempt": os.environ["CI_RUN_ATTEMPT"], "commit": os.environ["CI_SHA"], "ref": os.environ["CI_REF"], "status": os.environ["CI_JOB_STATUS"], "os": os.environ["CI_OS"], "python": os.environ["CI_PYTHON"]}, sort_keys=True, indent=2) + "\n", encoding="utf-8")'
+
+      - name: Upload CI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: klone-ci-evidence-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: ci-evidence.json
+          retention-days: 30

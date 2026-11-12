@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - hypervisor-runtime-contract
+      - feat/security-s1-deny-default-core
 
 permissions:
   contents: read

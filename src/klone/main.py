@@ -110,7 +110,10 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     def clone_chat_room() -> FileResponse:
         return FileResponse(STATIC_DIR / "chat.html")
 
-    return app
+    @app.get("/evidence", include_in_schema=False)
+    def evidence_dashboard() -> FileResponse:
+        return FileResponse(STATIC_DIR / "evidence.html")
+\n    return app
 
 
 app = create_app(settings)

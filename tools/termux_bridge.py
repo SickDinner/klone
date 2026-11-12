@@ -94,16 +94,17 @@ def format_result(action: str, result: dict) -> str:
         output = output.replace(token, "[REDACTED]")
     summary = ""
     if action == "tests":
-        match = re.search(r"Ran (\\d+) tests? in ([\\d.]+)s", output)
-        verdict = re.search(r"^(OK(?: \\(skipped=\\d+\\))?|FAILED \\(.*\\))$", output, re.MULTILINE)
+        match = re.search(r"Ran (\d+) tests? in ([\d.]+)s", output)
+        verdict = re.search(r"^(OK(?: \(skipped=\d+\))?|FAILED \(.*\))$", output, re.MULTILINE)
         if match:
             summary = f"Tests: {match.group(1)} in {match.group(2)}s"
             if verdict:
                 summary += f"; {verdict.group(1)}"
-            summary += "\\n\\n"
-    return ("KLONE Termux bridge result for \`" + action + "\`\\n\\n"
-            + summary + "\`\`\`text\\n" + output.replace("\`\`\`", "[fence]")[-5000:]
-            + "\\n\`\`\`\\nExit code: " + str(result["exit_code"]))
+            summary += "\n\n"
+    fence = chr(96) * 3
+    return ("KLONE Termux bridge result for " + chr(96) + action + chr(96) + "\n\n"
+            + summary + fence + "text\n" + output.replace(fence, "[fence]")[-5000:]
+            + "\n" + fence + "\nExit code: " + str(result["exit_code"]))
 
 
 def once():

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-import hmac
 
 from .approval_access import VerifiedActor
 from .approval_identity import SignedActorAssertion, verify_actor_assertion

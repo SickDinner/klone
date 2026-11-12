@@ -37,17 +37,29 @@ def compare_history(runs: list[dict]) -> list[dict]:
         before = previous["stage_statuses"]
         after = current["stage_statuses"]
         regressions = [name for name in REQUIRED
-                       if before.get(name) == "passed" and after.get(name) != "passed"]
+                       if before.get(name) == "passed" and after.get(name) == "failed"]
         recoveries = [name for name in REQUIRED
-                      if before.get(name) != "passed" and after.get(name) == "passed"]
+                      if before.get(name) == "failed" and after.get(name) == "passed"]
+        unknown_transitions = [name for name in REQUIRED
+                               if before.get(name) in ("passed", "failed")
+                               and after.get(name) not in ("passed", "failed")]
+        integrity_comparable = (previous["integrity_ok"] is True
+                                and current["integrity_ok"] is True)
+        if not integrity_comparable:
+            unknown_transitions = sorted(set(unknown_transitions) | {
+                name for name in REQUIRED if before.get(name) != after.get(name)
+            })
+            regressions = []
+            recoveries = []
         changes.append({
+            "unknown_transitions": unknown_transitions,
             "from_run": previous["run_name"], "to_run": current["run_name"],
             "from_commit": previous["commit"], "to_commit": current["commit"],
             "regressed_stages": regressions, "recovered_stages": recoveries,
             "integrity_changed": previous["integrity_ok"] != current["integrity_ok"],
-            "comparable": previous["integrity_ok"] and current["integrity_ok"],
+            "comparable": integrity_comparable,
             "manual_review_required": True,
-            "note": "Directory order is not causal or chronological proof.",
+            "note": "Only verified passed-to-failed transitions count as regressions; missing evidence is unknown. Directory order is not causal or chronological proof.",
         })
     return changes
 

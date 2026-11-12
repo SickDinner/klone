@@ -83,6 +83,18 @@ class CognitionApiTests(unittest.TestCase):
                 response = self.client.post("/api/cognition/plan", json=invalid)
                 self.assertEqual(response.status_code, 422)
 
+    def test_ablations_are_replayable_across_identical_requests(self):
+        first = self.client.post("/api/cognition/ablations", json={"steps": 6})
+        second = self.client.post("/api/cognition/ablations", json={"steps": 6})
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.json(), second.json())
+
+    def test_invalid_ablations_input_is_rejected(self):
+        for payload in ({"steps": -1}, {"steps": 201}, {"memory_capacity": 0}):
+            with self.subTest(payload=payload):
+                response = self.client.post("/api/cognition/ablations", json=payload)
+                self.assertEqual(response.status_code, 422)
+
     def test_capabilities_explicitly_deny_persistence_and_memory_access(self):
         response = self.client.get("/api/cognition/capabilities")
         self.assertEqual(response.status_code, 200)

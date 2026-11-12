@@ -57,6 +57,34 @@ class SafeReadPipelineTests(unittest.TestCase):
                           trace_id="trace-audit", classification_level="public")
         self.assertEqual(self.calls, [])
 
+    def test_denied_request_never_calls_handler_even_with_repeated_attempts(self):
+        for attempt in range(3):
+            with self.subTest(attempt=attempt):
+                with self.assertRaises(DispatchDenied):
+                    self.run_read(seam="nonexistent")
+        self.assertEqual(self.calls, [])
+
+    def test_prehandler_audit_failure_never_calls_handler_or_reports_success(self):
+        audit_events = []
+
+        def failing_audit(event, route, seam):
+            audit_events.append(event)
+            raise OSError("synthetic prehandler audit failure")
+
+        pipeline = SafeReadPipeline(
+            runtime=HypervisorRuntime(),
+            handlers={"MemoryFacade": lambda room: self.calls.append(room) or {"secret": "x"}},
+            audit=failing_audit,
+            authorize_output=lambda _: "allowed",
+        )
+        with self.assertRaisesRegex(OSError, "synthetic prehandler audit failure"):
+            pipeline.read(
+                seam="MemoryFacade", room_id="public-room", actor_role="owner",
+                trace_id="trace-fail-closed", classification_level="public",
+            )
+        self.assertEqual(self.calls, [])
+        self.assertEqual(audit_events, ["delegated"])
+
     def test_oversized_payload_is_rejected_and_audited(self):
         pipeline = SafeReadPipeline(
             runtime=HypervisorRuntime(),

@@ -46,6 +46,22 @@ def doctor() -> int:
     return 1 if errors else 0
 
 
+def dependencies_ready() -> bool:
+    executable = python_path()
+    if not executable.is_file():
+        return False
+    result = subprocess.run(
+        [str(executable), "-c",
+         "import fastapi, uvicorn, pydantic, PIL, klone.main"],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    if result.returncode:
+        print("KLONE environment incomplete; run: python tools/local_deploy.py install",
+              file=sys.stderr)
+        print(result.stderr[-1200:], file=sys.stderr)
+    return result.returncode == 0
+
+
 def install() -> int:
     if doctor():
         return 1
@@ -59,8 +75,8 @@ def install() -> int:
 def start(port: int) -> int:
     if doctor():
         return 1
-    if not python_path().is_file():
-        print("Run install first", file=sys.stderr)
+    if not dependencies_ready():
+        print("Run install first, then retry start", file=sys.stderr)
         return 2
     if not 1024 <= port <= 65535:
         print("Port must be 1024..65535", file=sys.stderr)

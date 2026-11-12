@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from contextlib import closing
 import sqlite3
 import tempfile
 import unittest
@@ -39,16 +40,18 @@ class EvidenceIntegrityTests(unittest.TestCase):
 
     def test_tampered_payload_detected(self):
         self.add(self.new, "termux_bridge")
-        with sqlite3.connect(self.db) as connection:
+        with closing(sqlite3.connect(self.db)) as connection:
             connection.execute("UPDATE test_evidence SET payload_json='{}'")
+            connection.commit()
         result = audit(self.db)
         self.assertFalse(result["valid"])
         self.assertEqual(assess(self.db, self.old, self.new)["decision"], "blocked")
 
     def test_tampered_index_detected(self):
         self.add(self.new, "github_actions")
-        with sqlite3.connect(self.db) as connection:
+        with closing(sqlite3.connect(self.db)) as connection:
             connection.execute("UPDATE test_evidence SET status='failure'")
+            connection.commit()
         self.assertFalse(audit(self.db)["valid"])
 
     def test_two_sources_never_auto_approve(self):

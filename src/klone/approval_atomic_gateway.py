@@ -13,6 +13,7 @@ from .approval_access import ApprovalAccess
 from .approval_identity import SignedActorAssertion
 from .approval_keyring import ApprovalKeyring
 from .approval_policy import ApprovalProposal
+from .approval_session import SessionAssertion
 
 
 class AtomicApprovalGateway:
@@ -83,3 +84,47 @@ class AtomicApprovalGateway:
                          self.access.revoke(
                              proposal_id, actor=actor, now=now, reason=reason,
                          ))
+
+    def session_propose(
+        self, proposal: ApprovalProposal, *, assertion: SessionAssertion,
+        expected_session_id: str, now: datetime,
+    ) -> ApprovalProposal:
+        actor = self.keyring.verify_session(
+            assertion, now=now, expected_session_id=expected_session_id,
+        )
+        return self._run_verified(
+            assertion.key_id, assertion.payload, assertion.signature_hex, actor,
+            lambda verified: self.access.propose(proposal, actor=verified),
+        )
+
+    def session_transition(
+        self, proposal_id: str, next_state: str, *, assertion: SessionAssertion,
+        expected_session_id: str, now: datetime,
+        current_target_version: str | None = None,
+        current_patch_sha256: str | None = None,
+    ) -> ApprovalProposal:
+        actor = self.keyring.verify_session(
+            assertion, now=now, expected_session_id=expected_session_id,
+        )
+        return self._run_verified(
+            assertion.key_id, assertion.payload, assertion.signature_hex, actor,
+            lambda verified: self.access.transition(
+                proposal_id, next_state, actor=verified, now=now,
+                current_target_version=current_target_version,
+                current_patch_sha256=current_patch_sha256,
+            ),
+        )
+
+    def session_revoke(
+        self, proposal_id: str, *, assertion: SessionAssertion,
+        expected_session_id: str, now: datetime, reason: str,
+    ) -> None:
+        actor = self.keyring.verify_session(
+            assertion, now=now, expected_session_id=expected_session_id,
+        )
+        return self._run_verified(
+            assertion.key_id, assertion.payload, assertion.signature_hex, actor,
+            lambda verified: self.access.revoke(
+                proposal_id, actor=verified, now=now, reason=reason,
+            ),
+        )

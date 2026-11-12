@@ -20,6 +20,12 @@ class LocalDeployTests(unittest.TestCase):
         with patch.object(deploy, "python_path", return_value=Path(__file__)):
             self.assertEqual(deploy.start(80), 2)
 
+    def test_invalid_port_never_checks_dependencies(self):
+        with patch.object(deploy, "dependencies_ready", side_effect=AssertionError("must not run")):
+            for port in (0, 80, 1023, 65536, -1):
+                with self.subTest(port=port):
+                    self.assertEqual(deploy.start(port), 2)
+
     def test_missing_virtualenv_denied(self):
         with tempfile.TemporaryDirectory() as temp:
             with patch.object(deploy, "python_path", return_value=Path(temp) / "missing"):

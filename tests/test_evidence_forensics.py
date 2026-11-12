@@ -234,6 +234,24 @@ class EvidenceForensicsTests(unittest.TestCase):
         self.assertFalse(r['github']['origin_authenticated'])
         self.assertFalse(r['decision_dossier']['deployment_approval'])
 
+    def test_log_contradiction_blocks_ci_and_decision_dossier(self):
+        run = create_run(self.root)
+        (run / 'full.log').write_text('1 failed in 0.1s')
+        save_packet(run)
+        ci = {'a' * 40: {'commit': 'a' * 40, 'conclusion': 'success', 'workflow': 'KLONE regression guard'}}
+        r = self.run_report(ci_by_commit=ci)
+        self.assertTrue(r['trust']['manifest_reports_required_stages_passed'])
+        self.assertTrue(r['packet']['matches_source'])
+        self.assertTrue(r['observatory_status']['required_stages_passed'])
+        self.assertFalse(r['decision_input_status']['required_stages_passed'])
+        self.assertFalse(r['github_comparison']['consistent_claims'])
+        self.assertIn('local_content_contradiction', r['github_comparison']['errors'])
+        dossier = r['decision_dossier']
+        self.assertEqual(dossier['decision'], 'blocked')
+        self.assertFalse(dossier['shadow_review']['operational_claims_consistent'])
+        self.assertIn('investigate_mismatch', [a['kind'] for a in dossier['next_actions']])
+        self.assertFalse(next(v['value'] for v in dossier['claims']['observations'] if v['field'] == 'required_stages_passed'))
+
     def test_report_generation_leaves_original_bytes_and_mtime_unchanged(self):
         create_run(self.root)
         def snapshot_files():

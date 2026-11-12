@@ -65,6 +65,9 @@ Yleistä kaikki-onnistui-lippua ei ole.
 `verified` tarkoittaa vain paikallisen tilannekuvan eheyttä. Myös epäonnistuneen
 testin aineisto voi olla eheä. Sisällöllinen ristiriita muuttaa luokan
 `contradictory`:ksi, vaikka paketin tiivisteet täsmäisivät.
+Alkuperäinen manifestiväite säilyy `observatory_status`-kentässä, mutta
+`decision_input_status` estää tunnetun ristiriidan etenemisen CI-vertailun tai
+päätösraportin yhteensopivana testinäyttönä.
 
 ## Lokien tulkinnan rajat
 

@@ -267,8 +267,16 @@ def inspect_run(directory: Path, *, budget: int = MAX_TOTAL_BYTES,
     quality = classify(status)
     if contradictions:
         quality = {**quality, "category": "contradictory", "reason": "explicit_claim_contradiction"}
-    github, comparison = _ci(commit, status, ci_by_commit or {})
-    dossier = build_dossier({"local": status, "github": github, "comparison": comparison})
+    # Keep the manifest and byte-integrity observations intact. Decision inputs
+    # must additionally account for known content contradictions.
+    decision_status = {**status, "required_stages_passed": reported_passed is True and not contradictions,
+                       "content_consistent": not contradictions,
+                       "errors": [*status_errors, *contradictions]}
+    github, comparison = _ci(commit, decision_status, ci_by_commit or {})
+    if contradictions:
+        comparison = {**comparison, "consistent_claims": False, "decision": "blocked",
+                      "errors": [*comparison["errors"], "local_content_contradiction"]}
+    dossier = build_dossier({"local": decision_status, "github": github, "comparison": comparison})
     environment = manifest.get("environment") if valid else None
     if not isinstance(environment, (str, dict)) or not environment:
         environment = None
@@ -277,6 +285,7 @@ def inspect_run(directory: Path, *, budget: int = MAX_TOTAL_BYTES,
         "manifest": artifacts["run.json"], "packet": packet, "artifacts": artifacts,
         "stages": stages, "quality": quality, "contradictions": contradictions,
         "errors": sorted(set(errors)), "observatory_status": status,
+        "decision_input_status": decision_status,
         "recovery": _recovery(directory.parent, directory.name, quality["category"]),
         "github": github, "github_comparison": comparison, "decision_dossier": dossier,
         "completed_at_claim": manifest.get("completed_at") if valid else None,

@@ -49,6 +49,11 @@ _DIR_FD = os.open in os.supports_dir_fd and hasattr(os, "O_NOFOLLOW")
 
 @contextmanager
 def directory_handle(path: Path, *, create: bool = False):
+    """Open a directory without requiring access to Android's '/' inode.
+
+    Start at the highest accessible ancestor and traverse descendants with
+    O_NOFOLLOW. Refuse symlinks; do not silently downgrade to path-only I/O.
+    """
     path = checked_path(path)
     if not _DIR_FD:
         if create:
@@ -57,26 +62,35 @@ def directory_handle(path: Path, *, create: bool = False):
         yield None
         checked_path(path, directory=True)
         return
+
+    ancestors = list(reversed(path.parents)) + [path]
+    descriptor = None
+    start = None
+    for index, ancestor in enumerate(ancestors):
+        try:
+            descriptor = os.open(ancestor, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            start = index
+            break
+        except PermissionError:
+            continue
+        except FileNotFoundError:
+            if not create:
+                raise
+            continue
+    if descriptor is None:
+        raise PermissionError("no accessible directory ancestor")
     try:
-        descriptor = os.open(path.anchor, os.O_RDONLY | os.O_DIRECTORY)
-    except PermissionError:
-        # Android app sandboxes can traverse their private directory while
-        # disallowing opening '/'. Keep O_NOFOLLOW on the final component.
-        checked_path(path, directory=True)
-        yield None
-        checked_path(path, directory=True)
-        return
-    try:
-        for name in path.parts[1:]:
+        for part in ancestors[start + 1:]:
             if create:
                 try:
-                    os.mkdir(name, mode=0o700, dir_fd=descriptor)
+                    os.mkdir(part.name, mode=0o700, dir_fd=descriptor)
                 except FileExistsError:
                     pass
-            next_fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+            next_fd = os.open(part.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
                               dir_fd=descriptor)
             os.close(descriptor)
             descriptor = next_fd
+        checked_path(path, directory=True)
         yield descriptor
     finally:
         os.close(descriptor)
@@ -154,17 +168,6 @@ def write_report(path: Path, content: str, source_root: Path) -> None:
     target = output_path(path, source_root)
     raw = content.encode("utf-8")
     if _DIR_FD:
-        # Android may deny opening '/', so use the portable atomic writer
-        # when directory-descriptor traversal is unavailable.
-        try:
-            anchor_fd = os.open(target.anchor, os.O_RDONLY | os.O_DIRECTORY)
-        except PermissionError:
-            anchor_fd = None
-        if anchor_fd is not None:
-            os.close(anchor_fd)
-        if anchor_fd is None:
-            _write_report_portable(target, raw, source_root)
-            return
         with directory_handle(target.parent, create=True) as parent_fd:
             temporary = ".klone-report-" + uuid.uuid4().hex
             descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL

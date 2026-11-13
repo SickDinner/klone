@@ -54,6 +54,7 @@ HTML:ää tai pienempää alkuperäisten ajojen joukkoa erillisessä tarkastelus
 | `contradictions` | Esimerkiksi status/exit code tai manifesti/loki-ristiriita |
 | `recovery` | Käsin tarkistettava tutkimustoimi |
 | `github`, `github_comparison` | Valinnaisen offline-CI-väitteen vertailu |
+| `attestation` | Erillinen allekirjoituksen ja käyttäjän valitseman luottamuskartan tarkistus |
 | `origin_authenticated` | Aina `false`: v1 ei todenna historiallista alkuperää |
 | `test_execution_authenticated` | Aina `false`: lokirivi ei todista suoritusta |
 | `deployment_approval` | Aina `false`: raportti ei hyväksy käyttöönottoa |
@@ -116,6 +117,57 @@ Puuttuva CI on `unavailable`; epäonnistunut CI pysyy epäonnistumisväitteenä.
 CI:n läpäisy ilman paikallista Android-evidenssiä ei vahvista Android-testiä.
 Myös yhteensopiva CI-vienti vaatii alkuperän erillisen tarkistamisen.
 
+## Valinnainen erillisen allekirjoituksen tarkistus
+
+Forensics voi tarkistaa jo olemassa olevan paketin erillisen
+[Ed25519-allekirjoituksen](evidence-attestation-v1.md) samalla lukukerralla.
+Se käyttää täsmälleen samaa pakettioliota kuin lähdeaineiston vertailu. Pakettia
+ei avata allekirjoitusta varten uudelleen.
+
+Lisää tavalliseen Forensics-komentoon molemmat valinnat:
+
+```bash
+--attestations "$ATTESTATIONS" --trusted-keys "$TRUSTED_KEYS"
+```
+
+Polut ovat itse tarkistamiasi JSON-tiedostoja lähdejuuren ulkopuolella.
+`ATTESTATIONS` on suora olio: ajohakemiston nimi -> olemassa oleva erillinen
+allekirjoitusolio. Ajonnimen muoto on `[A-Za-z0-9][A-Za-z0-9_.-]{0,199}`.
+`TRUSTED_KEYS` on witness-tunniste -> 64 pientä heksamerkkiä sisältävä
+Ed25519-julkinen avain. Varmista avaimen sormenjälki toisessa luotetussa kanavassa.
+Paketti, loki tai allekirjoitustiedosto ei voi itse lisätä luotettua avainta.
+
+Allekirjoituskartan raja on 2 MiB / 1000 ajoa ja luottamuskartan 128 KiB /
+1000 avainta. Syötteet luetaan samalla rajatulla no-follow-lukijalla kuin muutkin
+JSONit. Raportti ei saa korvata kumpaakaan syötettä. CLI ei luo allekirjoituksia,
+avaimia tai historiallisia paketteja eikä asenna valinnaista cryptography-backendiä.
+Ilman valintoja allekirjoituksia tai avaimia ei etsitä ajohakemistoista.
+
+`attestation.state` erottaa puuttuvan syötteen (`not_provided`), puuttuvan tai
+virheellisen paketin (`packet_unavailable`), kelvollisen luotetun avaimen
+allekirjoituksen (`verified_signature`), hylkäyksen (`rejected`) ja puuttuvan
+backendin (`verification_unavailable`). `reason` antaa tarkemman syyn.
+Tuntemattomiin ajonnimiin liitetyt allekirjoitukset näkyvät
+`attestation_policy.unmatched_run_names`-listassa. Niitä ei arvata toiselle ajolle.
+
+`attestation_policy` tallentaa molempien jäsennettyjen syötteiden kanonisen JSONin
+SHA-256-tiivisteet. Ne ovat tämän analyysin syötesormenjälkiä, eivät tiedoston
+alkuperän tai historiallisen luottamuksen todisteita. Julkisia avaimia tai
+allekirjoitusolion sisältöä ei kopioida raporttiin; avaimen sormenjälki ja
+witness-tunniste näkyvät erillisinä tietoina.
+
+Kelvollinen allekirjoitus voi esiintyä yhdessä muuttuneiden lähdelokien,
+epäonnistuneen testin tai keskeneräisen v2-talteenoton kanssa. Se ei muuta
+laatuluokkaa, vertailukelpoisuutta, CI-vertailua tai päätösraporttia.
+`origin_authenticated`, `device_identity_verified`, `test_execution_authenticated`
+ja `deployment_approval` pysyvät `false`. Forensicsin exit code 0 tarkoittaa
+raportin muodostumista; se ei lupaa kelvollisia allekirjoituksia tai testien läpäisyä.
+Ajonnimikartta valitsee tarkistettavan paketin; allekirjoitusprotokolla ei sido
+hakemistonimeä tai estä replayta eikä anna luotettua aikaleimaa.
+
+Näkymä näyttää raportin tarkistustulokset tekstinä. Selain ei tee uutta
+kryptografista tarkistusta eikä ota käyttäjän avaamaa raporttia luottamusjuureksi.
+
 ## Luku- ja kirjoitusrajat
 
 Enintään 1000 juurihakemiston merkintää, 64 KiB manifesti, 16 MiB loki, 1 MiB
@@ -132,7 +184,7 @@ JSON-ehdokas voidaan tarkistaa. Useita ehdokkaita ei arvata oikeaksi paketiksi.
 Puuttuvaa historiallista pakettia ei luoda.
 
 Raportit saa kirjoittaa vain lähdejuuren ulkopuolelle. Kohteiden täytyy olla
-erilliset eivätkä ne saa korvata CI-syötettä. Kukin raporttitiedosto korvataan
+erilliset eivätkä ne saa korvata CI- tai allekirjoituksen tarkistuksen syötteitä. Kukin raporttitiedosto korvataan
 atomisesti; kahden tiedoston julkaisu ei ole yhteinen transaktio. CLI:n virhettä
 ei saa tulkita valmiiksi raporttipariksi. Alkuperäisiä lähteitä ei kirjoiteta.
 Sama muuttumaton syöte ja samat rajat tuottavat saman JSONin ja analyysitiivisteen.

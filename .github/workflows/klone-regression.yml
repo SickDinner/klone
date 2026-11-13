@@ -27,6 +27,7 @@ jobs:
         run: |
           python -c "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey"
           python -m unittest discover -s tests -p "test_evidence_attestation.py" -v
+          python -m unittest discover -s tests -p "test_evidence_forensics_attestation.py" -v
 
   test:
     runs-on: ${{ matrix.os }}

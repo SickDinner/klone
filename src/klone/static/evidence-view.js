@@ -168,6 +168,19 @@
         ["Paketti", r.packet?.state], ["Paketti vastaa lähdeaineistoa", tri(r.packet?.matches_source)],
         ["CI-väite", r.github?.state], ["CI ja paikallinen väite yhteensopivat", tri(r.github_comparison?.consistent_claims)],
         ["Alkuperä", "Ei riippumattomasti varmennettu"], ["Käyttöönotto", "Ei hyväksyntää"]]);
+      item.appendChild(node("h3", "Erillinen allekirjoituksen tarkistus"));
+      const witness = r.attestation;
+      const witnessStates = {not_provided: "Ei annettu", packet_unavailable: "Pakettia ei voi tarkistaa",
+        verified_signature: "Luotetun avaimen allekirjoitus täsmää",
+        verification_unavailable: "Tarkistus ei käytettävissä", rejected: "Allekirjoitus hylätty"};
+      appendTable(item, ["Tieto", "Raportin tarkistustulos"], [
+        ["Tila", witnessStates[witness?.state] || "Ei tietoa tässä raportissa"],
+        ["Allekirjoitus kelvollinen", tri(witness?.signature_valid)],
+        ["Witness ja luottamuskartan avain täsmäävät", tri(witness?.witness_authenticated)],
+        ["Witness-tunniste", witness?.witness_id], ["Julkisen avaimen SHA-256", witness?.public_key_sha256],
+        ["Tarkistuksen syy", witness?.reason],
+        ["Luottamuskartan kanoninen SHA-256", data.attestation_policy?.trusted_keys_sha256]]);
+      item.appendChild(node("p", "Allekirjoitus koskee pakettitiivistettä, committia ja witness-tunnistetta. Lähdeaineiston vastaavuus tarkistetaan erikseen. Tämä näkymä näyttää raportin väitteet; se ei itse tarkista allekirjoitusta eikä vahvista laitetta, testisuoritusta tai käyttöönottoa."));
       item.appendChild(node("h3", "Testivaiheet"));
       appendTable(item, ["Vaihe", "Manifestin status", "Exit code", "Lokin väite", "Näyttö"],
         Object.entries(r.stages).map(([name, stage]) => [name, stage?.declared_status,

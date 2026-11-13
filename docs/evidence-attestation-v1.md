@@ -26,6 +26,11 @@ Se ei lue tai varmista paketin nimeämiä alkuperäisiä testilokeja. Tee niiden
 vertailu erikseen Evidence Forensicsilla. Näiden kahden tarkistuksen tuloksia ei
 saa yhdistää yleiseksi onnistumiseksi.
 
+Forensicsin [valinnainen allekirjoitusnäkymä](evidence-forensics-v1.md#valinnainen-erillisen-allekirjoituksen-tarkistus)
+tekee nyt molemmat tarkistukset samasta pakettitilannekuvasta ja näyttää niiden
+tulokset erillisinä. Tarkistuksen syötteet annetaan erikseen; puuttuvia
+allekirjoituksia tai luottamusavaimia ei luoda tai päätellä.
+
 ## Käyttö
 
 Perusasennus ja Forensics eivät tarvitse cryptography-pakettia. Allekirjoitukset

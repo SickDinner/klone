@@ -13,6 +13,7 @@ import urllib.error
 from klone.evidence_status import inspect
 from klone.evidence_github_bridge import fetch
 from klone.evidence_cross_environment import compare
+from klone.evidence_io import new_output_path, write_new_report
 
 
 def run(run_directory: Path, packet: Path, *, github_fetch=fetch) -> dict:
@@ -44,11 +45,15 @@ def main(argv=None) -> int:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     packet = args.packet or args.run_directory / "evidence-packet.json"
-    result = run(args.run_directory, packet)
-    rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
-    if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(rendered, encoding="utf-8")
+    try:
+        if args.output:
+            new_output_path(args.output, args.run_directory.parent)
+        result = run(args.run_directory, packet)
+        rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
+        if args.output:
+            write_new_report(args.output, rendered, args.run_directory.parent)
+    except (ValueError, OSError, TypeError, UnicodeError, RecursionError) as exc:
+        parser.error(str(exc))
     print(rendered, end="")
     return 0 if result["decision"] == "manual_review_required" else 2
 

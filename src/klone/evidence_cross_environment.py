@@ -9,7 +9,8 @@ import argparse
 import json
 from pathlib import Path
 
-from klone.evidence_network import SHA, REQUIRED, _read_json
+from klone.evidence_network import SHA, REQUIRED
+from klone.evidence_io import json_object, read_bounded, new_output_path, write_new_report
 
 
 def compare(android: dict, github: dict) -> dict:
@@ -30,6 +31,14 @@ def compare(android: dict, github: dict) -> dict:
         errors.append("github_ci_not_success")
     if github.get("workflow") != "KLONE regression guard":
         errors.append("unexpected_workflow")
+    if "run_status" in github and github["run_status"] != "completed":
+        errors.append("github_ci_not_completed")
+    if "listing_complete" in github and github["listing_complete"] is not True:
+        errors.append("github_ci_listing_incomplete")
+    if "repository" in github and github["repository"] != "SickDinner/klone":
+        errors.append("unexpected_repository")
+    if "workflow_path" in github and github["workflow_path"] != ".github/workflows/klone-regression.yml":
+        errors.append("unexpected_workflow_path")
     stages = android.get("stage_statuses")
     if not isinstance(stages, dict) or any(stages.get(x) != "passed" for x in REQUIRED):
         errors.append("android_required_stage_mismatch")
@@ -47,16 +56,18 @@ def main(argv=None) -> int:
     parser.add_argument("--android-status", type=Path, required=True)
     parser.add_argument("--github-ci", type=Path, required=True)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--runs-root", type=Path, default=Path.home() / "klone-var/test-runs")
     args = parser.parse_args(argv)
     try:
-        result = compare(_read_json(args.android_status),
-                         _read_json(args.github_ci))
-    except (ValueError, OSError, TypeError, KeyError, json.JSONDecodeError) as exc:
+        if args.output:
+            new_output_path(args.output, args.runs_root)
+        result = compare(json_object(read_bounded(args.android_status, 131072)),
+                         json_object(read_bounded(args.github_ci, 131072)))
+        rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
+        if args.output:
+            write_new_report(args.output, rendered, args.runs_root)
+    except (ValueError, OSError, TypeError, KeyError, UnicodeError, RecursionError) as exc:
         parser.error(str(exc))
-    rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
-    if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(rendered, encoding="utf-8")
     print(rendered, end="")
     return 0 if result["consistent_claims"] else 2
 

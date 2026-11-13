@@ -258,8 +258,10 @@ def _ci(commit: str | None, status: dict, snapshots: dict) -> tuple[dict, dict]:
                       "origin_authenticated": False, "deployment_approval": False}
         return {"state": "unavailable", "commit": None, "conclusion": None,
                 "origin_authenticated": False}, comparison
-    normalized = {key: candidate.get(key) for key in
-                  ("commit", "conclusion", "workflow", "run_id", "run_status")}
+    normalized = {key: candidate.get(key) for key in ("commit", "conclusion", "workflow")}
+    normalized.update({key: candidate[key] for key in
+                       ("run_id", "run_status", "run_attempt", "repository", "event",
+                        "workflow_path", "listing_complete", "job_matrix_verified") if key in candidate})
     comparison = compare_ci(status, normalized)
     return {**normalized, "state": "reported_success" if normalized["conclusion"] == "success"
             else "reported_failure" if normalized["conclusion"] in

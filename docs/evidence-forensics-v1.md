@@ -98,6 +98,12 @@ Sama ympäristöväite on vertailun edellytys, ei riippumattomasti varmennettu f
 Historiallinen `termux_evidence_battery.py` ei tallentanut ympäristöväitettä.
 Sellaisesta aineistosta ei jälkikäteen keksitä ympäristöä tai hyväksyntää.
 
+Uusien ajojen [manifesti v2](termux-evidence-manifest-v2.md) tallentaa tarkat
+komennot ja vertailutunnisteen. V2-ajoilla myös sen täytyy täsmätä. Ajon aikana
+muuttunut konteksti tai keskeneräinen lokien talteenotto estää päätösraportin
+yhteensopivuuspolun. V1/v2-sekavertailua ei vahvisteta. Syntax-vaiheen uusi
+rakenteinen yhteenveto tunnistetaan edelleen epäluotettavana lokiväitteenä.
+
 ## Valinnainen CI-vienti
 
 `--github-ci /polku/ci-by-commit.json` lukee enintään 2 MiB JSON-olion. Sen avaimet

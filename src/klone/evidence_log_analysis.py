@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import re
 
+from klone.evidence_io import json_object
+
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 COUNTS = re.compile(r"(?<!\w)(\d+) (passed|failed|errors?|skipped|warnings?|xfailed|xpassed|deselected)\b")
 PYTEST_SUMMARY = re.compile(
@@ -24,6 +26,21 @@ def analyze(raw: bytes, stage: str) -> dict:
         result["reason"] = "invalid_utf8"
         return result
     candidates = []
+    if stage == "syntax":
+        try:
+            claim = json_object(raw)
+            if (type(claim.get("schema_version")) is int and claim["schema_version"] == 1
+                    and claim.get("kind") == "klone-syntax-check"
+                    and claim.get("status") in ("passed", "failed")
+                    and type(claim.get("files")) is int and claim["files"] >= 0
+                    and isinstance(claim.get("errors"), list)
+                    and (claim["status"] == "failed" or (claim["files"] > 0 and not claim["errors"]))):
+                result.update(reported_status=claim["status"], framework="klone_syntax_check",
+                              counts={"files": claim["files"]}, summary=text[:512],
+                              reason="untrusted_syntax_summary_claim")
+                return result
+        except (ValueError, UnicodeError, RecursionError):
+            pass
     lines = text.splitlines()
     for index, line in enumerate(lines):
         if PYTEST_SUMMARY.fullmatch(line):

@@ -32,4 +32,4 @@ class TermuxEvidenceBatteryTests(unittest.TestCase):
 
     def test_missing_virtualenv_does_not_create_false_success(self):
         with self.assertRaises(FileNotFoundError):
-            module.run_battery(self.root, self.root / "reports")
+            module.run_battery(self.root, self.root.parent / (self.root.name + "-reports"))

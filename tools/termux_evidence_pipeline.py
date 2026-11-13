@@ -17,6 +17,8 @@ from klone.test_evidence_ledger import EvidenceLedger
 from klone.test_evidence_dashboard import compare_commits, summarize
 from test_evidence_dashboard import render
 from termux_evidence_battery import run_battery
+from klone.evidence_network import STAGES, validate_run
+from klone.evidence_io import json_object, read_bounded
 
 SHA = re.compile(r"^[0-9a-f]{40}$")
 REQUIRED = ("syntax", "cognition", "full", "local_deploy")
@@ -25,9 +27,12 @@ OPTIONAL = ("passed", "failed", "unavailable", "not_present")
 
 def load_report(directory: Path) -> dict:
     path = directory / "run.json"
-    if not path.is_file() or path.stat().st_size > 65536:
-        raise ValueError("missing or oversized run.json")
-    report = json.loads(path.read_text(encoding="utf-8"))
+    report = json_object(read_bounded(path, 65536))
+    if type(report.get("schema_version")) is int and report["schema_version"] == 2:
+        validate_run(report)
+        for name in STAGES:
+            read_bounded(directory / (name + ".log"), 16 * 1024 * 1024)
+        return report
     if not isinstance(report, dict) or report.get("schema_version") != 1:
         raise ValueError("unsupported report schema")
     before, after = report["before"], report["after"]
@@ -83,7 +88,7 @@ def import_report(directory: Path, database: Path) -> tuple[dict, bool, str]:
         "commit": commit,
         "status": "success" if report["overall"] == "passed" else "failure",
         "observed_at": report["completed_at"],
-        "environment": "android-termux-unverified",
+        "environment": (report["environment"]["platform"] + "-unverified") if report["schema_version"] == 2 else "android-termux-unverified",
         "details": {
             "manifest_sha256": digest,
             "stages": {name: item["status"] for name, item in report["stages"].items()},
@@ -95,6 +100,11 @@ def import_report(directory: Path, database: Path) -> tuple[dict, bool, str]:
             "deployment_approval": False,
         },
     }
+    if report["schema_version"] == 2:
+        record["details"].update(manifest_schema_version=2,
+                                 comparison_id=report["execution"]["comparison_id"],
+                                 execution_context_consistent=report["execution"]["context_consistent"],
+                                 collection_complete=report["collection_complete"])
     database.parent.mkdir(parents=True, exist_ok=True)
     ledger = EvidenceLedger(database)
     ledger.initialize()
@@ -109,6 +119,7 @@ def main(argv=None):
     mode.add_argument("--run-directory", type=Path)
     parser.add_argument("--root", type=Path, default=Path.home() / "klone-next")
     parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--python", type=Path, help="Existing virtualenv interpreter for --run")
     parser.add_argument("--database", type=Path, required=True)
     parser.add_argument("--dashboard", type=Path, required=True)
     parser.add_argument("--baseline", help="baseline SHA; default is candidate (no comparison)")
@@ -118,7 +129,8 @@ def main(argv=None):
         if args.output_dir is None or not (1 <= args.timeout <= 3600):
             parser.error("--run requires --output-dir and timeout 1..3600")
         directory = args.output_dir.resolve()
-        run_battery(args.root.resolve(), directory, args.timeout)
+        kwargs = {"python": args.python} if args.python is not None else {}
+        run_battery(args.root, args.output_dir, args.timeout, **kwargs)
     else:
         directory = args.run_directory.resolve()
     try:

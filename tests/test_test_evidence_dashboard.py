@@ -77,6 +77,44 @@ class EvidenceDashboardTests(unittest.TestCase):
             {"source": "termux_bridge", "environment": "android"}
         ])
 
+    def v2(self, commit, status, run, context='c'*64, consistent=True, complete=True):
+        item = record(commit, 'termux_bridge', status, 'android-unverified', run)
+        item['details'] = {'manifest_schema_version':2, 'comparison_id':context,
+                           'execution_context_consistent':consistent, 'collection_complete':complete}
+        self.ledger.append(item)
+
+    def test_v2_matching_complete_context_can_compare(self):
+        self.v2(self.old, 'success', 'old')
+        self.v2(self.new, 'failure', 'new')
+        comparison = compare_commits(self.ledger,self.old,self.new)
+        self.assertEqual(len(comparison['regressions']),1)
+        self.assertEqual(comparison['unknown_contexts'],[])
+
+    def test_v2_different_profiles_are_unknown_and_visible_in_html(self):
+        self.v2(self.old, 'success', 'old')
+        self.v2(self.new, 'failure', 'new', context='d'*64)
+        comparison = compare_commits(self.ledger,self.old,self.new)
+        self.assertEqual(comparison['regressions'],[])
+        self.assertEqual(comparison['improvements'],[])
+        self.assertEqual(len(comparison['unknown_contexts']),1)
+        import importlib.util
+        spec=importlib.util.spec_from_file_location('context_dashboard_html',Path(__file__).resolve().parents[1]/'tools/test_evidence_dashboard.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        page=module.render(summarize(self.ledger,self.new),comparison)
+        self.assertIn('v2_context_unavailable_or_mismatched',page)
+
+    def test_v2_incomplete_or_inconsistent_context_cannot_confirm(self):
+        self.v2(self.old,'success','old',consistent=False)
+        self.v2(self.new,'failure','new',complete=False)
+        self.assertEqual(compare_commits(self.ledger,self.old,self.new)['regressions'],[])
+
+    def test_mixed_v1_and_v2_cannot_confirm_a_ledger_regression(self):
+        self.ledger.append(record(self.old,'termux_bridge','success','android-unverified','old'))
+        self.v2(self.new,'failure','new')
+        comparison=compare_commits(self.ledger,self.old,self.new)
+        self.assertEqual(comparison['regressions'],[])
+        self.assertEqual(len(comparison['unknown_contexts']),1)
+
 
 if __name__ == "__main__":
     unittest.main()

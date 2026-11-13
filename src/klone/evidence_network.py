@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 import re
 
+from klone.evidence_run_context import validate_context
+
 STAGES = ("syntax", "cognition", "full", "local_deploy", "torch_probe")
 REQUIRED = STAGES[:4]
 SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -46,7 +48,7 @@ def _read_json(path: Path, limit: int = 65536) -> dict:
 
 
 def validate_run(run: dict) -> None:
-    if run.get("schema_version") != 1:
+    if type(run.get("schema_version")) is not int or run["schema_version"] not in (1, 2):
         raise ValueError("unsupported battery schema")
     before, after = run["before"], run["after"]
     commit = before["commit"]
@@ -66,9 +68,13 @@ def validate_run(run: dict) -> None:
         raise ValueError("invalid optional stage")
     required_ok = all(stages[n]["status"] == "passed" for n in REQUIRED)
     consistent = (before.get("dirty") is False and after.get("dirty") is False)
+    execution_ok = True
+    if run["schema_version"] == 2:
+        execution = validate_context(run)
+        execution_ok = execution["context_consistent"] and run["collection_complete"]
     if (run.get("required_tests_passed") is not required_ok
             or run.get("checkout_consistent") is not consistent
-            or run.get("overall") != ("passed" if required_ok and consistent else "failed")):
+            or run.get("overall") != ("passed" if required_ok and consistent and execution_ok else "failed")):
         raise ValueError("contradictory run verdict")
     if run.get("device_identity_verified") is not False or run.get("deployment_approval") is not False:
         raise ValueError("unsupported authenticity or approval claim")

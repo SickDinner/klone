@@ -173,6 +173,22 @@
         Object.entries(r.stages).map(([name, stage]) => [name, stage?.declared_status,
           stage?.declared_exit_code, stage?.log_evidence?.reported_status,
           stage?.log_evidence?.summary || stage?.log_evidence?.reason]));
+      const execution = r.execution_context_claim;
+      item.appendChild(node("h3", "Ajokonteksti ja tarkat komennot"));
+      if (r.manifest_schema_version === 2 && execution) {
+        appendTable(item, ["Tieto", "Manifestin väite"], [
+          ["Python", r.environment_claim?.python_version], ["Alusta", r.environment_claim?.platform],
+          ["Suoritettava Python", execution.python_executable], ["Työhakemisto", execution.cwd],
+          ["Testiaineiston SHA-256", execution.test_suite_before?.sha256],
+          ["Vertailutunniste", execution.comparison_id],
+          ["Konteksti pysyi samana", tri(r.trust?.execution_context_consistent)],
+          ["Lokien talteenotto kokonainen", tri(r.trust?.collection_complete)]]);
+        appendTable(item, ["Vaihe", "Tarkka argv (tietoa, ei ajettava painike)"],
+          Object.entries(execution.commands || {}).map(([name, argv]) => [name, JSON.stringify(argv)]));
+        item.appendChild(node("p", "Kontekstin täsmääminen on paikallinen vertailuehto. Laitetta tai testisuorituksen aitoutta ei sillä varmenneta."));
+      } else {
+        item.appendChild(node("p", "Tarkka ajokonteksti puuttuu tästä vanhasta tai puutteellisesta manifestista. Tietoja ei täydennetä jälkikäteen."));
+      }
       item.appendChild(node("h3", "Artefaktien eheys"));
       appendTable(item, ["Tiedosto", "Tila", "Tavuja", "SHA-256"],
         [...Object.entries(r.artifacts).map(([name, a]) => [name, a?.state, a?.bytes, a?.sha256]),

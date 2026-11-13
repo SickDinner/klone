@@ -45,6 +45,15 @@ def compare_history(runs: list[dict]) -> list[dict]:
                                and after.get(name) not in ("passed", "failed")]
         integrity_comparable = (previous["integrity_ok"] is True
                                 and current["integrity_ok"] is True)
+        versions = (previous.get("manifest_schema_version", 1), current.get("manifest_schema_version", 1))
+        if 2 in versions:
+            integrity_comparable = (integrity_comparable and versions == (2, 2)
+                                    and previous.get("execution_context_consistent") is True
+                                    and current.get("execution_context_consistent") is True
+                                    and previous.get("collection_complete") is True
+                                    and current.get("collection_complete") is True
+                                    and isinstance(previous.get("execution_context_id"), str)
+                                    and previous["execution_context_id"] == current.get("execution_context_id"))
         if not integrity_comparable:
             unknown_transitions = sorted(set(unknown_transitions) | {
                 name for name in REQUIRED if before.get(name) != after.get(name)

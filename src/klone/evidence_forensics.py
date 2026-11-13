@@ -53,7 +53,7 @@ def _manifest(raw: bytes | None) -> tuple[dict | None, bool, list[str]]:
     except (ValueError, UnicodeError, RecursionError):
         return None, False, ["manifest_invalid_json"]
     try:
-        if type(data.get("schema_version")) is not int or data["schema_version"] != 1:
+        if type(data.get("schema_version")) is not int or data["schema_version"] not in (1, 2):
             raise ValueError("schema")
         before, after, stages = data["before"], data["after"], data["stages"]
         if not all(isinstance(value, dict) for value in (before, after, stages)):
@@ -269,13 +269,22 @@ def inspect_run(directory: Path, *, budget: int = MAX_TOTAL_BYTES,
         quality = {**quality, "category": "contradictory", "reason": "explicit_claim_contradiction"}
     # Keep the manifest and byte-integrity observations intact. Decision inputs
     # must additionally account for known content contradictions.
-    decision_status = {**status, "required_stages_passed": reported_passed is True and not contradictions,
+    execution = manifest.get("execution") if valid and manifest["schema_version"] == 2 else None
+    status.update(manifest_schema_version=manifest["schema_version"] if valid else None,
+                  execution_context_id=execution["comparison_id"] if execution else None,
+                  execution_context_consistent=execution["context_consistent"] if execution else None,
+                  collection_complete=manifest["collection_complete"] if execution else None)
+    execution_ok = execution is None or (execution["context_consistent"] and manifest["collection_complete"])
+    decision_status = {**status, "required_stages_passed": reported_passed is True and not contradictions and execution_ok,
                        "content_consistent": not contradictions,
                        "errors": [*status_errors, *contradictions]}
     github, comparison = _ci(commit, decision_status, ci_by_commit or {})
     if contradictions:
         comparison = {**comparison, "consistent_claims": False, "decision": "blocked",
                       "errors": [*comparison["errors"], "local_content_contradiction"]}
+    if not execution_ok:
+        comparison = {**comparison, "consistent_claims": False, "decision": "blocked",
+                      "errors": [*comparison["errors"], "local_execution_context_incomplete"]}
     dossier = build_dossier({"local": decision_status, "github": github, "comparison": comparison})
     environment = manifest.get("environment") if valid else None
     if not isinstance(environment, (str, dict)) or not environment:
@@ -290,12 +299,16 @@ def inspect_run(directory: Path, *, budget: int = MAX_TOTAL_BYTES,
         "github": github, "github_comparison": comparison, "decision_dossier": dossier,
         "completed_at_claim": manifest.get("completed_at") if valid else None,
         "environment_claim": environment,
+        "manifest_schema_version": manifest["schema_version"] if valid else None,
+        "execution_context_claim": execution,
         "trust": {"manifest_and_logs_found": _all_known(a["exists"] for a in artifacts.values()),
                   "manifest_and_logs_readable": _all_known(a["readable"] for a in artifacts.values()),
                   "manifest_structurally_valid": valid if "run.json" in contents else None,
                   "packet_matches_source": packet["matches_source"],
                   "manifest_reports_required_stages_passed": reported_passed,
                   "all_required_logs_support_claims": _all_known(stages[n]["log_supports_claim"] for n in REQUIRED),
+                  "execution_context_consistent": execution["context_consistent"] if execution else None,
+                  "collection_complete": manifest["collection_complete"] if execution else None,
                   "origin_authenticated": False, "test_execution_authenticated": False,
                   "deployment_approval": False},
         "origin_authenticated": False, "deployment_approval": False,
@@ -311,10 +324,15 @@ def _comparisons(runs: list[dict]) -> list[dict]:
         temporal = t0 is not None and t1 is not None and t0 < t1
         environment = (before["environment_claim"] is not None
                        and before["environment_claim"] == after["environment_claim"])
-        comparable = comparison["comparable"] and temporal and environment
+        v0, v1 = before["manifest_schema_version"], after["manifest_schema_version"]
+        c0, c1 = before["execution_context_claim"], after["execution_context_claim"]
+        context = (v0 == v1 == 1 or (v0 == v1 == 2 and c0["context_consistent"]
+                   and c1["context_consistent"] and c0["comparison_id"] == c1["comparison_id"]
+                   and before["trust"]["collection_complete"] and after["trust"]["collection_complete"]))
+        comparable = comparison["comparable"] and temporal and environment and context
         regressed, recovered = [], []
         unknown = set(comparison["unknown_transitions"])
-        if not comparison["comparable"]:
+        if not comparable:
             unknown.update(REQUIRED)
         for name in REQUIRED:
             a, b = before["stages"][name], after["stages"][name]
@@ -331,6 +349,8 @@ def _comparisons(runs: list[dict]) -> list[dict]:
                        "regressed_stages": regressed, "recovered_stages": recovered,
                        "unknown_transitions": sorted(unknown),
                        "environment_claims_match": environment, "time_claims_ordered": temporal,
+                       "execution_contexts_match": bool(context),
+                       "context_comparison_scope": "v2_execution_claims" if v0 == v1 == 2 else "legacy_environment_claim_only" if v0 == v1 == 1 else "unavailable",
                        "ordering": "directory_name_only", "causality_established": False,
                        "confirmation_scope": "locally_consistent_claims_only",
                        "origin_authenticated": False, "deployment_approval": False})

@@ -344,3 +344,14 @@ class BatteryV2Tests(unittest.TestCase):
              patch.object(battery,'checkout',side_effect=AssertionError('no test execution')):
             with self.assertRaises(ValueError):
                 battery.run_battery(self.root,self.output,python=self.python)
+
+    def test_cli_keeps_symlink_path_until_safety_validation(self):
+        linked=self.base/'linked-output-parent'
+        try:
+            linked.symlink_to(self.root,target_is_directory=True)
+        except OSError:
+            self.skipTest('symlinks unavailable')
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as raised:
+            battery.main(['--root',str(self.root),'--python',str(self.python),'--output',str(linked/'new-run')])
+        self.assertEqual(raised.exception.code,2)
+        self.assertFalse((self.root/'new-run').exists())

@@ -26,7 +26,9 @@ class BatteryOutputAliasTests(unittest.TestCase):
                     with patch("builtins.print"):
                         code = self.module.main(["--root", str(root), flag, str(output)])
                 self.assertEqual(code, 0)
-                self.assertEqual(run.call_args.args[1], output.resolve())
+                # Preserve the original path for the collector's no-follow checks.
+                # Windows can spell the same temp directory with an 8.3 alias.
+                self.assertEqual(run.call_args.args[1], output)
 
     def test_missing_output_rejected(self):
         with patch.object(sys, "stderr"):

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime
+import re
 from .test_evidence_ledger import EvidenceLedger
 
 
@@ -49,15 +50,29 @@ def compare_commits(ledger: EvidenceLedger, baseline: str, candidate: str) -> di
         grouped = {}
         for row in rows.values():
             key = (row["source"], row.get("environment", ""))
-            grouped.setdefault(key, []).append(row["status"])
+            grouped.setdefault(key, []).append(row)
         return grouped
 
     old, new = groups(before), groups(after)
     regressions = []
     improvements = []
+    unknown_contexts = []
     for key in sorted(old.keys() & new.keys()):
-        previous = old[key]
-        current = new[key]
+        rows = old[key] + new[key]
+        versions = [r.get("details", {}).get("manifest_schema_version", 1) for r in rows]
+        if any(type(v) is not int or v != 1 for v in versions):
+            context_ids = [r.get("details", {}).get("comparison_id") for r in rows]
+            context_ok = (all(type(v) is int and v == 2 for v in versions)
+                          and all(isinstance(v, str) and re.fullmatch(r"[0-9a-f]{64}", v) for v in context_ids)
+                          and len(set(context_ids)) == 1
+                          and all(r["details"].get("execution_context_consistent") is True
+                                  and r["details"].get("collection_complete") is True for r in rows))
+            if not context_ok:
+                unknown_contexts.append({"source": key[0], "environment": key[1],
+                                         "reason": "v2_context_unavailable_or_mismatched"})
+                continue
+        previous = [row["status"] for row in old[key]]
+        current = [row["status"] for row in new[key]]
         if previous and all(s == "success" for s in previous) and "failure" in current:
             regressions.append({"source": key[0], "environment": key[1], "reason": "success_to_failure"})
         elif "failure" in previous and current and all(s == "success" for s in current):
@@ -67,6 +82,7 @@ def compare_commits(ledger: EvidenceLedger, baseline: str, candidate: str) -> di
         "candidate": candidate,
         "regressions": regressions,
         "improvements": improvements,
+        "unknown_contexts": unknown_contexts,
         "missing_baseline_environments": [
             {"source": k[0], "environment": k[1]} for k in sorted(new.keys() - old.keys())
         ],

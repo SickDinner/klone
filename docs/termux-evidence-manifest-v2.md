@@ -82,6 +82,11 @@ pysyneillä konteksteilla. V1:n ja v2:n sekoitus jää epävarmaksi. Vanhojen ka
 v1-ajon vertailun ennestään dokumentoitu ympäristöväite säilyy erillisenä
 heikompana vertailutasona.
 
+Myös Pipelinesta muodostettu SQLite-dashboard tarkistaa v2-kontekstit. Saman
+lähde/alustaryhmän kaikkien vertailtavien tietueiden täytyy ilmoittaa sama,
+vakaa ja kokonaan talteenotettu v2-konteksti. Muut ryhmät näkyvät
+`unknown_contexts`-havaintoina, eivät regressioina tai palautumisina.
+
 Luotettavan laitteen identiteetti, historiallisen suorituksen aitous ja
 käyttöönoton hyväksyntä eivät seuraa kontekstitiivisteestä. Niiden liput pysyvät
 `false`. Forensicsin päätösraportti estää muuttuneen kontekstin tai vaillinaisen

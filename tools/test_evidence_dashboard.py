@@ -33,8 +33,8 @@ def render(summary: dict, comparison: dict) -> str:
     differences = [
         {"type": kind, **entry}
         for kind in ("regressions", "improvements", "missing_baseline_environments",
-                     "missing_candidate_environments")
-        for entry in comparison[kind]
+                     "missing_candidate_environments", "unknown_contexts")
+        for entry in comparison.get(kind, [])
     ]
     style = ("body{font:16px system-ui,sans-serif;max-width:1100px;margin:2rem auto;"
              "padding:0 1rem;background:#101820;color:#f1f5f9}"

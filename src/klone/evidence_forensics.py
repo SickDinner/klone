@@ -13,7 +13,9 @@ from datetime import datetime
 import hashlib
 import json
 from pathlib import Path
+import re
 
+from klone.evidence_attestation import unverified_result, verify as verify_attestation
 from klone.evidence_artifact_inspector import snapshot
 from klone.evidence_cross_environment import compare as compare_ci
 from klone.evidence_decision_dossier import build as build_dossier
@@ -33,6 +35,49 @@ MAX_RUNS = 1000
 MAX_DIRECTORY_ENTRIES = 128
 MAX_CI = 2 * 1024 * 1024
 KIND = "klone-evidence-forensics"
+MAX_ATTESTATIONS = 2 * 1024 * 1024
+MAX_TRUSTED_KEYS = 128 * 1024
+
+
+def _witness_inputs(attestations: dict | None, trusted_keys: dict | None) -> dict:
+    """Validate explicit caller-owned inputs; never discover trust in a run."""
+    if attestations is None and trusted_keys is None:
+        return {"mode": "not_provided", "attestations_sha256": None,
+                "trusted_keys_sha256": None}
+    if attestations is None or trusted_keys is None:
+        raise ValueError("attestations and explicit trusted keys must be provided together")
+    if not isinstance(attestations, dict) or len(attestations) > MAX_RUNS:
+        raise ValueError("invalid attestation run mapping")
+    if any(not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,199}", name)
+           or not isinstance(value, dict) for name, value in attestations.items()):
+        raise ValueError("invalid attestation run entry")
+    if not isinstance(trusted_keys, dict) or len(trusted_keys) > MAX_RUNS:
+        raise ValueError("invalid trusted key mapping")
+    if any(not isinstance(name, str) or not re.fullmatch(r"[a-zA-Z0-9_.:-]{1,100}", name)
+           or not isinstance(key, str) or not re.fullmatch(r"[0-9a-f]{64}", key)
+           for name, key in trusted_keys.items()):
+        raise ValueError("invalid trusted public key entry")
+    encoded, keys = canonical(attestations), canonical(trusted_keys)
+    if len(encoded) > MAX_ATTESTATIONS or len(keys) > MAX_TRUSTED_KEYS:
+        raise ValueError("witness input size limit exceeded")
+    return {"mode": "explicit_external_inputs",
+            "attestations_sha256": hashlib.sha256(encoded).hexdigest(),
+            "trusted_keys_sha256": hashlib.sha256(keys).hexdigest()}
+
+
+def _witness(packet: dict | None, attestation: dict | None,
+             trusted_keys: dict | None) -> dict:
+    if attestation is None:
+        return {**unverified_result("not_provided"), "state": "not_provided"}
+    if packet is None:
+        return {**unverified_result("packet_unavailable"), "state": "packet_unavailable"}
+    result = verify_attestation(packet, attestation, trusted_keys)
+    state = ("verified_signature" if result["witness_authenticated"] else
+             "verification_unavailable" if result["reason"] == "crypto_unavailable" else "rejected")
+    witness = attestation.get("witness_id")
+    return {**result, "state": state,
+            "witness_id": witness if isinstance(witness, str) and
+            re.fullmatch(r"[a-zA-Z0-9_.:-]{1,100}", witness) else None}
 
 
 def _timestamp(value):
@@ -104,13 +149,13 @@ def _select_packet(directory: Path) -> tuple[str | None, list[str]]:
 
 
 def _packet(directory: Path, manifest: dict | None, manifest_valid: bool,
-            contents: dict[str, bytes], artifacts: dict, budget: int) -> tuple[dict, int]:
+            contents: dict[str, bytes], artifacts: dict, budget: int) -> tuple[dict, int, dict | None]:
     name, errors = _select_packet(directory)
     result = {"filename": name, "state": "unknown" if errors else "missing",
               "exists": None, "readable": None, "structure_valid": None, "matches_source": None, "sha256": None,
               "packet_sha256": None, "errors": errors}
     if name is None:
-        return result, 0
+        return result, 0, None
     try:
         raw = read_bounded(directory / name, min(MAX_PACKET, max(0, budget)))
     except EvidenceIOError as exc:
@@ -119,8 +164,9 @@ def _packet(directory: Path, manifest: dict | None, manifest_valid: bool,
         result["exists"] = False if result["state"] == "missing" else True if result["state"] in ("oversized", "symlink_rejected", "not_regular", "budget_exceeded") else None
         result["readable"] = False if result["state"] == "unreadable" else None
         result["errors"].append("packet_unreadable:" + result["state"])
-        return result, 0
+        return result, 0, None
     result.update(state="present", exists=True, readable=True, bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest())
+    payload = None
     try:
         packet = json_object(raw)
         digest = packet.get("packet_sha256")
@@ -150,6 +196,7 @@ def _packet(directory: Path, manifest: dict | None, manifest_valid: bool,
                 or packet.get("origin_authentication") != "not_provided"):
             raise ValueError("packet claims schema")
         result["structure_valid"] = True
+        payload = packet
         result["packet_sha256"] = digest
         actual_digest = hashlib.sha256(canonical({k: v for k, v in packet.items()
                                                    if k != "packet_sha256"})).hexdigest()
@@ -166,9 +213,10 @@ def _packet(directory: Path, manifest: dict | None, manifest_valid: bool,
         else:
             result["errors"].append("packet_source_comparison_unavailable")
     except (ValueError, KeyError, TypeError, AttributeError, UnicodeError, RecursionError):
+        payload = None
         result["structure_valid"] = False
         result["errors"].append("packet_invalid_json_or_schema")
-    return result, len(raw)
+    return result, len(raw), payload
 
 
 def _stage_claims(manifest: dict | None, contents: dict[str, bytes]) -> tuple[dict, list[str]]:
@@ -234,13 +282,15 @@ def _recovery(root: Path, name: str, category: str) -> dict:
 
 
 def inspect_run(directory: Path, *, budget: int = MAX_TOTAL_BYTES,
-                ci_by_commit: dict | None = None) -> tuple[dict, int]:
+                ci_by_commit: dict | None = None, attestation: dict | None = None,
+                trusted_keys: dict | None = None) -> tuple[dict, int]:
     inventory, contents = snapshot(directory, byte_budget=budget)
     artifacts = {name: _artifact_state(meta) for name, meta in inventory["artifacts"].items()}
     consumed = sum(len(raw) for raw in contents.values())
     manifest, valid, manifest_errors = _manifest(contents.get("run.json"))
     artifacts["run.json"]["structure_valid"] = valid if "run.json" in contents else None
-    packet, packet_bytes = _packet(directory, manifest, valid, contents, artifacts, budget - consumed)
+    packet, packet_bytes, packet_payload = _packet(directory, manifest, valid, contents, artifacts, budget - consumed)
+    witness = _witness(packet_payload, attestation, trusted_keys)
     stages, contradictions = _stage_claims(manifest, contents)
     if packet["matches_source"] is False:
         contradictions.append("packet:source_or_digest_mismatch")
@@ -297,6 +347,7 @@ def inspect_run(directory: Path, *, budget: int = MAX_TOTAL_BYTES,
         "decision_input_status": decision_status,
         "recovery": _recovery(directory.parent, directory.name, quality["category"]),
         "github": github, "github_comparison": comparison, "decision_dossier": dossier,
+        "attestation": witness,
         "completed_at_claim": manifest.get("completed_at") if valid else None,
         "environment_claim": environment,
         "manifest_schema_version": manifest["schema_version"] if valid else None,
@@ -358,7 +409,8 @@ def _comparisons(runs: list[dict]) -> list[dict]:
 
 
 def generate(runs_root: Path, *, ci_by_commit: dict | None = None,
-             byte_budget: int = MAX_TOTAL_BYTES, max_runs: int = MAX_RUNS) -> dict:
+             byte_budget: int = MAX_TOTAL_BYTES, max_runs: int = MAX_RUNS,
+             attestations_by_run: dict | None = None, trusted_keys: dict | None = None) -> dict:
     root = checked_path(runs_root, directory=True)
     if type(byte_budget) is not int or not 0 <= byte_budget <= MAX_TOTAL_BYTES:
         raise ValueError("invalid aggregate byte budget")
@@ -366,6 +418,7 @@ def generate(runs_root: Path, *, ci_by_commit: dict | None = None,
         raise ValueError("invalid run limit")
     if ci_by_commit is not None and not isinstance(ci_by_commit, dict):
         raise ValueError("CI snapshot must be a commit mapping")
+    witness_policy = _witness_inputs(attestations_by_run, trusted_keys)
     directories, rejected = [], []
     entry_count = 0
     for path in root.iterdir():
@@ -382,7 +435,9 @@ def generate(runs_root: Path, *, ci_by_commit: dict | None = None,
     for directory in sorted(directories):
         try:
             run, used = inspect_run(directory, budget=byte_budget - consumed,
-                                    ci_by_commit=ci_by_commit)
+                                    ci_by_commit=ci_by_commit,
+                                    attestation=(attestations_by_run or {}).get(directory.name),
+                                    trusted_keys=trusted_keys)
         except (ValueError, OSError) as exc:
             rejected.append({"name": directory.name, "reason": "unsafe_or_unreadable_directory"})
             continue
@@ -407,6 +462,12 @@ def generate(runs_root: Path, *, ci_by_commit: dict | None = None,
     regression_graph["edges"] = [e for e in regression_graph["edges"]
                                  if e["from"] in allowed_nodes and e["to"] in allowed_nodes]
     result = {"schema_version": 1, "kind": KIND, "runs": runs,
+              "attestation_policy": {**witness_policy,
+                  "fingerprint_encoding": "sha256_of_canonical_json",
+                  "verification_scope": "packet_digest_commit_and_witness_only",
+                  "unmatched_run_names": sorted(set(attestations_by_run or {}) -
+                                                 {run["run_name"] for run in runs})},
+              "attestation_counts": dict(sorted(Counter(run["attestation"]["state"] for run in runs).items())),
               "categories": {name: categories[name] for name in CATEGORIES},
               "comparisons": comparisons, "regression_graph": regression_graph,
               "confirmed_regression_transitions": sum(len(c["regressed_stages"]) for c in comparisons),
@@ -441,6 +502,8 @@ def main(argv=None) -> int:
     parser.add_argument("--json-output", required=True, type=Path)
     parser.add_argument("--html-output", type=Path)
     parser.add_argument("--github-ci", type=Path, help="Offline commit-keyed CI export; no network calls")
+    parser.add_argument("--attestations", type=Path, help="External JSON map of run names to detached attestations")
+    parser.add_argument("--trusted-keys", type=Path, help="Explicit external witness ID to hex public key map")
     args = parser.parse_args(argv)
     try:
         root = checked_path(args.runs_root, directory=True)
@@ -448,10 +511,19 @@ def main(argv=None) -> int:
         normalized = [output_path(path, root) for path in destinations]
         if len(set(normalized)) != len(normalized):
             raise ValueError("report destinations must be distinct")
+        if bool(args.attestations) != bool(args.trusted_keys):
+            raise ValueError("--attestations and --trusted-keys must be provided together")
+        inputs = [path for path in (args.github_ci, args.attestations, args.trusted_keys) if path]
+        for path in inputs:
+            selected = checked_path(path)
+            if selected in normalized:
+                raise ValueError("report output must not overwrite an analysis input")
+            if path in (args.attestations, args.trusted_keys) and (selected == root or selected.is_relative_to(root)):
+                raise ValueError("witness inputs must be explicitly selected outside historical evidence")
         ci = json_object(read_bounded(args.github_ci, MAX_CI)) if args.github_ci else None
-        if args.github_ci and checked_path(args.github_ci) in normalized:
-            raise ValueError("report output must not overwrite the CI input")
-        result = generate(root, ci_by_commit=ci)
+        attestations = json_object(read_bounded(args.attestations, MAX_ATTESTATIONS)) if args.attestations else None
+        trusted_keys = json_object(read_bounded(args.trusted_keys, MAX_TRUSTED_KEYS)) if args.trusted_keys else None
+        result = generate(root, ci_by_commit=ci, attestations_by_run=attestations, trusted_keys=trusted_keys)
         rendered = render(result) if args.html_output else None
         write_report(args.json_output, json.dumps(result, indent=2, sort_keys=True) + "\n", root)
         if args.html_output:

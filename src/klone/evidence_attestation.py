@@ -70,13 +70,18 @@ def message(packet: dict, witness_id: str) -> bytes:
                       "commit": packet["commit"]})
 
 
-def verify(packet: dict, attestation: dict, trusted_keys: dict[str, str]) -> dict:
-    result = {"signature_valid": False, "trusted_witness": False,
+def unverified_result(reason: str = "unverified") -> dict:
+    """Shared non-authorizing result for omitted or unavailable verification."""
+    return {"signature_valid": False, "trusted_witness": False,
               "witness_authenticated": False, "key_in_trust_map": False,
               "origin_authenticated": False, "device_identity_verified": False,
               "test_execution_authenticated": False, "deployment_approval": False,
               "verification_scope": "packet_digest_commit_and_witness_only",
-              "reason": "unverified"}
+              "reason": reason}
+
+
+def verify(packet: dict, attestation: dict, trusted_keys: dict[str, str]) -> dict:
+    result = unverified_result()
     try:
         if (not isinstance(attestation, dict) or type(attestation.get("schema_version")) is not int
                 or attestation["schema_version"] != 1

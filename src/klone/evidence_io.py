@@ -57,7 +57,15 @@ def directory_handle(path: Path, *, create: bool = False):
         yield None
         checked_path(path, directory=True)
         return
-    descriptor = os.open(path.anchor, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        descriptor = os.open(path.anchor, os.O_RDONLY | os.O_DIRECTORY)
+    except PermissionError:
+        # Android app sandboxes can traverse their private directory while
+        # disallowing opening '/'. Keep O_NOFOLLOW on the final component.
+        checked_path(path, directory=True)
+        yield None
+        checked_path(path, directory=True)
+        return
     try:
         for name in path.parts[1:]:
             if create:
@@ -89,7 +97,7 @@ def read_bounded(path: Path, limit: int) -> bytes:
         flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NONBLOCK", 0)
         with directory_handle(path.parent) as parent_fd:
             descriptor = (os.open(path.name, flags | os.O_NOFOLLOW, dir_fd=parent_fd)
-                          if parent_fd is not None else os.open(path, flags))
+                          if parent_fd is not None else os.open(path, flags | os.O_NOFOLLOW))
             with os.fdopen(descriptor, "rb") as handle:
                 opened = os.fstat(handle.fileno())
                 if (not stat.S_ISREG(opened.st_mode)
@@ -146,6 +154,17 @@ def write_report(path: Path, content: str, source_root: Path) -> None:
     target = output_path(path, source_root)
     raw = content.encode("utf-8")
     if _DIR_FD:
+        # Android may deny opening '/', so use the portable atomic writer
+        # when directory-descriptor traversal is unavailable.
+        try:
+            anchor_fd = os.open(target.anchor, os.O_RDONLY | os.O_DIRECTORY)
+        except PermissionError:
+            anchor_fd = None
+        if anchor_fd is not None:
+            os.close(anchor_fd)
+        if anchor_fd is None:
+            _write_report_portable(target, raw, source_root)
+            return
         with directory_handle(target.parent, create=True) as parent_fd:
             temporary = ".klone-report-" + uuid.uuid4().hex
             descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL
@@ -161,15 +180,20 @@ def write_report(path: Path, content: str, source_root: Path) -> None:
                 except FileNotFoundError:
                     pass
     else:
-        target.parent.mkdir(parents=True, exist_ok=True)
+        _write_report_portable(target, raw, source_root)
+
+
+def _write_report_portable(target: Path, raw: bytes, source_root: Path) -> None:
+    """Atomic fallback when Android blocks opening the filesystem anchor."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    output_path(target, source_root)
+    name = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as handle:
+            name = handle.name
+            handle.write(raw)
         output_path(target, source_root)
-        name = None
-        try:
-            with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as handle:
-                name = handle.name
-                handle.write(raw)
-            output_path(target, source_root)
-            os.replace(name, target)
-        finally:
-            if name is not None and os.path.exists(name):
-                os.unlink(name)
+        os.replace(name, target)
+    finally:
+        if name is not None and os.path.exists(name):
+            os.unlink(name)

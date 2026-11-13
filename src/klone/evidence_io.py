@@ -144,7 +144,7 @@ def output_path(path: Path, source_root: Path) -> Path:
 def new_output_path(path: Path, source_root: Path) -> Path:
     """Preflight a new export; the writer still reserves it exclusively."""
     source, target = checked_path(source_root), checked_path(path)
-    if target == source or target.is_relative_to(source) or ".git" in target.parts:
+    if target == source or target.is_relative_to(source) or any(part.casefold() == ".git" for part in target.parts):
         raise ValueError("new export must be outside source evidence and .git")
     if target.exists():
         raise ValueError("new export destination already exists")

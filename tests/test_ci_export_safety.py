@@ -128,7 +128,8 @@ class ExportSafetyTests(unittest.TestCase):
         self.assertEqual(self.output.read_text(), 'ORIGINAL')
 
     def test_cannot_add_export_inside_source_evidence_or_git(self):
-        for path in (self.run / 'ci.json', self.root / 'new' / 'ci.json', self.base / '.git' / 'ci.json'):
+        for path in (self.run / 'ci.json', self.root / 'new' / 'ci.json',
+                     self.base / '.git' / 'ci.json', self.base / '.GIT' / 'ci.json'):
             args = self.args()
             args[3] = str(path)
             with patch('klone.evidence_github_bridge.fetch') as remote:

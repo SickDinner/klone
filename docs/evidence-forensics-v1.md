@@ -117,6 +117,12 @@ Puuttuva CI on `unavailable`; epäonnistunut CI pysyy epäonnistumisväitteenä.
 CI:n läpäisy ilman paikallista Android-evidenssiä ei vahvista Android-testiä.
 Myös yhteensopiva CI-vienti vaatii alkuperän erillisen tarkistamisen.
 
+[CI Bridgen turvallinen vienti](evidence-ci-export.md) tuottaa suoraan tämän
+commit-kartan `--forensics-map`-valinnalla. Ajon tunnistetiedot ja listauksen
+tila säilyvät raportissa. Eksplisiittisesti keskeneräinen ajo tai puutteellinen
+listaus estää yhteensopivuuspolun. Job-matriisin tarkistus on erillinen tieto;
+workflow-tuloksesta ei päätellä Android-suoritusta.
+
 ## Valinnainen erillisen allekirjoituksen tarkistus
 
 Forensics voi tarkistaa jo olemassa olevan paketin erillisen

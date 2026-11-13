@@ -141,6 +141,35 @@ def output_path(path: Path, source_root: Path) -> Path:
     return target
 
 
+def new_output_path(path: Path, source_root: Path) -> Path:
+    """Preflight a new export; the writer still reserves it exclusively."""
+    source, target = checked_path(source_root), checked_path(path)
+    if target == source or target.is_relative_to(source) or any(part.casefold() == ".git" for part in target.parts):
+        raise ValueError("new export must be outside source evidence and .git")
+    if target.exists():
+        raise ValueError("new export destination already exists")
+    return target
+
+
+def write_new_report(path: Path, content: str, source_root: Path) -> None:
+    """Never replace an existing export, link, source file or raced-in target.
+
+    A failed or interrupted write may leave a partial new file. It is not
+    automatically deleted or overwritten; choose a fresh path for a retry.
+    """
+    target = new_output_path(path, source_root)
+    raw = content.encode("utf-8")
+    with directory_handle(target.parent, create=True) as parent_fd:
+        if parent_fd is None:
+            with target.open("xb") as handle:
+                handle.write(raw)
+        else:
+            descriptor = os.open(target.name, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                                 os.O_NOFOLLOW, 0o600, dir_fd=parent_fd)
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(raw)
+
+
 def write_report(path: Path, content: str, source_root: Path) -> None:
     """Atomically replace only an explicitly selected report outside source_root."""
     target = output_path(path, source_root)

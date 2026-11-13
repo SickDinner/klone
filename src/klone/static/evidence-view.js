@@ -181,6 +181,14 @@
         ["Tarkistuksen syy", witness?.reason],
         ["Luottamuskartan kanoninen SHA-256", data.attestation_policy?.trusted_keys_sha256]]);
       item.appendChild(node("p", "Allekirjoitus koskee pakettitiivistettä, committia ja witness-tunnistetta. Lähdeaineiston vastaavuus tarkistetaan erikseen. Tämä näkymä näyttää raportin väitteet; se ei itse tarkista allekirjoitusta eikä vahvista laitetta, testisuoritusta tai käyttöönottoa."));
+      item.appendChild(node("h3", "GitHub CI -viennin tiedot"));
+      appendTable(item, ["Tieto", "Vientitiedoston väite"], [
+        ["Repositorio", r.github?.repository], ["Workflow", r.github?.workflow],
+        ["Workflow-tiedosto", r.github?.workflow_path], ["Run ID", r.github?.run_id],
+        ["Yritys", r.github?.run_attempt], ["Ajon tila", r.github?.run_status],
+        ["Ajojen listaus kokonainen", tri(r.github?.listing_complete)],
+        ["Job-matriisi erikseen tarkistettu", tri(r.github?.job_matrix_verified)]]);
+      item.appendChild(node("p", "CI-vienti on erillinen väite. Sen läpimeno ei varmista Android-ajoa tai käyttöönottoa. Vanhan viennin puuttuvat tunnistetiedot pysyvät avoimina."));
       item.appendChild(node("h3", "Testivaiheet"));
       appendTable(item, ["Vaihe", "Manifestin status", "Exit code", "Lokin väite", "Näyttö"],
         Object.entries(r.stages).map(([name, stage]) => [name, stage?.declared_status,

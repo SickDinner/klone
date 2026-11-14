@@ -20,6 +20,23 @@ class NokiCompanionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Taidelaboratorio", response.text)
 
+    def test_ragged_voice_and_opt_in_mimic_are_present(self):
+        html = self.client.get("/noki").text
+        self.assertIn('class="syringe syringe-left"', html)
+        self.assertIn('class="syringe syringe-right"', html)
+        self.assertIn('id="savage"', html)
+        self.assertIn('id="mimic"', html)
+        self.assertIn('id="roughness"', html)
+        self.assertIn('KRRRÄÄÄ', html)
+        self.assertIn('getUserMedia', html)
+        self.assertIn('SpeechRecognition', html)
+        self.assertIn('MediaRecorder', html)
+        self.assertIn('decodeAudioData', html)
+        self.assertIn('src.playbackRate.value=.68', html)
+        self.assertIn('noiseSuppression:false', html)
+        self.assertIn('discardRecord', html)
+        self.assertIn('setTimeout(function(){if(recorder.state==="recording"){recorder.stop();}},4000)', html)
+
     def test_prototype_privacy_and_controls_are_explicit(self):
         html = self.client.get("/noki").text
         self.assertIn('id="listen"', html)

@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .api import router as api_router
 from .cognition_api import router as cognition_router
+from .council72_api import router as council_router
 from .audit import AuditService
 from .config import Settings, load_settings, settings
 from .contracts import APP_VERSION, BOOTSTRAP_TASK_ID
@@ -100,6 +101,7 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     app.include_router(api_router)
     app.include_router(cognition_router)
+    app.include_router(council_router)
     app.include_router(v1_router)
 
     @app.get("/", include_in_schema=False)
@@ -113,6 +115,10 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     @app.get("/evidence", include_in_schema=False)
     def evidence_dashboard() -> FileResponse:
         return FileResponse(STATIC_DIR / "evidence.html")
+
+    @app.get("/council72", include_in_schema=False)
+    def council_dashboard() -> FileResponse:
+        return FileResponse(STATIC_DIR / "council72.html")
     return app
 
 

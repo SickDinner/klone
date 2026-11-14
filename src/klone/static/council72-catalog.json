@@ -1,0 +1,1918 @@
+{
+  "schema_version": 1,
+  "kind": "klone-council72-catalog",
+  "model_version": "council72-v1",
+  "name": "KLONE · 72-paikkainen neuvosto",
+  "common_goal": "Tutki ja kehitä KLONEn muistin, tarkkaavaisuuden, itsemallin ja yhteisen päätöksenteon toiminnallisia edellytyksiä.",
+  "rings": [
+    {
+      "id": 1,
+      "dante_label": "Limbo",
+      "domain": "Ulkomaa ja viestintä",
+      "steward_id": 1,
+      "member_ids": [
+        24,
+        27,
+        30,
+        53,
+        55,
+        70,
+        11,
+        71
+      ]
+    },
+    {
+      "id": 2,
+      "dante_label": "Himo",
+      "domain": "Tahto, merkitys ja luovuus",
+      "steward_id": 9,
+      "member_ids": [
+        12,
+        16,
+        19,
+        13,
+        34,
+        37,
+        47,
+        56
+      ]
+    },
+    {
+      "id": 3,
+      "dante_label": "Ylensyönti",
+      "domain": "Muisti ja kokemusten jäsentäminen",
+      "steward_id": 20,
+      "member_ids": [
+        4,
+        3,
+        8,
+        7,
+        29,
+        46,
+        54,
+        72
+      ]
+    },
+    {
+      "id": 4,
+      "dante_label": "Ahneus",
+      "domain": "Resurssit ja toteutusjärjestys",
+      "steward_id": 32,
+      "member_ids": [
+        26,
+        6,
+        48,
+        58,
+        62,
+        39,
+        38,
+        33
+      ]
+    },
+    {
+      "id": 5,
+      "dante_label": "Viha",
+      "domain": "Tunne, esto ja kuormituksen säätely",
+      "steward_id": 51,
+      "member_ids": [
+        5,
+        10,
+        17,
+        22,
+        14,
+        35,
+        63,
+        41
+      ]
+    },
+    {
+      "id": 6,
+      "dante_label": "Harhaoppi",
+      "domain": "Tutkimus ja vaihtoehtoiset mallit",
+      "steward_id": 61,
+      "member_ids": [
+        21,
+        36,
+        31,
+        50,
+        60,
+        65,
+        59,
+        66
+      ]
+    },
+    {
+      "id": 7,
+      "dante_label": "Väkivalta",
+      "domain": "Arkkitehtuuri ja rajatut toiminnot",
+      "steward_id": 45,
+      "member_ids": [
+        2,
+        15,
+        18,
+        23,
+        25,
+        42,
+        43,
+        49
+      ]
+    },
+    {
+      "id": 8,
+      "dante_label": "Vilppi / Malebolge",
+      "domain": "Evidenssi, oikeudet ja auditointi",
+      "steward_id": 68,
+      "member_ids": [
+        28,
+        44,
+        40,
+        52,
+        57,
+        64,
+        67,
+        69
+      ]
+    },
+    {
+      "id": 9,
+      "dante_label": "Kadotus / petollisuus",
+      "domain": "Perustajakokous ja yhteinen päämäärä",
+      "steward_id": null,
+      "member_ids": [
+        1,
+        9,
+        20,
+        32,
+        51,
+        61,
+        45,
+        68
+      ]
+    }
+  ],
+  "members": [
+    {
+      "id": 24,
+      "name": "Naberius",
+      "ring": 1,
+      "slot": 1,
+      "task": "Kielten ja yleisöjen tulkkaus",
+      "source_motif": "puhetaito",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": 1,
+      "baseline_modulators": {
+        "dopamine": 0.6,
+        "noradrenaline": 0.8,
+        "acetylcholine": 0.591667,
+        "serotonin": 0.383333,
+        "gaba": 0.575,
+        "glutamate": 0.366667
+      },
+      "traits": {
+        "risk_aversion": 0.595,
+        "novelty_bias": 0.6,
+        "deliberation": 0.383333
+      }
+    },
+    {
+      "id": 27,
+      "name": "Ronove",
+      "ring": 1,
+      "slot": 2,
+      "task": "Yhteisökeskustelun tiivistys",
+      "source_motif": "kielet",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": 9,
+      "baseline_modulators": {
+        "dopamine": 0.65,
+        "noradrenaline": 0.266667,
+        "acetylcholine": 0.716667,
+        "serotonin": 0.558333,
+        "gaba": 0.241667,
+        "glutamate": 0.691667
+      },
+      "traits": {
+        "risk_aversion": 0.395,
+        "novelty_bias": 0.65,
+        "deliberation": 0.558333
+      }
+    },
+    {
+      "id": 30,
+      "name": "Forneus",
+      "ring": 1,
+      "slot": 3,
+      "task": "Dokumentaation ja ohjeiden selkeys",
+      "source_motif": "kielet",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": 20,
+      "baseline_modulators": {
+        "dopamine": 0.7,
+        "noradrenaline": 0.341667,
+        "acetylcholine": 0.233333,
+        "serotonin": 0.733333,
+        "gaba": 0.516667,
+        "glutamate": 0.408333
+      },
+      "traits": {
+        "risk_aversion": 0.56,
+        "novelty_bias": 0.7,
+        "deliberation": 0.733333
+      }
+    },
+    {
+      "id": 53,
+      "name": "Caim",
+      "ring": 1,
+      "slot": 4,
+      "task": "Palautteen ja erimielisyyksien vastaanotto",
+      "source_motif": "äänet",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": 32,
+      "baseline_modulators": {
+        "dopamine": 0.475,
+        "noradrenaline": 0.308333,
+        "acetylcholine": 0.583333,
+        "serotonin": 0.25,
+        "gaba": 0.8,
+        "glutamate": 0.466667
+      },
+      "traits": {
+        "risk_aversion": 0.73,
+        "novelty_bias": 0.475,
+        "deliberation": 0.25
+      }
+    },
+    {
+      "id": 55,
+      "name": "Orobas",
+      "ring": 1,
+      "slot": 5,
+      "task": "Väitteiden ja lähdeviitteiden tarkistus",
+      "source_motif": "vastaukset",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": 51,
+      "baseline_modulators": {
+        "dopamine": 0.508333,
+        "noradrenaline": 0.358333,
+        "acetylcholine": 0.666667,
+        "serotonin": 0.366667,
+        "gaba": 0.375,
+        "glutamate": 0.683333
+      },
+      "traits": {
+        "risk_aversion": 0.475,
+        "novelty_bias": 0.508333,
+        "deliberation": 0.366667
+      }
+    },
+    {
+      "id": 70,
+      "name": "Seere",
+      "ring": 1,
+      "slot": 6,
+      "task": "Ajankohtaisten havaintojen välitys",
+      "source_motif": "nopeus",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": 61,
+      "baseline_modulators": {
+        "dopamine": 0.758333,
+        "noradrenaline": 0.733333,
+        "acetylcholine": 0.683333,
+        "serotonin": 0.633333,
+        "gaba": 0.533333,
+        "glutamate": 0.483333
+      },
+      "traits": {
+        "risk_aversion": 0.57,
+        "novelty_bias": 0.758333,
+        "deliberation": 0.633333
+      }
+    },
+    {
+      "id": 11,
+      "name": "Gusion",
+      "ring": 1,
+      "slot": 7,
+      "task": "Kysymysten reititys oikeaan rinkiin",
+      "source_motif": "vastaukset",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": 45,
+      "baseline_modulators": {
+        "dopamine": 0.383333,
+        "noradrenaline": 0.475,
+        "acetylcholine": 0.658333,
+        "serotonin": 0.233333,
+        "gaba": 0.6,
+        "glutamate": 0.783333
+      },
+      "traits": {
+        "risk_aversion": 0.61,
+        "novelty_bias": 0.383333,
+        "deliberation": 0.233333
+      }
+    },
+    {
+      "id": 71,
+      "name": "Dantalion",
+      "ring": 1,
+      "slot": 8,
+      "task": "Viestin sävyn ja ymmärrettävyyden arviointi",
+      "source_motif": "ajatukset",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": 68,
+      "baseline_modulators": {
+        "dopamine": 0.775,
+        "noradrenaline": 0.758333,
+        "acetylcholine": 0.725,
+        "serotonin": 0.691667,
+        "gaba": 0.625,
+        "glutamate": 0.591667
+      },
+      "traits": {
+        "risk_aversion": 0.625,
+        "novelty_bias": 0.775,
+        "deliberation": 0.691667
+      }
+    },
+    {
+      "id": 12,
+      "name": "Sitri",
+      "ring": 2,
+      "slot": 1,
+      "task": "Tavoitteen kiinnostavuuden arviointi",
+      "source_motif": "vetovoima",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.4,
+        "noradrenaline": 0.5,
+        "acetylcholine": 0.7,
+        "serotonin": 0.291667,
+        "gaba": 0.691667,
+        "glutamate": 0.283333
+      },
+      "traits": {
+        "risk_aversion": 0.665,
+        "novelty_bias": 0.4,
+        "deliberation": 0.291667
+      }
+    },
+    {
+      "id": 16,
+      "name": "Zepar",
+      "ring": 2,
+      "slot": 2,
+      "task": "Vaihtoehtoisten tavoitteiden erottelu",
+      "source_motif": "suhteet",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.466667,
+        "noradrenaline": 0.6,
+        "acetylcholine": 0.258333,
+        "serotonin": 0.525,
+        "gaba": 0.45,
+        "glutamate": 0.716667
+      },
+      "traits": {
+        "risk_aversion": 0.52,
+        "novelty_bias": 0.466667,
+        "deliberation": 0.525
+      }
+    },
+    {
+      "id": 19,
+      "name": "Sallos",
+      "ring": 2,
+      "slot": 3,
+      "task": "Yhteistyön ja tarpeiden yhteensovitus",
+      "source_motif": "ystävyys",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.516667,
+        "noradrenaline": 0.675,
+        "acetylcholine": 0.383333,
+        "serotonin": 0.7,
+        "gaba": 0.725,
+        "glutamate": 0.433333
+      },
+      "traits": {
+        "risk_aversion": 0.685,
+        "novelty_bias": 0.516667,
+        "deliberation": 0.7
+      }
+    },
+    {
+      "id": 13,
+      "name": "Beleth",
+      "ring": 2,
+      "slot": 4,
+      "task": "Sitoutumisen ja arvojen punninta",
+      "source_motif": "yhteys",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.416667,
+        "noradrenaline": 0.525,
+        "acetylcholine": 0.741667,
+        "serotonin": 0.35,
+        "gaba": 0.783333,
+        "glutamate": 0.391667
+      },
+      "traits": {
+        "risk_aversion": 0.72,
+        "novelty_bias": 0.416667,
+        "deliberation": 0.35
+      }
+    },
+    {
+      "id": 34,
+      "name": "Furfur",
+      "ring": 2,
+      "slot": 5,
+      "task": "Luovan ristiriidan tunnistaminen",
+      "source_motif": "myrsky",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.766667,
+        "noradrenaline": 0.441667,
+        "acetylcholine": 0.4,
+        "serotonin": 0.358333,
+        "gaba": 0.275,
+        "glutamate": 0.233333
+      },
+      "traits": {
+        "risk_aversion": 0.415,
+        "novelty_bias": 0.766667,
+        "deliberation": 0.358333
+      }
+    },
+    {
+      "id": 37,
+      "name": "Phenex",
+      "ring": 2,
+      "slot": 6,
+      "task": "Äänen, taiteen ja ilmaisun ideointi",
+      "source_motif": "laulu",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.208333,
+        "noradrenaline": 0.516667,
+        "acetylcholine": 0.525,
+        "serotonin": 0.533333,
+        "gaba": 0.55,
+        "glutamate": 0.558333
+      },
+      "traits": {
+        "risk_aversion": 0.58,
+        "novelty_bias": 0.208333,
+        "deliberation": 0.533333
+      }
+    },
+    {
+      "id": 47,
+      "name": "Vual",
+      "ring": 2,
+      "slot": 7,
+      "task": "Suhteiden ja kontekstin kartoitus",
+      "source_motif": "yhteys",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.375,
+        "noradrenaline": 0.766667,
+        "acetylcholine": 0.333333,
+        "serotonin": 0.508333,
+        "gaba": 0.25,
+        "glutamate": 0.425
+      },
+      "traits": {
+        "risk_aversion": 0.4,
+        "novelty_bias": 0.375,
+        "deliberation": 0.508333
+      }
+    },
+    {
+      "id": 56,
+      "name": "Gremory",
+      "ring": 2,
+      "slot": 8,
+      "task": "Käyttäjän toiveiden erittely",
+      "source_motif": "aarteet",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.525,
+        "noradrenaline": 0.383333,
+        "acetylcholine": 0.708333,
+        "serotonin": 0.425,
+        "gaba": 0.466667,
+        "glutamate": 0.791667
+      },
+      "traits": {
+        "risk_aversion": 0.53,
+        "novelty_bias": 0.525,
+        "deliberation": 0.425
+      }
+    },
+    {
+      "id": 4,
+      "name": "Samigina",
+      "ring": 3,
+      "slot": 1,
+      "task": "Episodien lähteiden merkitseminen",
+      "source_motif": "oppi",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.266667,
+        "noradrenaline": 0.3,
+        "acetylcholine": 0.366667,
+        "serotonin": 0.433333,
+        "gaba": 0.566667,
+        "glutamate": 0.633333
+      },
+      "traits": {
+        "risk_aversion": 0.59,
+        "novelty_bias": 0.266667,
+        "deliberation": 0.433333
+      }
+    },
+    {
+      "id": 3,
+      "name": "Vassago",
+      "ring": 3,
+      "slot": 2,
+      "task": "Kadonneen kontekstin etsimissuunnitelma",
+      "source_motif": "ennakointi",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.25,
+        "noradrenaline": 0.275,
+        "acetylcholine": 0.325,
+        "serotonin": 0.375,
+        "gaba": 0.475,
+        "glutamate": 0.525
+      },
+      "traits": {
+        "risk_aversion": 0.535,
+        "novelty_bias": 0.25,
+        "deliberation": 0.375
+      }
+    },
+    {
+      "id": 8,
+      "name": "Barbatos",
+      "ring": 3,
+      "slot": 3,
+      "task": "Havaintojen yhteyksien tunnistus",
+      "source_motif": "luonto",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.333333,
+        "noradrenaline": 0.4,
+        "acetylcholine": 0.533333,
+        "serotonin": 0.666667,
+        "gaba": 0.325,
+        "glutamate": 0.458333
+      },
+      "traits": {
+        "risk_aversion": 0.445,
+        "novelty_bias": 0.333333,
+        "deliberation": 0.666667
+      }
+    },
+    {
+      "id": 7,
+      "name": "Amon",
+      "ring": 3,
+      "slot": 4,
+      "task": "Ennen–jälkeen-erojen muistaminen",
+      "source_motif": "menneisyys",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.316667,
+        "noradrenaline": 0.375,
+        "acetylcholine": 0.491667,
+        "serotonin": 0.608333,
+        "gaba": 0.233333,
+        "glutamate": 0.35
+      },
+      "traits": {
+        "risk_aversion": 0.39,
+        "novelty_bias": 0.316667,
+        "deliberation": 0.608333
+      }
+    },
+    {
+      "id": 29,
+      "name": "Astaroth",
+      "ring": 3,
+      "slot": 5,
+      "task": "Muistin ristiriitojen näkyväksi tuonti",
+      "source_motif": "tieto",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.683333,
+        "noradrenaline": 0.316667,
+        "acetylcholine": 0.8,
+        "serotonin": 0.675,
+        "gaba": 0.425,
+        "glutamate": 0.3
+      },
+      "traits": {
+        "risk_aversion": 0.505,
+        "novelty_bias": 0.683333,
+        "deliberation": 0.675
+      }
+    },
+    {
+      "id": 46,
+      "name": "Bifrons",
+      "ring": 3,
+      "slot": 6,
+      "task": "Semanttisten rakenteiden järjestäminen",
+      "source_motif": "geometria",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.358333,
+        "noradrenaline": 0.741667,
+        "acetylcholine": 0.291667,
+        "serotonin": 0.45,
+        "gaba": 0.766667,
+        "glutamate": 0.316667
+      },
+      "traits": {
+        "risk_aversion": 0.71,
+        "novelty_bias": 0.358333,
+        "deliberation": 0.45
+      }
+    },
+    {
+      "id": 54,
+      "name": "Murmur",
+      "ring": 3,
+      "slot": 7,
+      "task": "Historiallisen evidenssin säilytys",
+      "source_motif": "menneisyys",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.491667,
+        "noradrenaline": 0.333333,
+        "acetylcholine": 0.625,
+        "serotonin": 0.308333,
+        "gaba": 0.283333,
+        "glutamate": 0.575
+      },
+      "traits": {
+        "risk_aversion": 0.42,
+        "novelty_bias": 0.491667,
+        "deliberation": 0.308333
+      }
+    },
+    {
+      "id": 72,
+      "name": "Andromalius",
+      "ring": 3,
+      "slot": 8,
+      "task": "Korjausten ja poikkeamien jäljitys",
+      "source_motif": "jäljitys",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.791667,
+        "noradrenaline": 0.783333,
+        "acetylcholine": 0.766667,
+        "serotonin": 0.75,
+        "gaba": 0.716667,
+        "glutamate": 0.7
+      },
+      "traits": {
+        "risk_aversion": 0.68,
+        "novelty_bias": 0.791667,
+        "deliberation": 0.75
+      }
+    },
+    {
+      "id": 26,
+      "name": "Bune",
+      "ring": 4,
+      "slot": 1,
+      "task": "Laskenta- ja aikabudjetin arviointi",
+      "source_motif": "puhe",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.633333,
+        "noradrenaline": 0.241667,
+        "acetylcholine": 0.675,
+        "serotonin": 0.5,
+        "gaba": 0.758333,
+        "glutamate": 0.583333
+      },
+      "traits": {
+        "risk_aversion": 0.705,
+        "novelty_bias": 0.633333,
+        "deliberation": 0.5
+      }
+    },
+    {
+      "id": 6,
+      "name": "Valefor",
+      "ring": 4,
+      "slot": 2,
+      "task": "Resurssivuotojen tunnistaminen",
+      "source_motif": "omaisuus",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.3,
+        "noradrenaline": 0.35,
+        "acetylcholine": 0.45,
+        "serotonin": 0.55,
+        "gaba": 0.75,
+        "glutamate": 0.241667
+      },
+      "traits": {
+        "risk_aversion": 0.7,
+        "novelty_bias": 0.3,
+        "deliberation": 0.55
+      }
+    },
+    {
+      "id": 48,
+      "name": "Haagenti",
+      "ring": 4,
+      "slot": 3,
+      "task": "Muunnosten kustannusten arviointi",
+      "source_motif": "muunnos",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.391667,
+        "noradrenaline": 0.791667,
+        "acetylcholine": 0.375,
+        "serotonin": 0.566667,
+        "gaba": 0.341667,
+        "glutamate": 0.533333
+      },
+      "traits": {
+        "risk_aversion": 0.455,
+        "novelty_bias": 0.391667,
+        "deliberation": 0.566667
+      }
+    },
+    {
+      "id": 58,
+      "name": "Amy",
+      "ring": 4,
+      "slot": 4,
+      "task": "Kokeiden hyöty–kustannus-vertailu",
+      "source_motif": "tieto",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.558333,
+        "noradrenaline": 0.433333,
+        "acetylcholine": 0.791667,
+        "serotonin": 0.541667,
+        "gaba": 0.65,
+        "glutamate": 0.4
+      },
+      "traits": {
+        "risk_aversion": 0.64,
+        "novelty_bias": 0.558333,
+        "deliberation": 0.541667
+      }
+    },
+    {
+      "id": 62,
+      "name": "Valac",
+      "ring": 4,
+      "slot": 5,
+      "task": "Käytettävissä olevan aineiston kartoitus",
+      "source_motif": "löydöt",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.625,
+        "noradrenaline": 0.533333,
+        "acetylcholine": 0.35,
+        "serotonin": 0.775,
+        "gaba": 0.408333,
+        "glutamate": 0.225
+      },
+      "traits": {
+        "risk_aversion": 0.495,
+        "novelty_bias": 0.625,
+        "deliberation": 0.775
+      }
+    },
+    {
+      "id": 39,
+      "name": "Malphas",
+      "ring": 4,
+      "slot": 6,
+      "task": "Riippuvuuksien ja rakennusvaiheiden jako",
+      "source_motif": "rakenteet",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.241667,
+        "noradrenaline": 0.566667,
+        "acetylcholine": 0.608333,
+        "serotonin": 0.65,
+        "gaba": 0.733333,
+        "glutamate": 0.775
+      },
+      "traits": {
+        "risk_aversion": 0.69,
+        "novelty_bias": 0.241667,
+        "deliberation": 0.65
+      }
+    },
+    {
+      "id": 38,
+      "name": "Halphas",
+      "ring": 4,
+      "slot": 7,
+      "task": "Työkuormien eristyksen suunnittelu",
+      "source_motif": "rakentaminen",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.225,
+        "noradrenaline": 0.541667,
+        "acetylcholine": 0.566667,
+        "serotonin": 0.591667,
+        "gaba": 0.641667,
+        "glutamate": 0.666667
+      },
+      "traits": {
+        "risk_aversion": 0.635,
+        "novelty_bias": 0.225,
+        "deliberation": 0.591667
+      }
+    },
+    {
+      "id": 33,
+      "name": "Gaap",
+      "ring": 4,
+      "slot": 8,
+      "task": "Paikallisen ja raskaan laskennan työnjako",
+      "source_motif": "siirtymä",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.75,
+        "noradrenaline": 0.416667,
+        "acetylcholine": 0.358333,
+        "serotonin": 0.3,
+        "gaba": 0.791667,
+        "glutamate": 0.733333
+      },
+      "traits": {
+        "risk_aversion": 0.725,
+        "novelty_bias": 0.75,
+        "deliberation": 0.3
+      }
+    },
+    {
+      "id": 5,
+      "name": "Marbas",
+      "ring": 5,
+      "slot": 1,
+      "task": "Poikkeavan tilan diagnostiikka",
+      "source_motif": "mekaniikka",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.283333,
+        "noradrenaline": 0.325,
+        "acetylcholine": 0.408333,
+        "serotonin": 0.491667,
+        "gaba": 0.658333,
+        "glutamate": 0.741667
+      },
+      "traits": {
+        "risk_aversion": 0.645,
+        "novelty_bias": 0.283333,
+        "deliberation": 0.491667
+      }
+    },
+    {
+      "id": 10,
+      "name": "Buer",
+      "ring": 5,
+      "slot": 2,
+      "task": "Palautumisen ja rytmityksen arviointi",
+      "source_motif": "kasvit",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.366667,
+        "noradrenaline": 0.45,
+        "acetylcholine": 0.616667,
+        "serotonin": 0.783333,
+        "gaba": 0.508333,
+        "glutamate": 0.675
+      },
+      "traits": {
+        "risk_aversion": 0.555,
+        "novelty_bias": 0.366667,
+        "deliberation": 0.783333
+      }
+    },
+    {
+      "id": 17,
+      "name": "Botis",
+      "ring": 5,
+      "slot": 3,
+      "task": "Ristiriidan rauhoittava jäsentely",
+      "source_motif": "sovittelu",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.483333,
+        "noradrenaline": 0.625,
+        "acetylcholine": 0.3,
+        "serotonin": 0.583333,
+        "gaba": 0.541667,
+        "glutamate": 0.216667
+      },
+      "traits": {
+        "risk_aversion": 0.575,
+        "novelty_bias": 0.483333,
+        "deliberation": 0.583333
+      }
+    },
+    {
+      "id": 22,
+      "name": "Ipos",
+      "ring": 5,
+      "slot": 4,
+      "task": "Epävarmuuden ja rohkeuden tasapaino",
+      "source_motif": "harkinta",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.566667,
+        "noradrenaline": 0.75,
+        "acetylcholine": 0.508333,
+        "serotonin": 0.266667,
+        "gaba": 0.391667,
+        "glutamate": 0.758333
+      },
+      "traits": {
+        "risk_aversion": 0.485,
+        "novelty_bias": 0.566667,
+        "deliberation": 0.266667
+      }
+    },
+    {
+      "id": 14,
+      "name": "Leraje",
+      "ring": 5,
+      "slot": 5,
+      "task": "Hälytysherkkyyden arviointi",
+      "source_motif": "kiistat",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.433333,
+        "noradrenaline": 0.55,
+        "acetylcholine": 0.783333,
+        "serotonin": 0.408333,
+        "gaba": 0.266667,
+        "glutamate": 0.5
+      },
+      "traits": {
+        "risk_aversion": 0.41,
+        "novelty_bias": 0.433333,
+        "deliberation": 0.408333
+      }
+    },
+    {
+      "id": 35,
+      "name": "Marchosias",
+      "ring": 5,
+      "slot": 6,
+      "task": "Paineensietokokeen suunnittelu",
+      "source_motif": "rohkeus",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.783333,
+        "noradrenaline": 0.466667,
+        "acetylcholine": 0.441667,
+        "serotonin": 0.416667,
+        "gaba": 0.366667,
+        "glutamate": 0.341667
+      },
+      "traits": {
+        "risk_aversion": 0.47,
+        "novelty_bias": 0.783333,
+        "deliberation": 0.416667
+      }
+    },
+    {
+      "id": 63,
+      "name": "Andras",
+      "ring": 5,
+      "slot": 7,
+      "task": "Sisäisen erimielisyyden kirjaus",
+      "source_motif": "erimielisyys",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.641667,
+        "noradrenaline": 0.558333,
+        "acetylcholine": 0.391667,
+        "serotonin": 0.225,
+        "gaba": 0.5,
+        "glutamate": 0.333333
+      },
+      "traits": {
+        "risk_aversion": 0.55,
+        "novelty_bias": 0.641667,
+        "deliberation": 0.225
+      }
+    },
+    {
+      "id": 41,
+      "name": "Focalor",
+      "ring": 5,
+      "slot": 8,
+      "task": "Ylikuormituksen jarrutus",
+      "source_motif": "vesi",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.275,
+        "noradrenaline": 0.616667,
+        "acetylcholine": 0.691667,
+        "serotonin": 0.766667,
+        "gaba": 0.308333,
+        "glutamate": 0.383333
+      },
+      "traits": {
+        "risk_aversion": 0.435,
+        "novelty_bias": 0.275,
+        "deliberation": 0.766667
+      }
+    },
+    {
+      "id": 21,
+      "name": "Marax",
+      "ring": 6,
+      "slot": 1,
+      "task": "Käsitteiden ja muuttujien määrittely",
+      "source_motif": "tähtitiede",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.55,
+        "noradrenaline": 0.725,
+        "acetylcholine": 0.466667,
+        "serotonin": 0.208333,
+        "gaba": 0.3,
+        "glutamate": 0.65
+      },
+      "traits": {
+        "risk_aversion": 0.43,
+        "novelty_bias": 0.55,
+        "deliberation": 0.208333
+      }
+    },
+    {
+      "id": 36,
+      "name": "Stolas",
+      "ring": 6,
+      "slot": 2,
+      "task": "Monimodaalisten ilmiöiden mallinnus",
+      "source_motif": "tähtitiede",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.8,
+        "noradrenaline": 0.491667,
+        "acetylcholine": 0.483333,
+        "serotonin": 0.475,
+        "gaba": 0.458333,
+        "glutamate": 0.45
+      },
+      "traits": {
+        "risk_aversion": 0.525,
+        "novelty_bias": 0.8,
+        "deliberation": 0.475
+      }
+    },
+    {
+      "id": 31,
+      "name": "Foras",
+      "ring": 6,
+      "slot": 3,
+      "task": "Testattavan hypoteesin erittely",
+      "source_motif": "logiikka",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.716667,
+        "noradrenaline": 0.366667,
+        "acetylcholine": 0.275,
+        "serotonin": 0.791667,
+        "gaba": 0.608333,
+        "glutamate": 0.516667
+      },
+      "traits": {
+        "risk_aversion": 0.615,
+        "novelty_bias": 0.716667,
+        "deliberation": 0.791667
+      }
+    },
+    {
+      "id": 50,
+      "name": "Furcas",
+      "ring": 6,
+      "slot": 4,
+      "task": "Loogisen päättelyn tarkistus",
+      "source_motif": "filosofia",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.425,
+        "noradrenaline": 0.233333,
+        "acetylcholine": 0.458333,
+        "serotonin": 0.683333,
+        "gaba": 0.525,
+        "glutamate": 0.75
+      },
+      "traits": {
+        "risk_aversion": 0.565,
+        "novelty_bias": 0.425,
+        "deliberation": 0.683333
+      }
+    },
+    {
+      "id": 60,
+      "name": "Vapula",
+      "ring": 6,
+      "slot": 5,
+      "task": "Teknisen prototyypin suunnittelu",
+      "source_motif": "käsityö",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.591667,
+        "noradrenaline": 0.483333,
+        "acetylcholine": 0.266667,
+        "serotonin": 0.658333,
+        "gaba": 0.225,
+        "glutamate": 0.616667
+      },
+      "traits": {
+        "risk_aversion": 0.385,
+        "novelty_bias": 0.591667,
+        "deliberation": 0.658333
+      }
+    },
+    {
+      "id": 65,
+      "name": "Andrealphus",
+      "ring": 6,
+      "slot": 6,
+      "task": "Geometrian ja rakenteiden vertailu",
+      "source_motif": "geometria",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.675,
+        "noradrenaline": 0.608333,
+        "acetylcholine": 0.475,
+        "serotonin": 0.341667,
+        "gaba": 0.683333,
+        "glutamate": 0.55
+      },
+      "traits": {
+        "risk_aversion": 0.66,
+        "novelty_bias": 0.675,
+        "deliberation": 0.341667
+      }
+    },
+    {
+      "id": 59,
+      "name": "Orias",
+      "ring": 6,
+      "slot": 7,
+      "task": "Mallin muutoksen arviointi",
+      "source_motif": "tähdet",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.575,
+        "noradrenaline": 0.458333,
+        "acetylcholine": 0.225,
+        "serotonin": 0.6,
+        "gaba": 0.741667,
+        "glutamate": 0.508333
+      },
+      "traits": {
+        "risk_aversion": 0.695,
+        "novelty_bias": 0.575,
+        "deliberation": 0.6
+      }
+    },
+    {
+      "id": 66,
+      "name": "Cimeies",
+      "ring": 6,
+      "slot": 8,
+      "task": "Vaihtoehtoisen selityksen muodostus",
+      "source_motif": "oppi",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.691667,
+        "noradrenaline": 0.633333,
+        "acetylcholine": 0.516667,
+        "serotonin": 0.4,
+        "gaba": 0.775,
+        "glutamate": 0.658333
+      },
+      "traits": {
+        "risk_aversion": 0.715,
+        "novelty_bias": 0.691667,
+        "deliberation": 0.4
+      }
+    },
+    {
+      "id": 2,
+      "name": "Agares",
+      "ring": 7,
+      "slot": 1,
+      "task": "Syöte- ja tulostusrajojen suunnittelu",
+      "source_motif": "kielet",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.233333,
+        "noradrenaline": 0.25,
+        "acetylcholine": 0.283333,
+        "serotonin": 0.316667,
+        "gaba": 0.383333,
+        "glutamate": 0.416667
+      },
+      "traits": {
+        "risk_aversion": 0.48,
+        "novelty_bias": 0.233333,
+        "deliberation": 0.316667
+      }
+    },
+    {
+      "id": 15,
+      "name": "Eligos",
+      "ring": 7,
+      "slot": 2,
+      "task": "Riippuvuuksien ennakointi",
+      "source_motif": "ennakointi",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.45,
+        "noradrenaline": 0.575,
+        "acetylcholine": 0.216667,
+        "serotonin": 0.466667,
+        "gaba": 0.358333,
+        "glutamate": 0.608333
+      },
+      "traits": {
+        "risk_aversion": 0.465,
+        "novelty_bias": 0.45,
+        "deliberation": 0.466667
+      }
+    },
+    {
+      "id": 18,
+      "name": "Bathin",
+      "ring": 7,
+      "slot": 3,
+      "task": "Android–Termux-siirrettävyyden arviointi",
+      "source_motif": "siirtymä",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.5,
+        "noradrenaline": 0.65,
+        "acetylcholine": 0.341667,
+        "serotonin": 0.641667,
+        "gaba": 0.633333,
+        "glutamate": 0.325
+      },
+      "traits": {
+        "risk_aversion": 0.63,
+        "novelty_bias": 0.5,
+        "deliberation": 0.641667
+      }
+    },
+    {
+      "id": 23,
+      "name": "Aim",
+      "ring": 7,
+      "slot": 4,
+      "task": "Yhden pienen korjausaskeleen rajaus",
+      "source_motif": "tuli",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.583333,
+        "noradrenaline": 0.775,
+        "acetylcholine": 0.55,
+        "serotonin": 0.325,
+        "gaba": 0.483333,
+        "glutamate": 0.258333
+      },
+      "traits": {
+        "risk_aversion": 0.54,
+        "novelty_bias": 0.583333,
+        "deliberation": 0.325
+      }
+    },
+    {
+      "id": 25,
+      "name": "Glasya-Labolas",
+      "ring": 7,
+      "slot": 5,
+      "task": "Simulaation virhetilojen tutkiminen",
+      "source_motif": "tiede",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.616667,
+        "noradrenaline": 0.216667,
+        "acetylcholine": 0.633333,
+        "serotonin": 0.441667,
+        "gaba": 0.666667,
+        "glutamate": 0.475
+      },
+      "traits": {
+        "risk_aversion": 0.65,
+        "novelty_bias": 0.616667,
+        "deliberation": 0.441667
+      }
+    },
+    {
+      "id": 42,
+      "name": "Vepar",
+      "ring": 7,
+      "slot": 6,
+      "task": "Palvelimen ja porttien tilan erottelu",
+      "source_motif": "meri",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.291667,
+        "noradrenaline": 0.641667,
+        "acetylcholine": 0.733333,
+        "serotonin": 0.216667,
+        "gaba": 0.4,
+        "glutamate": 0.491667
+      },
+      "traits": {
+        "risk_aversion": 0.49,
+        "novelty_bias": 0.291667,
+        "deliberation": 0.216667
+      }
+    },
+    {
+      "id": 43,
+      "name": "Sabnock",
+      "ring": 7,
+      "slot": 7,
+      "task": "Huoneiden ja prosessien eristyksen tarkistus",
+      "source_motif": "linnoitus",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.308333,
+        "noradrenaline": 0.666667,
+        "acetylcholine": 0.775,
+        "serotonin": 0.275,
+        "gaba": 0.491667,
+        "glutamate": 0.6
+      },
+      "traits": {
+        "risk_aversion": 0.545,
+        "novelty_bias": 0.308333,
+        "deliberation": 0.275
+      }
+    },
+    {
+      "id": 49,
+      "name": "Crocell",
+      "ring": 7,
+      "slot": 8,
+      "task": "Rajapintojen ja tietovirtojen selkeytys",
+      "source_motif": "vesi",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.408333,
+        "noradrenaline": 0.208333,
+        "acetylcholine": 0.416667,
+        "serotonin": 0.625,
+        "gaba": 0.433333,
+        "glutamate": 0.641667
+      },
+      "traits": {
+        "risk_aversion": 0.51,
+        "novelty_bias": 0.408333,
+        "deliberation": 0.625
+      }
+    },
+    {
+      "id": 28,
+      "name": "Berith",
+      "ring": 8,
+      "slot": 1,
+      "task": "Väitteen ja lupauksen erottelu",
+      "source_motif": "lupaukset",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.666667,
+        "noradrenaline": 0.291667,
+        "acetylcholine": 0.758333,
+        "serotonin": 0.616667,
+        "gaba": 0.333333,
+        "glutamate": 0.8
+      },
+      "traits": {
+        "risk_aversion": 0.45,
+        "novelty_bias": 0.666667,
+        "deliberation": 0.616667
+      }
+    },
+    {
+      "id": 44,
+      "name": "Shax",
+      "ring": 8,
+      "slot": 2,
+      "task": "Puuttuvan näytön tunnistaminen",
+      "source_motif": "salaisuudet",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.325,
+        "noradrenaline": 0.691667,
+        "acetylcholine": 0.208333,
+        "serotonin": 0.333333,
+        "gaba": 0.583333,
+        "glutamate": 0.708333
+      },
+      "traits": {
+        "risk_aversion": 0.6,
+        "novelty_bias": 0.325,
+        "deliberation": 0.333333
+      }
+    },
+    {
+      "id": 40,
+      "name": "Raum",
+      "ring": 8,
+      "slot": 3,
+      "task": "Provenienssiketjun tarkistus",
+      "source_motif": "omaisuus",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.258333,
+        "noradrenaline": 0.591667,
+        "acetylcholine": 0.65,
+        "serotonin": 0.708333,
+        "gaba": 0.216667,
+        "glutamate": 0.275
+      },
+      "traits": {
+        "risk_aversion": 0.38,
+        "novelty_bias": 0.258333,
+        "deliberation": 0.708333
+      }
+    },
+    {
+      "id": 52,
+      "name": "Alloces",
+      "ring": 8,
+      "slot": 4,
+      "task": "Roolien ja vastuiden erottelu",
+      "source_motif": "tähtitiede",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.458333,
+        "noradrenaline": 0.283333,
+        "acetylcholine": 0.541667,
+        "serotonin": 0.8,
+        "gaba": 0.708333,
+        "glutamate": 0.358333
+      },
+      "traits": {
+        "risk_aversion": 0.675,
+        "novelty_bias": 0.458333,
+        "deliberation": 0.8
+      }
+    },
+    {
+      "id": 57,
+      "name": "Ose",
+      "ring": 8,
+      "slot": 5,
+      "task": "Harhaanjohtavan tulkinnan tunnistus",
+      "source_motif": "muutos",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.541667,
+        "noradrenaline": 0.408333,
+        "acetylcholine": 0.75,
+        "serotonin": 0.483333,
+        "gaba": 0.558333,
+        "glutamate": 0.291667
+      },
+      "traits": {
+        "risk_aversion": 0.585,
+        "novelty_bias": 0.541667,
+        "deliberation": 0.483333
+      }
+    },
+    {
+      "id": 64,
+      "name": "Haures",
+      "ring": 8,
+      "slot": 6,
+      "task": "Vastahypoteesin ja regression arviointi",
+      "source_motif": "menneisyys",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.658333,
+        "noradrenaline": 0.583333,
+        "acetylcholine": 0.433333,
+        "serotonin": 0.283333,
+        "gaba": 0.591667,
+        "glutamate": 0.441667
+      },
+      "traits": {
+        "risk_aversion": 0.605,
+        "novelty_bias": 0.658333,
+        "deliberation": 0.283333
+      }
+    },
+    {
+      "id": 67,
+      "name": "Amdusias",
+      "ring": 8,
+      "slot": 7,
+      "task": "Moniagenttisen koordinoinnin tarkistus",
+      "source_motif": "musiikki",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.708333,
+        "noradrenaline": 0.658333,
+        "acetylcholine": 0.558333,
+        "serotonin": 0.458333,
+        "gaba": 0.258333,
+        "glutamate": 0.766667
+      },
+      "traits": {
+        "risk_aversion": 0.405,
+        "novelty_bias": 0.708333,
+        "deliberation": 0.458333
+      }
+    },
+    {
+      "id": 69,
+      "name": "Decarabia",
+      "ring": 8,
+      "slot": 8,
+      "task": "Rakenne- ja eheysristiriitojen tunnistus",
+      "source_motif": "luonto",
+      "founder": false,
+      "stewards_ring": null,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.741667,
+        "noradrenaline": 0.708333,
+        "acetylcholine": 0.641667,
+        "serotonin": 0.575,
+        "gaba": 0.441667,
+        "glutamate": 0.375
+      },
+      "traits": {
+        "risk_aversion": 0.515,
+        "novelty_bias": 0.741667,
+        "deliberation": 0.575
+      }
+    },
+    {
+      "id": 1,
+      "name": "Bael",
+      "ring": 9,
+      "slot": 1,
+      "task": "Ulkorajan ja tiedon alkuperän yhteensovitus",
+      "source_motif": "peittyminen",
+      "founder": true,
+      "stewards_ring": 1,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.216667,
+        "noradrenaline": 0.225,
+        "acetylcholine": 0.241667,
+        "serotonin": 0.258333,
+        "gaba": 0.291667,
+        "glutamate": 0.308333
+      },
+      "traits": {
+        "risk_aversion": 0.425,
+        "novelty_bias": 0.216667,
+        "deliberation": 0.258333
+      }
+    },
+    {
+      "id": 9,
+      "name": "Paimon",
+      "ring": 9,
+      "slot": 2,
+      "task": "Tavoitteen, oppimisen ja merkityksen synteesi",
+      "source_motif": "opetus",
+      "founder": true,
+      "stewards_ring": 2,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.35,
+        "noradrenaline": 0.425,
+        "acetylcholine": 0.575,
+        "serotonin": 0.725,
+        "gaba": 0.416667,
+        "glutamate": 0.566667
+      },
+      "traits": {
+        "risk_aversion": 0.5,
+        "novelty_bias": 0.35,
+        "deliberation": 0.725
+      }
+    },
+    {
+      "id": 20,
+      "name": "Purson",
+      "ring": 9,
+      "slot": 3,
+      "task": "Muistin jatkuvuus ja historiatietoisuus",
+      "source_motif": "salaisuudet",
+      "founder": true,
+      "stewards_ring": 3,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.533333,
+        "noradrenaline": 0.7,
+        "acetylcholine": 0.425,
+        "serotonin": 0.758333,
+        "gaba": 0.208333,
+        "glutamate": 0.541667
+      },
+      "traits": {
+        "risk_aversion": 0.375,
+        "novelty_bias": 0.533333,
+        "deliberation": 0.758333
+      }
+    },
+    {
+      "id": 32,
+      "name": "Asmoday",
+      "ring": 9,
+      "slot": 4,
+      "task": "Resurssien ja mitattavan etenemisen synteesi",
+      "source_motif": "laskenta",
+      "founder": true,
+      "stewards_ring": 4,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.733333,
+        "noradrenaline": 0.391667,
+        "acetylcholine": 0.316667,
+        "serotonin": 0.241667,
+        "gaba": 0.7,
+        "glutamate": 0.625
+      },
+      "traits": {
+        "risk_aversion": 0.67,
+        "novelty_bias": 0.733333,
+        "deliberation": 0.241667
+      }
+    },
+    {
+      "id": 51,
+      "name": "Balam",
+      "ring": 9,
+      "slot": 5,
+      "task": "Tunnepainotuksen ja harkinnan tasapaino",
+      "source_motif": "ennakointi",
+      "founder": true,
+      "stewards_ring": 5,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.441667,
+        "noradrenaline": 0.258333,
+        "acetylcholine": 0.5,
+        "serotonin": 0.741667,
+        "gaba": 0.616667,
+        "glutamate": 0.25
+      },
+      "traits": {
+        "risk_aversion": 0.62,
+        "novelty_bias": 0.441667,
+        "deliberation": 0.741667
+      }
+    },
+    {
+      "id": 61,
+      "name": "Zagan",
+      "ring": 9,
+      "slot": 6,
+      "task": "Käsitemallien ja itsemallin uudelleenarviointi",
+      "source_motif": "muunnos",
+      "founder": true,
+      "stewards_ring": 6,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.608333,
+        "noradrenaline": 0.508333,
+        "acetylcholine": 0.308333,
+        "serotonin": 0.716667,
+        "gaba": 0.316667,
+        "glutamate": 0.725
+      },
+      "traits": {
+        "risk_aversion": 0.44,
+        "novelty_bias": 0.608333,
+        "deliberation": 0.716667
+      }
+    },
+    {
+      "id": 45,
+      "name": "Vine",
+      "ring": 9,
+      "slot": 7,
+      "task": "Arkkitehtuurin ja toiminnan yhteensovitus",
+      "source_motif": "rakenteet",
+      "founder": true,
+      "stewards_ring": 7,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.341667,
+        "noradrenaline": 0.716667,
+        "acetylcholine": 0.25,
+        "serotonin": 0.391667,
+        "gaba": 0.675,
+        "glutamate": 0.208333
+      },
+      "traits": {
+        "risk_aversion": 0.655,
+        "novelty_bias": 0.341667,
+        "deliberation": 0.391667
+      }
+    },
+    {
+      "id": 68,
+      "name": "Belial",
+      "ring": 9,
+      "slot": 8,
+      "task": "Evidenssin, vastuun ja yhteisten sääntöjen synteesi",
+      "source_motif": "asema",
+      "founder": true,
+      "stewards_ring": 8,
+      "courier_for": null,
+      "baseline_modulators": {
+        "dopamine": 0.725,
+        "noradrenaline": 0.683333,
+        "acetylcholine": 0.6,
+        "serotonin": 0.516667,
+        "gaba": 0.35,
+        "glutamate": 0.266667
+      },
+      "traits": {
+        "risk_aversion": 0.46,
+        "novelty_bias": 0.725,
+        "deliberation": 0.516667
+      }
+    }
+  ],
+  "founder_ids": [
+    1,
+    9,
+    20,
+    32,
+    51,
+    61,
+    45,
+    68
+  ],
+  "modulator_names": [
+    "dopamine",
+    "noradrenaline",
+    "acetylcholine",
+    "serotonin",
+    "gaba",
+    "glutamate"
+  ],
+  "sources": {
+    "goetia": "https://en.wikisource.org/wiki/The_Lesser_Key_of_Solomon",
+    "dante": "https://www.gutenberg.org/files/1001/1001-h/1001-h.htm"
+  },
+  "design_notes": [
+    "Kahdeksan perustajan valinta ja tekniset tehtävät ovat KLONEn oma tulkinta.",
+    "Lähdetekstin yhdeksäs kuningas Beleth on mukana ringissä 2.",
+    "Tunteet ja välittäjäaineet ovat laskennallisia analogioita.",
+    "Neuvoston viimeinen sana koskee sisäistä tutkimuskantaa, ei KLONEn käyttöoikeuksia."
+  ],
+  "authority": {
+    "binding_authority": false,
+    "external_actions": false,
+    "permission_changes": false,
+    "deployment_approval": false,
+    "consciousness_claim": false
+  }
+}

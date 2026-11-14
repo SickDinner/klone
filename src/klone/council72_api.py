@@ -7,9 +7,9 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from .council72 import catalog, deliberate, draft_dispatch, experiment
 from .council72_session import run_session
-from .council72_experiment import build_contract
 from .council72_review import review_session
 from .council72_briefing import build_briefing
+from .council72_contract import register_contract
 from .api import get_repository
 from .council72_memory import public_memory_observation
 from .hypervisor_dispatch import DispatchDenied
@@ -131,38 +131,47 @@ def council_briefing(request: ReviewRequest):
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-class ExperimentIdentity(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-    commit: str = Field(pattern=r"^[a-f0-9]{40}$")
-    test_suite_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
-    collector_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
-    platform: Literal["linux", "win32", "android"]
-
-
-class ExperimentContractRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-    review: ReviewRequest
-    task_id: str = Field(min_length=1, max_length=96)
-    expected: ExperimentIdentity
-    minimum_full_passed: int = Field(default=1, ge=1, le=1000000)
-    maximum_full_skipped: int = Field(default=0, ge=0, le=10000)
-
-
-@router.post("/experiment-contract")
-def council_experiment_contract(request: ExperimentContractRequest):
-    try:
-        session = run_session(request.review.session.model_dump())
-        options = request.review.model_dump(exclude={"session"})
-        briefing = build_briefing(review_session(session, **options))
-        return build_contract(briefing, request.task_id, request.expected.model_dump(),
-            minimum_full_passed=request.minimum_full_passed, maximum_full_skipped=request.maximum_full_skipped)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
 class MemoryObservationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     limit: int = Field(default=50, ge=1, le=200)
+
+
+class ContractCriterion(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    id: Identifier
+    claim_key: Identifier
+    domain: str = Field(min_length=1, max_length=32)
+    stage: Literal["syntax", "cognition", "full", "local_deploy"]
+    environment: Literal["work", "android"]
+    min_passed: int = Field(ge=0, le=1000000)
+    platform: Literal["linux","win32","darwin","android"] | None = None
+    max_skipped: int | None = Field(default=None,ge=0,le=1000000)
+    max_deselected: int | None = Field(default=None,ge=0,le=1000000)
+    full_suite: bool | None = None
+
+
+class ContractExecutionIdentity(BaseModel):
+    model_config = ConfigDict(extra="forbid",strict=True)
+    test_suite_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    collector_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class ContractSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    contract_id: Identifier
+    goal: str = Field(min_length=1, max_length=2000)
+    target_commit: str = Field(pattern=r"^[0-9a-f]{40}$")
+    classification: Literal["public", "restricted", "sealed"]
+    criteria: list[ContractCriterion] = Field(min_length=1, max_length=16)
+    execution_identity: ContractExecutionIdentity | None = None
+
+
+@router.post("/contract")
+def council_contract(request: ContractSpec):
+    try:
+        return register_contract(request.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("/memory-observation")

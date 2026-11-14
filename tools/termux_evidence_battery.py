@@ -20,7 +20,8 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from klone.evidence_io import checked_path, directory_handle, json_object, read_bounded
 from klone.evidence_network import MAX_LOG, assemble_packet, canonical, validate_run
-from klone.evidence_run_context import collector_snapshot, context_id, digest, suite_snapshot, validate_environment
+from klone.evidence_run_context import context_id, digest, suite_snapshot, validate_environment
+from klone.council72_contract import MAX_CONTRACT, load_contract, validate_checkout
 
 PROBE = r'''
 import importlib.metadata as metadata
@@ -114,6 +115,7 @@ def probe_python(python: Path, root: Path, env: dict) -> dict:
 
 
 def collector_digest(root: Path) -> str:
+    from klone.evidence_run_context import collector_snapshot
     return collector_snapshot(root)
 
 
@@ -167,19 +169,25 @@ def run_battery(root: Path, output: Path, timeout: int = 240, *, python: Path | 
     if any(env.get(k) for k in ("PYTEST_ADDOPTS", "PYTEST_PLUGINS")):
         raise ValueError("clear PYTEST_ADDOPTS and PYTEST_PLUGINS before collecting exact commands")
     before = checkout(root)
+    binding = None
+    if experiment_contract is not None:
+        contract, file_hash = load_contract(experiment_contract)
+        if contract["spec"]["target_commit"] != before["commit"]:
+            raise ValueError("experiment contract target commit differs from checkout")
+        binding = {"contract_sha256": contract["contract_sha256"], "file_sha256": file_hash,
+                   "after_file_sha256": None}
     probe = probe_python(python, root, env)
     suite_before, collector_before = suite_snapshot(root), collector_digest(root)
-    selected_contract = None
-    if experiment_contract is not None:
-        from klone.council72_experiment import validate_run_identity
-        selected_contract = validate_run_identity(json_object(read_bounded(experiment_contract, 2 * 1024 * 1024)),
-            commit=before["commit"], suite_sha256=suite_before["sha256"], collector_sha256=collector_before,
-            platform=probe["environment"]["platform"], clean=not before["dirty"])
+    if binding is not None:
+        validate_checkout(contract,commit=before["commit"],suite_sha256=suite_before["sha256"],
+            collector_sha256=collector_before,platform=probe["environment"]["platform"],clean=not before["dirty"])
     commands = stage_commands(root, python)
     execution = {"context_version": 1, "cwd": str(root), "python_executable": str(python),
                  "python_prefix": probe["prefix"], "virtualenv_reported": True,
                  "commands": commands, "environment_overrides": overrides, "timeout_seconds": timeout,
                  "test_suite_before": suite_before, "collector_sha256": collector_before}
+    if binding is not None:
+        execution["experiment_contract"] = binding
     execution["comparison_id"] = context_id(probe["environment"], execution)
     # Bound metadata before reserving the new evidence directory or executing tests.
     if len(canonical({"environment": probe["environment"], "execution": execution})) > 48000:
@@ -204,11 +212,17 @@ def run_battery(root: Path, output: Path, timeout: int = 240, *, python: Path | 
             files[name + ".log"] = {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
         after = checkout(root)
         after_probe = probe_python(python, root, env)
+        if binding is not None:
+            try:
+                binding["after_file_sha256"] = hashlib.sha256(read_bounded(experiment_contract, MAX_CONTRACT)).hexdigest()
+            except (ValueError, OSError):
+                binding["after_file_sha256"] = None
         execution.update(test_suite_after=suite_snapshot(root), collector_after_sha256=collector_digest(root),
                          environment_after_sha256=digest(after_probe["environment"]))
         execution["context_consistent"] = (execution["test_suite_before"] == execution["test_suite_after"]
                                             and collector_before == execution["collector_after_sha256"]
-                                            and probe["environment"] == after_probe["environment"])
+                                            and probe["environment"] == after_probe["environment"]
+                                            and (binding is None or binding["file_sha256"] == binding["after_file_sha256"]))
         required_ok = all(stages[n]["status"] == "passed" for n in commands if n != "torch_probe")
         consistent = before["commit"] == after["commit"] and not before["dirty"] and not after["dirty"]
         complete = all(stage["capture_complete"] for stage in stages.values())
@@ -220,8 +234,6 @@ def run_battery(root: Path, output: Path, timeout: int = 240, *, python: Path | 
                   "collection_complete": complete,
                   "overall": "passed" if required_ok and consistent and complete and execution["context_consistent"] else "failed",
                   "device_identity_verified": False, "deployment_approval": False}
-        if selected_contract is not None:
-            report["experiment_contract_sha256"] = selected_contract
         validate_run(report)
         raw = json.dumps(report, indent=2, sort_keys=True).encode()
         if len(raw) > 65536:
@@ -237,8 +249,8 @@ def main(argv=None):
     parser.add_argument("--root", type=Path, default=Path.home() / "klone-next")
     parser.add_argument("--output", "--output-dir", dest="output", type=Path, required=True)
     parser.add_argument("--python", type=Path, help="Existing virtualenv interpreter, including outside the worktree")
-    parser.add_argument("--experiment-contract", type=Path, help="Predeclared Council 72 battery criteria")
     parser.add_argument("--timeout", type=int, default=240)
+    parser.add_argument("--experiment-contract", type=Path, help="registered acceptance contract, read before/after tests")
     args = parser.parse_args(argv)
     if args.timeout < 1 or args.timeout > 3600:
         parser.error("timeout must be 1..3600")

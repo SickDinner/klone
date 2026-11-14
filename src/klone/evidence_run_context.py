@@ -59,7 +59,7 @@ def suite_snapshot(root: Path) -> dict:
 
 def collector_snapshot(root: Path) -> str:
     paths = (root / "tools/termux_evidence_battery.py", root / "src/klone/evidence_run_context.py")
-    return digest({p.relative_to(root).as_posix(): hashlib.sha256(read_bounded(p, 1024 * 1024)).hexdigest()
+    return digest({p.relative_to(root).as_posix(): hashlib.sha256(read_bounded(p,1024*1024)).hexdigest()
                    for p in paths})
 
 
@@ -95,14 +95,18 @@ def validate_environment(environment: dict) -> None:
 
 
 def context_id(environment: dict, execution: dict) -> str:
-    return digest({"context_version": 1, "environment": environment,
+    payload = {"context_version": 1, "environment": environment,
                    "commands": {name: ["$PYTHON", *args[1:]] if args else None
                                 for name, args in execution["commands"].items()},
                    "test_suite": execution["test_suite_before"],
                    "collector_sha256": execution["collector_sha256"],
                    "timeout_seconds": execution["timeout_seconds"],
                    "environment_overrides": {k: "$ROOT/src" if k == "PYTHONPATH" else v
-                                             for k, v in execution["environment_overrides"].items()}})
+                                             for k, v in execution["environment_overrides"].items()}}
+    if "experiment_contract" in execution:
+        binding = execution["experiment_contract"]
+        payload["experiment_contract"] = {k: binding[k] for k in ("contract_sha256", "file_sha256")}
+    return digest(payload)
 
 
 def validate_context(run: dict) -> dict:
@@ -142,9 +146,17 @@ def validate_context(run: dict) -> dict:
                 or not isinstance(suite["sha256"], str) or not HEX.fullmatch(suite["sha256"])
                 or type(suite["file_count"]) is not int or not 1 <= suite["file_count"] <= MAX_FILES + 5):
             raise ValueError("invalid test suite fingerprint")
+    binding = execution.get("experiment_contract")
+    if "experiment_contract" in execution:
+        if (not isinstance(binding, dict) or set(binding) != {"contract_sha256", "file_sha256", "after_file_sha256"}
+                or any(not isinstance(binding[k], str) or not HEX.fullmatch(binding[k]) for k in ("contract_sha256", "file_sha256"))
+                or binding["after_file_sha256"] is not None and
+                   (not isinstance(binding["after_file_sha256"], str) or not HEX.fullmatch(binding["after_file_sha256"]))):
+            raise ValueError("invalid experiment contract binding")
     consistent = (execution["collector_sha256"] == execution["collector_after_sha256"]
                   and execution["environment_after_sha256"] == digest(environment)
-                  and execution["test_suite_before"] == execution["test_suite_after"])
+                  and execution["test_suite_before"] == execution["test_suite_after"]
+                  and (binding is None or binding["file_sha256"] == binding["after_file_sha256"]))
     if execution.get("context_consistent") is not consistent:
         raise ValueError("contradictory execution context claim")
     if execution["comparison_id"] != context_id(environment, execution):

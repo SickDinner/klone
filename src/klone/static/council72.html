@@ -4,7 +4,7 @@
 <title>KLONE · 72-paikkainen neuvosto</title><link rel="stylesheet" href="/static/council72.css">
 <script src="/static/council72-view.js" defer></script></head>
 <body data-catalog="/static/council72-catalog.json" data-api="/api/cognition/council72">
-<header><a href="/">← KLONE-työpöytä</a><span class="pill">TUTKIMUSMALLI · ISTUNNOT</span></header>
+<header><a href="/">← KLONE-työpöytä</a><a href="/static/council72-evidence.html">Lukittu koe ja testievidenssi →</a><span class="pill">TUTKIMUSMALLI · ISTUNNOT</span></header>
 <main><section class="hero"><p class="eyebrow">KOTIPESÄ / NEUVOSTO 72</p><h1>Yhdeksän rinkiä.<br>Yksi yhteinen päämäärä.</h1>
 <p class="intro">72 erikoistunutta näkökulmaa. Kahdeksan perustajakuningasta.<br>Ulkoa havaintoja sisään, harkittuja luonnoksia takaisin Limbon kautta.</p>
 <div class="stats"><div><strong>72</strong><span>omaa tehtävää</span></div><div><strong>9 × 8</strong><span>rinkiä ja paikkaa</span></div><div><strong>6</strong><span>laskennallista säädintä</span></div><div><strong>0</strong><span>automaattista julkaisua</span></div></div></section>
@@ -48,12 +48,5 @@
 <div id="briefing-controls" hidden><button id="run-briefing" disabled>Muodosta kuninkaiden katselmus</button><p class="muted">Käyttää yllä valittuja osa-alueiden tiloja ja aikabudjettia. Avaa ensin istunto. Konsolidointi muodostaa viitteistetyn väitehakemiston.</p></div>
 <div class="actions"><button id="save-briefing" disabled>Tallenna katselmus</button></div>
 <div id="briefing-result"><p class="muted">Avaa katselmuksen JSON. Termux: <code>python -m klone.council72_briefing --input kehitysjono.json --output katselmus.json</code></p></div>
-</section>
-<section class="panel experiment" id="contract-panel"><div class="panel-heading"><div><p class="eyebrow">SOPIMUS → KOE → LÄHDENÄYTTÖ</p><h2>Lukitse tavoite ennen koetta.</h2></div><span class="pill">ALKUPERÄISET LOKIT</span></div>
-<p>Valitse kehitysjonosta budjetoitu osa-alueen tarkistus ja valmistele sille koesopimus Termuxissa. Sopimus sitoo commitin, testisarjan, kerääjän, alustan sekä testien ja ohitusten rajat. Testipatteri tarkistaa sidonnan ennen ajoa.</p>
-<p class="muted">Avaa sopimus tai tulos samalla JSON-painikkeella kuin muut raportit. Tulos perustuu CLI:n lukemiin alkuperäisiin tiedostoihin. Selain näyttää raportin väitteet; se ei lue paikallisia testilokeja eikä autentikoi ajoa.</p>
-<details><summary>Termuxin työjärjestys</summary><ol><li>Muodosta katselmus ja valitse budjettiin mahtuva <code>domain:memory</code> tai muu osa-alueen tarkistus.</li><li>Valmistele sopimus: <code>python -m klone.council72_experiment --prepare-briefing katselmus.json --task domain:memory --root "$KLONE_ROOT" --minimum-full-passed 983 --maximum-full-skipped 1 --output sopimus.json</code></li><li>Aja testipatteri sopimuksen kanssa: <code>python tools/termux_evidence_battery.py --root "$KLONE_ROOT" --python "$KLONE_PY" --experiment-contract sopimus.json --output "$NEW_RUN_DIRECTORY"</code></li><li>Arvioi alkuperäiset lokit: <code>python -m klone.council72_experiment --evaluate-contract sopimus.json --run-dir "$NEW_RUN_DIRECTORY" --output tulos.json</code></li></ol><p>Valitse rajat itse ennen ajoa. Käytä nykyistä virtuaaliympäristöä, oikeaa PYTHONPATH-arvoa ja joka kerta uusia vientipolkuja. Ajat ovat suunnitteluarvioita; tämä ei toteuta ajonaikaista aika- tai tokenbudjettia.</p></details>
-<div class="actions"><button id="save-contract" disabled>Tallenna avoin koesopimus</button><button id="save-evaluation" disabled>Tallenna avoin tulos</button><button id="append-experiment-observation" disabled>Lisää tuloshavainto seuraavan kierroksen lomakkeelle</button></div>
-<div id="contract-result"><p class="muted">Ei koesopimusta avattuna.</p></div><div id="evaluation-result"></div>
 </section>
 <footer><p>Dante ja Ars Goetia ovat roolien kirjallisia viitteitä. Tekniset tehtävät ja persoonaparametrit ovat KLONEn omaa suunnittelua.</p><p>Tämä sivu ei julkaise mitään. Kanavat ja tilit ovat määrittelemättä.</p></footer></main></body></html>

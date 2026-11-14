@@ -33,6 +33,10 @@ class NokiCompanionTests(unittest.TestCase):
         self.assertEqual(len(data["spirits"]), 72)
         self.assertEqual([s["order"] for s in data["spirits"]], list(range(1, 73)))
         self.assertEqual(data["spirits"][8]["name"], "Paimon")
+        self.assertIn("kuningas", data["spirits"][8]["ranks"])
+        self.assertIn("dromedaarilla", data["spirits"][8]["description"])
+        self.assertIn("markiisi", data["spirits"][23]["ranks"])
+        self.assertTrue(all(s.get("ranks") for s in data["spirits"]))
         self.assertEqual(data["spirits"][23]["name"], "Naberius")
         self.assertEqual(data["spirits"][-1]["name"], "Andromalius")
         self.assertGreaterEqual(len(data["entries"]), 60)
@@ -109,6 +113,7 @@ class NokiCompanionTests(unittest.TestCase):
         self.assertIn("Ei kuvien latausta palvelimelle", html)
         self.assertIn('capture="environment"', html)
         self.assertIn("NokiGrimoire.answer", html)
+        self.assertIn("Kirjalliset arvonimet", self.get_static("noki-grimoire.js").text)
         self.assertNotIn("localStorage", html)
         self.assertNotIn("https://", html)
         knowledge = self.get_static("noki-grimoire.js").text

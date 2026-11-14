@@ -154,3 +154,9 @@ tehtävä offline-konsolidointiehdotus. Multimodaalisen aineiston seuraava askel
 on tuoda ääni-/kuva-analyysin rajatut havaintoväitteet samaan lähdeskeemaan.
 Neuroteknologian syötteet tarvitsevat erillisen tutkimus- ja suostumusrajan.
 Nämä rivit ovat jatkokehitysehdotuksia, eivät tässä toteutettuja ominaisuuksia.
+
+Lähderyhmän poistokoe viimeisen kierroksen aktiiviselle aineistolle sekä
+selitettävä aikabudjetoitu kehitysjono on sittemmin toteutettu erillisenä
+[neuvoston katselmuksena](council72-review.md). Koko istuntohistorian
+vaihtoehtoinen uudelleenajo ja tehtävien suorittaminen ovat edelleen erillisiä
+jatkokehityskohtia.

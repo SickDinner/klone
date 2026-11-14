@@ -198,7 +198,9 @@ def review_session(session, *, domain_states=None, budget_minutes=60, max_tasks=
     options = _options(domain_states, budget_minutes, max_tasks, max_source_groups)
     if not session_replays(session):
         raise ValueError("session must replay before review")
-    return _build(session, options)
+    # JSON.stringify writes integral floats as integers. Rebuild the canonical
+    # session after verification so equivalent browser exports keep one digest.
+    return _build(run_session(session["request"]), options)
 
 
 def review_replays(report):

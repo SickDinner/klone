@@ -57,7 +57,11 @@ def directory_handle(path: Path, *, create: bool = False):
         yield None
         checked_path(path, directory=True)
         return
-    descriptor = os.open(path.anchor, os.O_RDONLY | os.O_DIRECTORY)
+    # Linux/Android can allow traversal while denying directory listing (even
+    # for '/'). O_PATH pins directories without requesting read permission;
+    # O_DIRECTORY and O_NOFOLLOW still reject links during the component walk.
+    flags = getattr(os, "O_PATH", os.O_RDONLY) | os.O_DIRECTORY | os.O_NOFOLLOW
+    descriptor = os.open(path.anchor, flags)
     try:
         for name in path.parts[1:]:
             if create:
@@ -65,8 +69,7 @@ def directory_handle(path: Path, *, create: bool = False):
                     os.mkdir(name, mode=0o700, dir_fd=descriptor)
                 except FileExistsError:
                     pass
-            next_fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
-                              dir_fd=descriptor)
+            next_fd = os.open(name, flags, dir_fd=descriptor)
             os.close(descriptor)
             descriptor = next_fd
         yield descriptor

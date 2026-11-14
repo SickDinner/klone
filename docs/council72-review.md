@@ -1,5 +1,7 @@
 # Neuvosto 72: lähteiden poistokokeet ja kehitysjono
 
+Jatko: [kahdeksan perustajan katselmus, väitehakemisto ja tarkistuspaketit](council72-briefing.md).
+
 Istunnon päälle saa nyt toistettavan katselmuksen. Se selvittää, mitä tapahtuu,
 jos yksi ilmoitettu lähderyhmä poistuu viimeisen kierroksen käytössä olevasta
 aineistosta. Katselmus muodostaa myös aikabudjettiin sopivan tehtäväehdotuksen

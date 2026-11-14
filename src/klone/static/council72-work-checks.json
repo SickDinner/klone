@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "kind": "klone-council72-work-checks",
+  "domains": [
+    {
+      "domain": "android",
+      "related_files": [
+        "tools/local_deploy.py",
+        "src/klone/evidence_io.py",
+        "tests/test_local_deploy.py"
+      ],
+      "test_targets": [
+        "tests/test_local_deploy.py"
+      ],
+      "commands_text": "(\nset -eu\nKLONE_ROOT=\"${KLONE_ROOT:-$HOME/klone-next}\"\nKLONE_PY=\"${KLONE_PY:-$HOME/klone-next/.venv/bin/python}\"\n[ -d \"$KLONE_ROOT/src/klone\" ] || { echo \"Tarkista KLONE_ROOT\"; exit 1; }\n[ -x \"$KLONE_PY\" ] || { echo \"Tarkista KLONE_PY\"; exit 1; }\ncd \"$KLONE_ROOT\" || exit 1\ngit status --short\ngit branch --show-current\ngit rev-parse HEAD\nPYTHONPATH=\"$PWD/src\" PYTHONDONTWRITEBYTECODE=1 \"$KLONE_PY\" -m pytest -p no:cacheprovider -q tests/test_local_deploy.py\ngit diff --check\ngit diff --stat\n)",
+      "coverage": "mapped_regression_subset"
+    },
+    {
+      "domain": "audit",
+      "related_files": [
+        "src/klone/council72_memory.py",
+        "src/klone/hypervisor_audit_adapter.py",
+        "tests/test_council72_memory.py"
+      ],
+      "test_targets": [
+        "tests/test_council72_memory.py"
+      ],
+      "commands_text": "(\nset -eu\nKLONE_ROOT=\"${KLONE_ROOT:-$HOME/klone-next}\"\nKLONE_PY=\"${KLONE_PY:-$HOME/klone-next/.venv/bin/python}\"\n[ -d \"$KLONE_ROOT/src/klone\" ] || { echo \"Tarkista KLONE_ROOT\"; exit 1; }\n[ -x \"$KLONE_PY\" ] || { echo \"Tarkista KLONE_PY\"; exit 1; }\ncd \"$KLONE_ROOT\" || exit 1\ngit status --short\ngit branch --show-current\ngit rev-parse HEAD\nPYTHONPATH=\"$PWD/src\" PYTHONDONTWRITEBYTECODE=1 \"$KLONE_PY\" -m pytest -p no:cacheprovider -q tests/test_council72_memory.py\ngit diff --check\ngit diff --stat\n)",
+      "coverage": "mapped_regression_subset"
+    },
+    {
+      "domain": "ci",
+      "related_files": [
+        ".github/workflows/klone-regression.yml"
+      ],
+      "test_targets": [],
+      "commands_text": null,
+      "coverage": "workflow_review_only"
+    },
+    {
+      "domain": "cognition",
+      "related_files": [
+        "src/klone/council72.py",
+        "src/klone/council72_session.py",
+        "tests/test_council72_session.py"
+      ],
+      "test_targets": [
+        "tests/test_council72_session.py"
+      ],
+      "commands_text": "(\nset -eu\nKLONE_ROOT=\"${KLONE_ROOT:-$HOME/klone-next}\"\nKLONE_PY=\"${KLONE_PY:-$HOME/klone-next/.venv/bin/python}\"\n[ -d \"$KLONE_ROOT/src/klone\" ] || { echo \"Tarkista KLONE_ROOT\"; exit 1; }\n[ -x \"$KLONE_PY\" ] || { echo \"Tarkista KLONE_PY\"; exit 1; }\ncd \"$KLONE_ROOT\" || exit 1\ngit status --short\ngit branch --show-current\ngit rev-parse HEAD\nPYTHONPATH=\"$PWD/src\" PYTHONDONTWRITEBYTECODE=1 \"$KLONE_PY\" -m pytest -p no:cacheprovider -q tests/test_council72_session.py\ngit diff --check\ngit diff --stat\n)",
+      "coverage": "mapped_regression_subset"
+    },
+    {
+      "domain": "deployment",
+      "related_files": [
+        "tools/local_deploy.py",
+        "tests/test_local_deploy.py"
+      ],
+      "test_targets": [
+        "tests/test_local_deploy.py"
+      ],
+      "commands_text": "(\nset -eu\nKLONE_ROOT=\"${KLONE_ROOT:-$HOME/klone-next}\"\nKLONE_PY=\"${KLONE_PY:-$HOME/klone-next/.venv/bin/python}\"\n[ -d \"$KLONE_ROOT/src/klone\" ] || { echo \"Tarkista KLONE_ROOT\"; exit 1; }\n[ -x \"$KLONE_PY\" ] || { echo \"Tarkista KLONE_PY\"; exit 1; }\ncd \"$KLONE_ROOT\" || exit 1\ngit status --short\ngit branch --show-current\ngit rev-parse HEAD\nPYTHONPATH=\"$PWD/src\" PYTHONDONTWRITEBYTECODE=1 \"$KLONE_PY\" -m pytest -p no:cacheprovider -q tests/test_local_deploy.py\ngit diff --check\ngit diff --stat\n)",
+      "coverage": "mapped_regression_subset"
+    },
+    {
+      "domain": "genomics",
+      "related_files": [
+        "src/klone/genomics_preflight.py",
+        "tests/test_genomics_preflight.py"
+      ],
+      "test_targets": [
+        "tests/test_genomics_preflight.py"
+      ],
+      "commands_text": "(\nset -eu\nKLONE_ROOT=\"${KLONE_ROOT:-$HOME/klone-next}\"\nKLONE_PY=\"${KLONE_PY:-$HOME/klone-next/.venv/bin/python}\"\n[ -d \"$KLONE_ROOT/src/klone\" ] || { echo \"Tarkista KLONE_ROOT\"; exit 1; }\n[ -x \"$KLONE_PY\" ] || { echo \"Tarkista KLONE_PY\"; exit 1; }\ncd \"$KLONE_ROOT\" || exit 1\ngit status --short\ngit branch --show-current\ngit rev-parse HEAD\nPYTHONPATH=\"$PWD/src\" PYTHONDONTWRITEBYTECODE=1 \"$KLONE_PY\" -m pytest -p no:cacheprovider -q tests/test_genomics_preflight.py\ngit diff --check\ngit diff --stat\n)",
+      "coverage": "mapped_regression_subset"
+    },
+    {
+      "domain": "hypervisor",
+      "related_files": [
+        "src/klone/hypervisor_runtime.py",
+        "src/klone/hypervisor_dispatch.py",
+        "tests/test_hypervisor_runtime_contract.py"
+      ],
+      "test_targets": [
+        "tests/test_hypervisor_runtime_contract.py"
+      ],
+      "commands_text": "(\nset -eu\nKLONE_ROOT=\"${KLONE_ROOT:-$HOME/klone-next}\"\nKLONE_PY=\"${KLONE_PY:-$HOME/klone-next/.venv/bin/python}\"\n[ -d \"$KLONE_ROOT/src/klone\" ] || { echo \"Tarkista KLONE_ROOT\"; exit 1; }\n[ -x \"$KLONE_PY\" ] || { echo \"Tarkista KLONE_PY\"; exit 1; }\ncd \"$KLONE_ROOT\" || exit 1\ngit status --short\ngit branch --show-current\ngit rev-parse HEAD\nPYTHONPATH=\"$PWD/src\" PYTHONDONTWRITEBYTECODE=1 \"$KLONE_PY\" -m pytest -p no:cacheprovider -q tests/test_hypervisor_runtime_contract.py\ngit diff --check\ngit diff --stat\n)",
+      "coverage": "mapped_regression_subset"
+    },
+    {
+      "domain": "media",
+      "related_files": [
+        "src/klone/art.py",
+        "tests/test_phase_v1_1.py",
+        "tests/test_phase_v1_2.py"
+      ],
+      "test_targets": [
+        "tests/test_phase_v1_1.py",
+        "tests/test_phase_v1_2.py"
+      ],
+      "commands_text": "(\nset -eu\nKLONE_ROOT=\"${KLONE_ROOT:-$HOME/klone-next}\"\nKLONE_PY=\"${KLONE_PY:-$HOME/klone-next/.venv/bin/python}\"\n[ -d \"$KLONE_ROOT/src/klone\" ] || { echo \"Tarkista KLONE_ROOT\"; exit 1; }\n[ -x \"$KLONE_PY\" ] || { echo \"Tarkista KLONE_PY\"; exit 1; }\ncd \"$KLONE_ROOT\" || exit 1\ngit status --short\ngit branch --show-current\ngit rev-parse HEAD\nPYTHONPATH=\"$PWD/src\" PYTHONDONTWRITEBYTECODE=1 \"$KLONE_PY\" -m pytest -p no:cacheprovider -q tests/test_phase_v1_1.py tests/test_phase_v1_2.py\ngit diff --check\ngit diff --stat\n)",
+      "coverage": "art_image_subset_only"
+    },
+    {
+      "domain": "memory",
+      "related_files": [
+        "src/klone/memory.py",
+        "src/klone/repository.py",
+        "tests/test_memory_phase_2b3.py"
+      ],
+      "test_targets": [
+        "tests/test_memory_phase_2b3.py"
+      ],
+      "commands_text": "(\nset -eu\nKLONE_ROOT=\"${KLONE_ROOT:-$HOME/klone-next}\"\nKLONE_PY=\"${KLONE_PY:-$HOME/klone-next/.venv/bin/python}\"\n[ -d \"$KLONE_ROOT/src/klone\" ] || { echo \"Tarkista KLONE_ROOT\"; exit 1; }\n[ -x \"$KLONE_PY\" ] || { echo \"Tarkista KLONE_PY\"; exit 1; }\ncd \"$KLONE_ROOT\" || exit 1\ngit status --short\ngit branch --show-current\ngit rev-parse HEAD\nPYTHONPATH=\"$PWD/src\" PYTHONDONTWRITEBYTECODE=1 \"$KLONE_PY\" -m pytest -p no:cacheprovider -q tests/test_memory_phase_2b3.py\ngit diff --check\ngit diff --stat\n)",
+      "coverage": "mapped_regression_subset"
+    },
+    {
+      "domain": "permissions",
+      "related_files": [
+        "src/klone/hypervisor_safe_pipeline.py",
+        "tests/test_hypervisor_safe_pipeline.py"
+      ],
+      "test_targets": [
+        "tests/test_hypervisor_safe_pipeline.py"
+      ],
+      "commands_text": "(\nset -eu\nKLONE_ROOT=\"${KLONE_ROOT:-$HOME/klone-next}\"\nKLONE_PY=\"${KLONE_PY:-$HOME/klone-next/.venv/bin/python}\"\n[ -d \"$KLONE_ROOT/src/klone\" ] || { echo \"Tarkista KLONE_ROOT\"; exit 1; }\n[ -x \"$KLONE_PY\" ] || { echo \"Tarkista KLONE_PY\"; exit 1; }\ncd \"$KLONE_ROOT\" || exit 1\ngit status --short\ngit branch --show-current\ngit rev-parse HEAD\nPYTHONPATH=\"$PWD/src\" PYTHONDONTWRITEBYTECODE=1 \"$KLONE_PY\" -m pytest -p no:cacheprovider -q tests/test_hypervisor_safe_pipeline.py\ngit diff --check\ngit diff --stat\n)",
+      "coverage": "mapped_regression_subset"
+    },
+    {
+      "domain": "research",
+      "related_files": [
+        "src/klone/research_workflow.py",
+        "tests/test_research_workflow.py"
+      ],
+      "test_targets": [
+        "tests/test_research_workflow.py"
+      ],
+      "commands_text": "(\nset -eu\nKLONE_ROOT=\"${KLONE_ROOT:-$HOME/klone-next}\"\nKLONE_PY=\"${KLONE_PY:-$HOME/klone-next/.venv/bin/python}\"\n[ -d \"$KLONE_ROOT/src/klone\" ] || { echo \"Tarkista KLONE_ROOT\"; exit 1; }\n[ -x \"$KLONE_PY\" ] || { echo \"Tarkista KLONE_PY\"; exit 1; }\ncd \"$KLONE_ROOT\" || exit 1\ngit status --short\ngit branch --show-current\ngit rev-parse HEAD\nPYTHONPATH=\"$PWD/src\" PYTHONDONTWRITEBYTECODE=1 \"$KLONE_PY\" -m pytest -p no:cacheprovider -q tests/test_research_workflow.py\ngit diff --check\ngit diff --stat\n)",
+      "coverage": "mapped_regression_subset"
+    },
+    {
+      "domain": "simulation",
+      "related_files": [
+        "src/klone/simulation.py",
+        "tests/test_phase_s1_1.py"
+      ],
+      "test_targets": [
+        "tests/test_phase_s1_1.py"
+      ],
+      "commands_text": "(\nset -eu\nKLONE_ROOT=\"${KLONE_ROOT:-$HOME/klone-next}\"\nKLONE_PY=\"${KLONE_PY:-$HOME/klone-next/.venv/bin/python}\"\n[ -d \"$KLONE_ROOT/src/klone\" ] || { echo \"Tarkista KLONE_ROOT\"; exit 1; }\n[ -x \"$KLONE_PY\" ] || { echo \"Tarkista KLONE_PY\"; exit 1; }\ncd \"$KLONE_ROOT\" || exit 1\ngit status --short\ngit branch --show-current\ngit rev-parse HEAD\nPYTHONPATH=\"$PWD/src\" PYTHONDONTWRITEBYTECODE=1 \"$KLONE_PY\" -m pytest -p no:cacheprovider -q tests/test_phase_s1_1.py\ngit diff --check\ngit diff --stat\n)",
+      "coverage": "mapped_regression_subset"
+    }
+  ]
+}

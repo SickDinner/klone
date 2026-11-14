@@ -9,6 +9,7 @@ from .council72 import catalog, deliberate, draft_dispatch, experiment
 from .council72_session import run_session
 from .council72_review import review_session
 from .council72_briefing import build_briefing
+from .council72_contract import register_contract
 from .api import get_repository
 from .council72_memory import public_memory_observation
 from .hypervisor_dispatch import DispatchDenied
@@ -133,6 +134,33 @@ def council_briefing(request: ReviewRequest):
 class MemoryObservationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     limit: int = Field(default=50, ge=1, le=200)
+
+
+class ContractCriterion(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    id: Identifier
+    claim_key: Identifier
+    domain: str = Field(min_length=1, max_length=32)
+    stage: Literal["syntax", "cognition", "full", "local_deploy"]
+    environment: Literal["work", "android"]
+    min_passed: int = Field(ge=0, le=1000000)
+
+
+class ContractSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    contract_id: Identifier
+    goal: str = Field(min_length=1, max_length=2000)
+    target_commit: str = Field(pattern=r"^[0-9a-f]{40}$")
+    classification: Literal["public", "restricted", "sealed"]
+    criteria: list[ContractCriterion] = Field(min_length=1, max_length=16)
+
+
+@router.post("/contract")
+def council_contract(request: ContractSpec):
+    try:
+        return register_contract(request.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("/memory-observation")

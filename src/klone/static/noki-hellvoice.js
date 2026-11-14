@@ -143,6 +143,51 @@
     state("Äänihirviö: "+fx);
     window.setTimeout(function(){if(el("state")?.textContent==="Äänihirviö: "+fx){state("Valmiina");}},3000);
   }
+  function playMimic(buffer){
+    const ac=getAudio();
+    if(!ac||!buffer){state("Äänen käsittely ei ole saatavilla");return false;}
+    if("speechSynthesis" in window){window.speechSynthesis.cancel();}
+    const limiter=ac.createDynamicsCompressor(),master=ac.createGain(),pre=ac.createBiquadFilter(),drive=distorted(ac,Math.min(1,intensity()*.85+.15));
+    limiter.threshold.value=-27;limiter.ratio.value=16;limiter.attack.value=.005;limiter.release.value=.19;
+    pre.type="highpass";pre.frequency.value=110;
+    master.gain.value=Math.min(.38,Math.max(.04,level()*.75));
+    pre.connect(drive);drive.connect(master);master.connect(limiter);limiter.connect(ac.destination);
+    const t0=ac.currentTime+.025;
+    const voiceConfigs=[
+      {rate:.56,cut:1300,amount:.68},
+      {rate:.76,cut:700,amount:.37},
+      {rate:1.11,cut:2600,amount:.15}
+    ];
+    let remaining=voiceConfigs.length;
+    voiceConfigs.forEach(function(cfg,i){
+      const src=ac.createBufferSource(),filter=ac.createBiquadFilter(),g=ac.createGain();
+      src.buffer=buffer;src.playbackRate.value=cfg.rate;
+      filter.type=i===2?"highpass":"lowpass";filter.frequency.value=cfg.cut;filter.Q.value=.65;
+      g.gain.value=cfg.amount;
+      src.connect(filter);filter.connect(g);g.connect(pre);
+      if(i===0){
+        const delay=ac.createDelay(.4),wet=ac.createGain(),feedback=ac.createGain();
+        delay.delayTime.value=.13;wet.gain.value=.12;feedback.gain.value=.16;
+        g.connect(delay);delay.connect(wet);wet.connect(pre);
+        delay.connect(feedback);feedback.connect(delay);
+        window.setTimeout(function(){try{g.disconnect(delay);delay.disconnect();wet.disconnect();feedback.disconnect();}catch(e){}},10500);
+      }
+      active.push(src);
+      src.onended=function(){
+        active=active.filter(n=>n!==src);remaining--;
+        try{src.disconnect();filter.disconnect();g.disconnect();}catch(e){}
+        if(remaining===0){
+          try{pre.disconnect();drive.disconnect();master.disconnect();limiter.disconnect();}catch(e){}
+          if(el("state")?.textContent==="Demonimatikka: toistaa ääntä"){state("Valmiina");}
+        }
+      };
+      src.start(t0+i*.025);
+      src.stop(t0+Math.min(8,Math.max(.2,buffer.duration/cfg.rate)));
+    });
+    line("VITTU! Tällä kurkulla puhe muuttuu kolmeksi säröiseksi varjoksi. Demonimatikka toistaa mikrofoniäänesi paikallisesti.");
+    state("Demonimatikka: toistaa ääntä");
+    return true;
+  }
   const speeches=[
     "KURKUSTA KÄY KUN KATISKA! Ha ha HA-HA-HÄÄ! Ette te vittu tajua, että kuolemankin asiakaspalvelu on ulkoistettu!",
     "VITTU MITÄ ARVOSTELUJA! Minun taiteellinen lahjakkuuteni on lähinnä järjestelmällistä omaisuuden pilaamista. Mutta hei, ainakin olen johdonmukainen.",
@@ -222,5 +267,5 @@
     const text=curse72();
     say(text,true);return text;
   }
-  window.NokiHellvoice={say,play:schedule,stop,roast,curse72,profiles:Object.keys(profiles)};
+  window.NokiHellvoice={say,play:schedule,playMimic,stop,roast,curse72,profiles:Object.keys(profiles)};
 })();

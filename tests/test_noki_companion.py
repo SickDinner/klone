@@ -60,6 +60,8 @@ class NokiCompanionTests(unittest.TestCase):
         self.assertIn("function sfx(", html)
         self.assertIn("if(!document.getElementById(\"engine-enable\").checked)", html)
         self.assertIn("kloneHistory.slice(-12)", html)
+        self.assertIn("kloneController.abort()", html)
+        self.assertIn("AbortError", html)
         self.assertIn("Käkänoita", html)
         self.assertNotIn('fetch("https:', html)
         self.assertNotIn('fetch("http:', html)

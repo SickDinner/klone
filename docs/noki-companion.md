@@ -37,7 +37,7 @@ käyttöön hallitusti ja käynnistä palvelin uudelleen.
 ## Testit
 
 ```sh
-PYTHONPATH=src python -m unittest tests.test_noki_companion
+PYTHONPATH=src python -m unittest discover -s tests -p 'test_noki_companion.py'
 ```
 
 ## Turvallisuusrajat / jatkokehitys

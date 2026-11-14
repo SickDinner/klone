@@ -144,6 +144,16 @@ class ContractCriterion(BaseModel):
     stage: Literal["syntax", "cognition", "full", "local_deploy"]
     environment: Literal["work", "android"]
     min_passed: int = Field(ge=0, le=1000000)
+    platform: Literal["linux","win32","darwin","android"] | None = None
+    max_skipped: int | None = Field(default=None,ge=0,le=1000000)
+    max_deselected: int | None = Field(default=None,ge=0,le=1000000)
+    full_suite: bool | None = None
+
+
+class ContractExecutionIdentity(BaseModel):
+    model_config = ConfigDict(extra="forbid",strict=True)
+    test_suite_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    collector_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
 class ContractSpec(BaseModel):
@@ -153,12 +163,13 @@ class ContractSpec(BaseModel):
     target_commit: str = Field(pattern=r"^[0-9a-f]{40}$")
     classification: Literal["public", "restricted", "sealed"]
     criteria: list[ContractCriterion] = Field(min_length=1, max_length=16)
+    execution_identity: ContractExecutionIdentity | None = None
 
 
 @router.post("/contract")
 def council_contract(request: ContractSpec):
     try:
-        return register_contract(request.model_dump())
+        return register_contract(request.model_dump(exclude_none=True))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

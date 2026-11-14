@@ -31,11 +31,20 @@ def _platform(row):
 def _case(contract, criterion, row):
     stage = row["stages"][criterion["stage"]]
     binding = (row["execution_context_claim"] or {}).get("experiment_contract")
+    execution = row["execution_context_claim"] or {}
+    environment = row["environment_claim"] if isinstance(row["environment_claim"],dict) else {}
+    identity = contract["spec"].get("execution_identity")
+    identity_matches = identity is None or (
+        all((execution.get("test_suite_"+p) or {}).get("sha256") == identity["test_suite_sha256"]
+            for p in ("before","after")) and
+        all(execution.get(k) == identity["collector_sha256"] for k in ("collector_sha256","collector_after_sha256")))
     reason = None
     if row["commit"] != contract["spec"]["target_commit"]:
         reason = "different_or_unknown_commit"
     elif _platform(row) != criterion["environment"]:
         reason = "different_or_unknown_environment"
+    elif "platform" in criterion and environment.get("platform") != criterion["platform"]:
+        reason = "different_or_unknown_platform"
     elif row["manifest_schema_version"] != 2:
         reason = "v2_execution_context_required"
     elif (not binding or binding.get("contract_sha256") != contract["contract_sha256"]
@@ -49,25 +58,34 @@ def _case(contract, criterion, row):
         reason = "incomplete_or_inconsistent_artifacts"
     elif row["contradictions"] or stage["exit_status_consistent"] is not True or stage["log_supports_claim"] is False:
         reason = "contradictory_evidence"
+    elif not identity_matches:
+        reason = "different_locked_suite_or_collector"
+    elif criterion.get("full_suite") and (execution.get("commands") or {}).get("full",[])[1:] != ["-B","-m","pytest","-p","no:cacheprovider","-q"]:
+        reason = "filtered_or_unrecognized_full_suite_command"
     elif stage["log_supports_claim"] is not True:
         reason = "log_does_not_establish_status"
     status = "unknown"
     if reason is None:
         if stage["declared_status"] == "failed":
             status, reason = "not_met", "consistent_reported_failure"
-        elif criterion["min_passed"]:
+        elif criterion["min_passed"] or any(k in criterion for k in ("max_skipped","max_deselected")) or criterion.get("full_suite"):
             counts = stage["log_evidence"]["counts"]
             passed = counts.get("passed") if stage["log_evidence"]["framework"] == "pytest" else None
             if type(passed) is not int:
                 reason = "pytest_pass_count_unavailable"
             elif passed < criterion["min_passed"]:
                 status, reason = "not_met", "reported_pass_count_below_locked_minimum"
+            elif "max_skipped" in criterion and counts.get("skipped",0) > criterion["max_skipped"]:
+                status, reason = "not_met", "reported_skips_above_locked_maximum"
+            elif counts.get("deselected",0) > criterion.get("max_deselected",0 if criterion.get("full_suite") else 1000000):
+                status, reason = "not_met", "reported_deselection_above_locked_maximum"
             else:
                 status, reason = "met_for_review", "locally_consistent_stage_claim"
         else:
             status, reason = "met_for_review", "locally_consistent_stage_claim"
     return {"run_name": row["run_name"], "status": status, "reason": reason,
-        "in_scope": (row["commit"] == contract["spec"]["target_commit"] and _platform(row) == criterion["environment"])
+        "in_scope": (row["commit"] == contract["spec"]["target_commit"] and _platform(row) == criterion["environment"] and
+                     ("platform" not in criterion or criterion["platform"] == environment.get("platform")))
                     if row["commit"] is not None and _platform(row) != "unknown" else None,
         "manifest_sha256": row["manifest"].get("sha256"),
         "log_sha256": row["artifacts"][criterion["stage"] + ".log"].get("sha256"),
@@ -110,7 +128,9 @@ def evaluate_evidence(contract_path, runs_root, run_names, *, ci_by_commit=None,
         ring = DOMAIN_RING[criterion["domain"]]
         king = model["rings"][ring-1]["steward_id"]
         courier = next(m["id"] for m in model["members"] if m.get("courier_for") == king)
-        ident = "evidence-" + digest([contract["contract_sha256"], result])[:40]
+        # Copied/renamed byte-identical evidence does not create a new observation.
+        source_cases = sorted({digest({k:v for k,v in case.items() if k != "run_name"}) for case in cases})
+        ident = "evidence-" + digest([contract["contract_sha256"],criterion,status,source_cases])[:40]
         observations.append({"id": ident, "courier_id": courier,
             "claim_key": criterion["claim_key"], "stance": {"met_for_review": "supports", "not_met": "contradicts", "unknown": "unknown"}[status],
             "source_group": "local-artifact-claims", "source_ref": "contract:" + contract["contract_sha256"] + ":criterion:" + criterion["id"],

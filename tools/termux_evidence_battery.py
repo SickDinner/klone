@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from klone.evidence_io import checked_path, directory_handle, json_object, read_bounded
 from klone.evidence_network import MAX_LOG, assemble_packet, canonical, validate_run
 from klone.evidence_run_context import context_id, digest, suite_snapshot, validate_environment
-from klone.council72_contract import MAX_CONTRACT, load_contract
+from klone.council72_contract import MAX_CONTRACT, load_contract, validate_checkout
 
 PROBE = r'''
 import importlib.metadata as metadata
@@ -115,8 +115,8 @@ def probe_python(python: Path, root: Path, env: dict) -> dict:
 
 
 def collector_digest(root: Path) -> str:
-    paths = (root / "tools/termux_evidence_battery.py", root / "src/klone/evidence_run_context.py")
-    return digest({p.relative_to(root).as_posix(): hashlib.sha256(read_bounded(p, 1024 * 1024)).hexdigest() for p in paths})
+    from klone.evidence_run_context import collector_snapshot
+    return collector_snapshot(root)
 
 
 def stage_commands(root: Path, python: Path) -> dict:
@@ -178,6 +178,9 @@ def run_battery(root: Path, output: Path, timeout: int = 240, *, python: Path | 
                    "after_file_sha256": None}
     probe = probe_python(python, root, env)
     suite_before, collector_before = suite_snapshot(root), collector_digest(root)
+    if binding is not None:
+        validate_checkout(contract,commit=before["commit"],suite_sha256=suite_before["sha256"],
+            collector_sha256=collector_before,platform=probe["environment"]["platform"],clean=not before["dirty"])
     commands = stage_commands(root, python)
     execution = {"context_version": 1, "cwd": str(root), "python_executable": str(python),
                  "python_prefix": probe["prefix"], "virtualenv_reported": True,

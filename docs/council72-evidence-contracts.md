@@ -1,5 +1,8 @@
 # Neuvoston koesopimus ja alkuperäiseen aineistoon sidottu havainto
 
+Testisarjan, kerääjän, tarkan alustan ja ohitusrajojen valinnaiset lukitukset
+kuvataan [tarkempien koerajojen ohjeessa](council72-contract-limits.md).
+
 Tavoite ja hyväksymiskriteerit kirjataan uuteen sopimustiedostoon ennen ajoa.
 Sopimus sitoo tarkan commitin, 1–16 yksilöllistä väitettä, vaihetestin,
 Work-/Android-ympäristön ja pytestin läpäisseiden testien vähimmäismäärän.

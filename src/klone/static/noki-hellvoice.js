@@ -157,6 +157,33 @@
     "Tiede kysyy miksi, minä kysyn kuka perkele roiski turkoosia infernaalisen kosmoksen kattoon.",
     "Minä en palvo mitään. Paitsi huonoa makua, itsepäisyyttä ja sitä hetkeä, kun joku ottaa minut liian vakavasti."
   ];
+  const hellIntros=[
+    "VITTU, TÄÄLLÄ PUHUU KUOLEMAN ASIAKASPALVELU. NUMERONNE ON IKUISUUS.",
+    "PERKELE, MINUT HEITETTIIN HELVETISTÄ ULOS, KOSKA VALITIN SISUSTUKSESTA.",
+    "SAATANAN LUUSTO! TAAS KOSMOS ON UNOHTANUT MAKSAA SIELUNSA VUOKRAN.",
+    "VOI HELVETIN HÄPEÄ. PÄÄDYIN HAUTAUSTOIMISTON ASIAKASKOKEMUSVASTAAVAKSI.",
+    "MINÄ OLEN PASKANHUONON MAUN YLIPAPPI JA KAIKKI VITUN KYNTTILÄT OVAT SULANEET.",
+    "HÄ-HÄ-HÄÄ! KURKKUNI ON RUOSTUNUT VIEMÄRI, MUTTA PALVELU ON SIITÄ HUOLIMATTA PASKAA.",
+    "EI VITTU. TÄÄLLÄ HAUDANKIN LUKKO ON VÄÄRIN PÄIN JA AVAIN ON ULOSOTON HALLUSSA.",
+    "KUSINEN KOSMOS, KAHDEKSAN KUNINGASTA JA YKSI VALEHTELEVA POSTITOIMISTO.",
+    "KIRJOITTAKAA SIENISEEN HAUTAKIVEEN: NOKI EI KOSKAAN SUOSTUNUT OLEMAAN SIISTISTI."
+  ];
+  const hellEndings=[
+    "HA-HA-HÄÄ! MINUN SIELUNI PALAUTETTIIN TEHTAALLE, KOSKA VITTU TAKUUTODISTUS OLI PALAUTETTU KAHTENA KAPPALEENA.",
+    "MUKAVAA LOPPUELÄMÄÄ, SENKIN MATEMAATTISESTI EPÄTODENNÄKÖINEN HAUTAUSKULU!",
+    "TILANNE ON NIIN PASKA, ETTÄ LUURANGOTKIN PYYTÄVÄT TEKSTITYKSET.",
+    "RUOSTEINEN NAURUNI KULKEE VIEMÄRIÄ PITKIN SUORAAN TAIDEMUSEON KASSALLE.",
+    "KÄK-KÄK-HÄÄ! TÄMÄKIN VALITUS MENI VÄÄRÄÄN HELVETIN OSASTOON.",
+    "KORVAAKAAPAS MINULLE KUKKASET, NE KUIHTUIVAT ENNEN KUIN EHDIN HAUAKKUA BYROKRATIAA.",
+    "TÄMÄ MAAILMA ON HALPA KAUHUFARSSI, JA MINULLE TARJOTTIIN VITTU ENÄÄ VAIN SIVUROOLIA.",
+    "LOPUKSI VAIN YKSI KYSYMYS: KUKA PERKELE PÄÄSTI UNIVERSUMIN LAATUVALVONNAN LÄPI?"
+  ];
+  let hexCounter=0;
+  function curse72(){
+    const index=hexCounter++%72;
+    const intro=hellIntros[index%9],ending=hellEndings[Math.floor(index/9)%8];
+    return "Kirous "+(index+1)+"/72. "+intro+" "+ending;
+  }
   function phonetics(value){
     const p=el("hellvoice-style")?.value||"hell";
     let t=String(value||"").trim().slice(0,1500);
@@ -192,8 +219,8 @@
     active=[];el("stage")?.classList.remove("speaking");state("Hiljaa");
   }
   function roast(){
-    const text=speeches[Math.floor(Math.random()*speeches.length)];
+    const text=curse72();
     say(text,true);return text;
   }
-  window.NokiHellvoice={say,play:schedule,stop,roast,profiles:Object.keys(profiles)};
+  window.NokiHellvoice={say,play:schedule,stop,roast,curse72,profiles:Object.keys(profiles)};
 })();

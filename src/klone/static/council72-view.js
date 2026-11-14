@@ -7,7 +7,9 @@
   const decisionNames = {endorsed_for_review:"Perustajat puoltavat tarkistusta", insufficient_evidence:"Rinkien viitteitä puuttuu", contested:"Perustajilla on erimielisyys", pending:"Harkinta kesken"};
   const modNames = {dopamine:"Dopamiini", noradrenaline:"Noradrenaliini", acetylcholine:"Asetyylikoliini", serotonin:"Serotoniini", gaba:"GABA", glutamate:"Glutamaatti"};
   const api = document.body.dataset.api;
-  let model, selected, selectedRing = 1, current = null, currentSession = null, generation = 0;
+  let model, selected, selectedRing = 1, current = null, currentSession = null, currentReview = null, generation = 0;
+  const domainNames={hypervisor:"Hypervisor",permissions:"Käyttöoikeudet",audit:"Auditointi",memory:"Muisti",cognition:"Kognitio",research:"Tutkimus",genomics:"Genomiikka",media:"Media",simulation:"Simulaatio",android:"Android / Termux",ci:"CI-testit",deployment:"Asennus"};
+  const stateNames={unverified:"Varmentamaton",failed:"Epäonnistunut",pending:"Kesken",passed:"Läpäissyt",not_applicable:"Soveltuvuus arvioitava"};
   const sessionNames = {...decisionNames, contradictory_evidence:"Ristiriita vaatii selvityksen", insufficient_sources:"Lähderyhmiä puuttuu"};
   const queueNames = {pending_owner_review:"Odota omistajan tarkistusta",stale_requires_review:"Vanhentunut · tarkista uudelleen",blocked_private:"Yksityinen aineisto · estetty",blocked_policy:"Käyttöoikeus estää",blocked_contradictory_evidence:"Ristiriita estää",blocked_insufficient_sources:"Lähderyhmiä puuttuu",blocked_contested:"Perustaja vastustaa",blocked_pending:"Harkinta kesken",blocked_insufficient_evidence:"Viitteitä puuttuu"};
   const unitValue=v=>typeof v==="number"&&Number.isFinite(v)&&v>=0&&v<=1;
@@ -170,7 +172,61 @@
       d.appendChild(node("p","Kierros "+q.round+" · "+(channelNames[q.channel]||"Kanava avoin")+" · vastaanottaja ja tili avoinna"));d.appendChild(node("p",q.message));d.appendChild(node("p","KLONE · tekoälyneuvoston tarkistamaton luonnos. Omistajan tarkistus tarvitaan."));outbox.appendChild(d);});
     byId("session-integrity").textContent="Istuntoketjun SHA-256: "+data.trace_sha256+". Selain tarkistaa rakenteen ja ketjuviitteet. Kryptografinen replay tehdään Pythonissa; alkuperää ei ole autentikoitu.";
     if(api)byId("session-input").value=JSON.stringify(data.request,null,2);
-    renderSessionRound(data.rounds.length-1);
+    renderSessionRound(data.rounds.length-1);clearReview();byId("run-review").disabled=!api;
+  }
+  function clearReview(){
+    currentReview=null;byId("save-review").disabled=true;
+    byId("review-result").replaceChildren(node("p","Muodosta kehitysjono avoimesta istunnosta tai avaa aiemmin tallennettu kehitysjonon JSON."));
+  }
+  function validateReview(data){
+    const fail=()=>{throw Error("Virheellinen tai puutteellinen kehitysjono");},a=data?.source_analysis,p=data?.plan,o=data?.options;
+    if(!data||data.kind!=="klone-council72-review"||data.schema_version!==1||authorityKeys.some(k=>data[k]!==false)||data.provenance_authenticated!==false||data.manual_review_required!==true||
+      !hex(data.review_sha256)||data.session_trace_sha256!==data.session?.trace_sha256||data.catalog_sha256!==data.session?.catalog_sha256||data.classification!==data.session?.classification||
+      !o||!Number.isInteger(o.budget_minutes)||o.budget_minutes<1||o.budget_minutes>480||!Number.isInteger(o.max_tasks)||o.max_tasks<1||o.max_tasks>32||!Number.isInteger(o.max_source_groups)||o.max_source_groups<1||o.max_source_groups>32||
+      !o.domain_states||Object.keys(o.domain_states).length!==12||Object.keys(domainNames).some(k=>!own(stateNames,o.domain_states[k]))||
+      !a||a.scope!=="final_active_evidence_with_original_incoming_state"||a.history_rewritten!==false||!own(sessionNames,a.baseline_review_status)||
+      !Array.isArray(a.cases)||a.cases.length>o.max_source_groups||!Array.isArray(a.tested_source_groups)||!Array.isArray(a.omitted_source_groups)||
+      a.tested_source_groups.length!==a.cases.length||a.tested_source_groups.length+a.omitted_source_groups.length!==a.active_source_groups||a.active_source_groups>256||
+      [...a.tested_source_groups,...a.omitted_source_groups].some(v=>!identifier(v))||new Set([...a.tested_source_groups,...a.omitted_source_groups]).size!==a.active_source_groups||
+      a.coverage_complete!==(a.omitted_source_groups.length===0)||!p||p.execution_enabled!==false||p.time_estimates_only!==true||p.domain_state_source!=="caller_declared_not_verified"||
+      !Array.isArray(p.tasks)||p.tasks.length>320)fail();
+    a.cases.forEach((c,i)=>{if(!c||c.removed_source_group!==a.tested_source_groups[i]||!own(sessionNames,c.review_status)||c.review_status_changed!==(c.review_status!==a.baseline_review_status)||authorityKeys.some(k=>c[k]!==false)||
+      !Array.isArray(c.affected_rings)||c.affected_rings.some(r=>!Number.isInteger(r)||r<1||r>8)||!Array.isArray(c.missing_quorum_rings)||c.missing_quorum_rings.some(r=>!Number.isInteger(r)||r<1||r>8)||
+      !Array.isArray(c.changed_founder_ids)||c.changed_founder_ids.some(id=>!model.founder_ids.includes(id))||!unitValue(c.mean_absolute_score_delta)||!Number.isInteger(c.changed_member_votes)||c.changed_member_votes<0||c.changed_member_votes>72||
+      !Array.isArray(c.removed_observation_ids)||c.removed_observation_ids.length>256||c.removed_observation_ids.some(id=>!identifier(id)))fail();});
+    if(a.status_sensitive_cases!==a.cases.filter(c=>c.review_status_changed).length)fail();
+    const ids=new Set();let total=0,count=0;
+    p.tasks.forEach(t=>{
+      const r=t?.route,courier=model.members.find(m=>m.id===r?.courier_id),king=model.members.find(m=>m.id===r?.founder_id);
+      if(!t||typeof t.id!=="string"||t.id.length>96||ids.has(t.id)||typeof t.title!=="string"||t.title.length>256||typeof t.done_check!=="string"||t.done_check.length>1024||
+        !Number.isInteger(t.priority_score)||t.priority_score<0||t.priority_score>30||!Number.isInteger(t.estimated_minutes)||t.estimated_minutes<1||t.estimated_minutes>480||t.execution_enabled!==false||
+        !["selected","deferred_budget","deferred_task_limit"].includes(t.allocation)||!courier||!king?.founder||courier.courier_for!==king.id||king.stewards_ring!==r.ring||
+        r.founder_name!==king.name||r.courier_name!==courier.name||!Array.isArray(t.evidence_observation_ids)||t.evidence_observation_ids.length>256||t.evidence_observation_ids.some(id=>!identifier(id)))fail();
+      ids.add(t.id);if(t.allocation==="selected"){total+=t.estimated_minutes;count++;}
+    });
+    if(total!==p.allocated_minutes||total>o.budget_minutes||count!==p.selected_count||count>o.max_tasks||p.deferred_count!==p.tasks.length-count||p.remaining_minutes!==o.budget_minutes-total)fail();
+  }
+  function renderReview(data){
+    validateReview(data);renderSession(data.session);currentReview=data;byId("save-review").disabled=false;
+    byId("review-budget").value=String(data.options.budget_minutes);byId("review-max-tasks").value=String(data.options.max_tasks);byId("review-max-sources").value=String(data.options.max_source_groups);
+    document.querySelectorAll("#domain-states select").forEach(s=>{s.value=data.options.domain_states[s.dataset.domain];});
+    const panel=byId("review-result"),a=data.source_analysis,p=data.plan;panel.replaceChildren();
+    panel.appendChild(node("p",(data.session.request.source_kind==="synthetic_fixture"?"Synteettinen koe":"Ilmoitetut havaintoväitteet")+" · "+classNames[data.classification]+" · lähtökanta: "+sessionNames[a.baseline_review_status])).className="tag";
+    panel.appendChild(node("h3",p.selected_count+" tehtävää · "+p.allocated_minutes+" / "+data.options.budget_minutes+" minuuttia"));
+    panel.appendChild(node("p","Ajat ovat suunnitteluarvioita. Tehtäviä ei suoriteta. Osa-alueiden tilat ovat ilmoituksia; tarkistusten tulokset kerätään erikseen."));
+    panel.appendChild(node("h3","Kestääkö kanta lähderyhmän poistamisen?"));
+    panel.appendChild(node("p",a.cases.length+" / "+a.active_source_groups+" lähderyhmää tutkittu · "+a.status_sensitive_cases+" kokeessa tarkistustila muuttui. Koe säilyttää viimeisen kierroksen alkuperäisen alkutilan ja perustajien annetut äänet. Historia ei muutu."));
+    if(!a.coverage_complete)panel.appendChild(node("p","OSITTAINEN KATTAVUUS · tutkimatta: "+a.omitted_source_groups.join(", "))).className="tag";
+    panel.appendChild(table(["Poistettu ryhmä","Tarkistustila ilman ryhmää","Lähdekiintiö puuttuu ringeistä","Muuttuneet jäsenäänet / perustajat","Keskimääräinen piste-ero"],a.cases.map(c=>[c.removed_source_group,sessionNames[c.review_status],c.missing_quorum_rings.join(", ")||"Ei puutu",c.changed_member_votes+" / "+c.changed_founder_ids.length,c.mean_absolute_score_delta])));
+    panel.appendChild(node("h3","Budjettiin valitut tehtävät"));
+    function taskCard(t){const card=node("article","");card.className="task-card";card.appendChild(node("p",t.estimated_minutes+" min · paino "+t.priority_score+" · rinki "+t.route.ring+" · "+({selected:"valittu",deferred_budget:"ei mahdu aikabudjettiin",deferred_task_limit:"tehtäväraja täynnä"}[t.allocation]))).className="tag";card.appendChild(node("h3",t.title));card.appendChild(node("p",t.route.founder_name+" → "+t.route.courier_name+" · käsiteltävä tehtäväehdotus"));card.appendChild(node("p",t.done_check));
+      if(t.check_target)card.appendChild(node("p","Tarkistuksen lähtökohta: "+t.check_target));
+      if(t.check_target_kind==="unmapped")card.appendChild(node("p","Erillistä regressiotestiä ei ole vielä kartoitettu. Määritä ensin testattava rajapinta."));
+      if(t.evidence_observation_ids.length)card.appendChild(node("p","Havainnot: "+t.evidence_observation_ids.join(", "))).className="muted";
+      return card;}
+    const picked=p.tasks.filter(t=>t.allocation==="selected");if(!picked.length)panel.appendChild(node("p","Yksikään kokonainen tehtävä ei mahdu tähän budjettiin."));picked.forEach(t=>panel.appendChild(taskCard(t)));
+    const deferred=node("details","");deferred.appendChild(node("summary",p.deferred_count+" odottavaa tehtävää"));p.tasks.filter(t=>t.allocation!=="selected").forEach(t=>deferred.appendChild(taskCard(t)));panel.appendChild(deferred);
+    panel.appendChild(node("p","Kehitysjonon SHA-256: "+data.review_sha256+". Selain tarkistaa rakenteen. Täysi toisto: python -m klone.council72_review --verify raportti.json. Tiiviste ei todenna lähteitä." )).className="muted";
   }
   async function request(path,payload){const response=await fetch(api+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});if(!response.ok)throw Error("Paikallinen API hylkäsi pyynnön ("+response.status+"). Tarkista viitteet, kanta ja luokittelu.");return response.json();}
   try {
@@ -180,16 +236,24 @@
     map();choose(model.rings[8].member_ids[1]);status("72 roolia ladattu · ei koetta avattuna · ulkoiset toimet pois käytöstä");
     byId("proposal-input").value=JSON.stringify(demo(),null,2);
     model.founder_ids.forEach(id=>{const o=node("option",model.members.find(m=>m.id===id).name);o.value=String(id);byId("draft-king").appendChild(o);});
-    byId("local-controls").hidden=!api;byId("session-controls").hidden=!api;
+    byId("local-controls").hidden=!api;byId("session-controls").hidden=!api;byId("review-controls").hidden=!api;
+    Object.entries(domainNames).forEach(([key,name])=>{const label=node("label",name),select=document.createElement("select");select.dataset.domain=key;Object.entries(stateNames).forEach(([value,text])=>{const option=node("option",text);option.value=value;select.appendChild(option);});label.appendChild(select);byId("domain-states").appendChild(label);});
     const template=await fetch(byId("session-template").href);if(template.ok)byId("session-input").value=JSON.stringify(await template.json(),null,2);
   } catch(error){status("Rakennetta ei voitu ladata: "+error.message);return;}
   byId("report-file").addEventListener("change",async()=>{const read=++generation,file=byId("report-file").files?.[0];if(!file)return;
     try{if(file.size>2097152)throw Error("Raportin enimmäiskoko on 2 MiB");const data=JSON.parse(await file.text());if(read!==generation)return;
-      if(data?.kind==="klone-council72-session"){renderSession(data);status("Istunto luettu paikallisesti · "+data.rounds.length+" kierrosta · mitään ei lähetetty.");}
-      else{renderReport(data);currentSession=null;byId("session-panel").hidden=true;byId("save-session").disabled=true;status("Koe luettu paikallisesti. Raportin väitteet eivät anna julkaisuvaltuutta.");}
+      if(data?.kind==="klone-council72-review"){renderReview(data);status("Kehitysjono ja lähteiden poistokokeet luettu paikallisesti. Täysi replay tehdään Pythonissa.");}
+      else if(data?.kind==="klone-council72-session"){renderSession(data);status("Istunto luettu paikallisesti · "+data.rounds.length+" kierrosta · mitään ei lähetetty.");}
+      else{renderReport(data);currentSession=null;clearReview();byId("run-review").disabled=true;byId("session-panel").hidden=true;byId("save-session").disabled=true;status("Koe luettu paikallisesti. Raportin väitteet eivät anna julkaisuvaltuutta.");}
     }catch(e){status("Raporttia ei hyväksytty: "+e.message);}});
   byId("download-input").addEventListener("click",()=>{const blob=new Blob([JSON.stringify(demo(),null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="council72-synteettinen-tehtava.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),0);});
-  byId("simulate").addEventListener("click",async()=>{if(!api)return;const own=++generation;try{const result=await request("/simulate",JSON.parse(byId("proposal-input").value));if(own!==generation)return;renderReport(result);currentSession=null;byId("session-panel").hidden=true;byId("save-session").disabled=true;status("Paikallinen koe valmis. Ei ulkoisia toimia.");}catch(e){status(e.message);}});
+  byId("simulate").addEventListener("click",async()=>{if(!api)return;const own=++generation;try{const result=await request("/simulate",JSON.parse(byId("proposal-input").value));if(own!==generation)return;renderReport(result);currentSession=null;clearReview();byId("run-review").disabled=true;byId("session-panel").hidden=true;byId("save-session").disabled=true;status("Paikallinen koe valmis. Ei ulkoisia toimia.");}catch(e){status(e.message);}});
+  byId("run-review").addEventListener("click",async()=>{if(!api||!currentSession)return;const own=++generation;try{
+    const domain_states=Object.fromEntries([...document.querySelectorAll("#domain-states select")].map(s=>[s.dataset.domain,s.value]));
+    const result=await request("/review",{session:currentSession.request,domain_states,budget_minutes:Number(byId("review-budget").value),max_tasks:Number(byId("review-max-tasks").value),max_source_groups:Number(byId("review-max-sources").value)});
+    if(own!==generation)return;renderReview(result);status("Lähteiden poistokokeet ja aikabudjetoitu kehitysjono valmiina. Tallenna tulos jatkoa varten.");
+  }catch(e){status(e.message);}});
+  byId("save-review").addEventListener("click",()=>{if(currentReview)download(currentReview,"council72-kehitysjono-"+currentReview.session.request.session_id+".json");});
   byId("save-session").addEventListener("click",()=>{if(currentSession)download(currentSession,"council72-istunto-"+currentSession.request.session_id+".json");});
   byId("run-session").addEventListener("click",async()=>{if(!api)return;const own=++generation;try{
     if(byId("session-input").value.length>2097152)throw Error("Istunnon tehtävä on liian suuri");

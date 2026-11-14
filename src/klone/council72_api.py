@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from .council72 import catalog, deliberate, draft_dispatch, experiment
 from .council72_session import run_session
+from .council72_review import review_session
 from .api import get_repository
 from .council72_memory import public_memory_observation
 from .hypervisor_dispatch import DispatchDenied
@@ -95,6 +96,25 @@ class SessionRequest(BaseModel):
 def council_session(request: SessionRequest):
     try:
         return run_session(request.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+class ReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    session: SessionRequest
+    domain_states: dict[str, Literal["passed", "failed", "pending", "unverified", "not_applicable"]] | None = Field(default=None, max_length=12)
+    budget_minutes: int = Field(default=60, ge=1, le=480)
+    max_tasks: int = Field(default=8, ge=1, le=32)
+    max_source_groups: int = Field(default=16, ge=1, le=32)
+
+
+@router.post("/review")
+def council_review(request: ReviewRequest):
+    try:
+        return review_session(run_session(request.session.model_dump()),
+            domain_states=request.domain_states, budget_minutes=request.budget_minutes,
+            max_tasks=request.max_tasks, max_source_groups=request.max_source_groups)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

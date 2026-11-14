@@ -406,6 +406,7 @@ class MemoryPhase2B3Tests(unittest.TestCase):
         episode_list_payload = episode_list[0].model_dump(mode="json")
 
         self.assertEqual(event_payload["status"], "superseded")
+        self.assertIs(event_payload["corrected"], True)
         self.assertEqual(event_payload["correction_reason"], "operator_supersede")
         self.assertIsNotNone(event_payload["corrected_at"])
         self.assertEqual(event_payload["corrected_by_role"], "owner")

@@ -1,0 +1,368 @@
+{
+  "session_id": "synthetic-session72",
+  "goal": "Tutki rinkien tiedonkulkua, ristiriitaa ja simuloidun tunnetilan palautumista.",
+  "source_kind": "synthetic_fixture",
+  "steps": [
+    {
+      "observations": [
+        {
+          "id": "r1-s1",
+          "courier_id": 24,
+          "source_ref": "synthetic:ring:1:source:1",
+          "source_group": "fixture-1",
+          "claim_key": "ring-1-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        },
+        {
+          "id": "r1-s2",
+          "courier_id": 24,
+          "source_ref": "synthetic:ring:1:source:2",
+          "source_group": "fixture-2",
+          "claim_key": "ring-1-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        },
+        {
+          "id": "r2-s1",
+          "courier_id": 27,
+          "source_ref": "synthetic:ring:2:source:1",
+          "source_group": "fixture-1",
+          "claim_key": "ring-2-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        },
+        {
+          "id": "r2-s2",
+          "courier_id": 27,
+          "source_ref": "synthetic:ring:2:source:2",
+          "source_group": "fixture-2",
+          "claim_key": "ring-2-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        },
+        {
+          "id": "r3-s1",
+          "courier_id": 30,
+          "source_ref": "synthetic:ring:3:source:1",
+          "source_group": "fixture-1",
+          "claim_key": "ring-3-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        },
+        {
+          "id": "r3-s2",
+          "courier_id": 30,
+          "source_ref": "synthetic:ring:3:source:2",
+          "source_group": "fixture-2",
+          "claim_key": "ring-3-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        },
+        {
+          "id": "r4-s1",
+          "courier_id": 53,
+          "source_ref": "synthetic:ring:4:source:1",
+          "source_group": "fixture-1",
+          "claim_key": "ring-4-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        },
+        {
+          "id": "r4-s2",
+          "courier_id": 53,
+          "source_ref": "synthetic:ring:4:source:2",
+          "source_group": "fixture-2",
+          "claim_key": "ring-4-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        },
+        {
+          "id": "r5-s1",
+          "courier_id": 55,
+          "source_ref": "synthetic:ring:5:source:1",
+          "source_group": "fixture-1",
+          "claim_key": "ring-5-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        },
+        {
+          "id": "r5-s2",
+          "courier_id": 55,
+          "source_ref": "synthetic:ring:5:source:2",
+          "source_group": "fixture-2",
+          "claim_key": "ring-5-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        },
+        {
+          "id": "r6-s1",
+          "courier_id": 70,
+          "source_ref": "synthetic:ring:6:source:1",
+          "source_group": "fixture-1",
+          "claim_key": "ring-6-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        },
+        {
+          "id": "r6-s2",
+          "courier_id": 70,
+          "source_ref": "synthetic:ring:6:source:2",
+          "source_group": "fixture-2",
+          "claim_key": "ring-6-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        },
+        {
+          "id": "r7-s1",
+          "courier_id": 11,
+          "source_ref": "synthetic:ring:7:source:1",
+          "source_group": "fixture-1",
+          "claim_key": "ring-7-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        },
+        {
+          "id": "r7-s2",
+          "courier_id": 11,
+          "source_ref": "synthetic:ring:7:source:2",
+          "source_group": "fixture-2",
+          "claim_key": "ring-7-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        },
+        {
+          "id": "r8-s1",
+          "courier_id": 71,
+          "source_ref": "synthetic:ring:8:source:1",
+          "source_group": "fixture-1",
+          "claim_key": "ring-8-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        },
+        {
+          "id": "r8-s2",
+          "courier_id": 71,
+          "source_ref": "synthetic:ring:8:source:2",
+          "source_group": "fixture-2",
+          "claim_key": "ring-8-ready",
+          "stance": "supports",
+          "summary": "Synteettinen lähtöhavainto.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          }
+        }
+      ],
+      "dispatches": [
+        {
+          "king_id": 9,
+          "courier_id": 27,
+          "channel": "research",
+          "message": "Synteettinen tutkimusluonnos tarkistukseen."
+        }
+      ]
+    },
+    {
+      "observations": [
+        {
+          "id": "new-threat",
+          "courier_id": 27,
+          "source_ref": "synthetic:ring:2:source:2",
+          "source_group": "fixture-3",
+          "claim_key": "ring-2-ready",
+          "stance": "contradicts",
+          "summary": "Synteettinen ristiriita ja kohonnut uhka.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.8,
+            "risk": 0.8,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.9,
+            "social_feedback": 0.4
+          }
+        }
+      ],
+      "dispatches": [
+        {
+          "king_id": 9,
+          "courier_id": 27,
+          "channel": "research",
+          "message": "Synteettinen tutkimusluonnos tarkistukseen."
+        }
+      ]
+    },
+    {
+      "observations": [
+        {
+          "id": "corrected-threat",
+          "courier_id": 27,
+          "source_ref": "synthetic:ring:2:source:2",
+          "source_group": "fixture-3",
+          "claim_key": "ring-2-ready",
+          "stance": "supports",
+          "summary": "Uusi synteettinen havainto korjaa aiemman väitteen; vanha jää lokiin.",
+          "signals": {
+            "evidence_quality": 0.95,
+            "uncertainty": 0.08,
+            "risk": 0.05,
+            "novelty": 0.6,
+            "reward": 0.8,
+            "threat": 0.04,
+            "social_feedback": 0.4
+          },
+          "supersedes": "new-threat"
+        }
+      ],
+      "dispatches": [
+        {
+          "king_id": 9,
+          "courier_id": 27,
+          "channel": "research",
+          "message": "Synteettinen tutkimusluonnos tarkistukseen."
+        }
+      ]
+    }
+  ]
+}

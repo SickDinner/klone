@@ -1,5 +1,8 @@
 # Neuvosto 72 v1 · yhdeksän rinkiä ja kahdeksan perustajaa
 
+Usean kierroksen jatkumo, lähdekiintiöt, korjaushistoria ja viestijono on
+kuvattu erikseen: [Neuvoston istunnot](council72-sessions.md).
+
 Toteutus on toimiva, deterministinen tutkimusmalli. Se sisältää 72 yksilöllistä
 roolia, henkilökohtaiset kuuden säätimen lähtövektorit, ringeittäin kulkevat
 raportit, perustajien viimeisen sisäisen kannan, jaetun toiminnallisen työmuistin

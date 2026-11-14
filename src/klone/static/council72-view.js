@@ -7,7 +7,19 @@
   const decisionNames = {endorsed_for_review:"Perustajat puoltavat tarkistusta", insufficient_evidence:"Rinkien viitteitä puuttuu", contested:"Perustajilla on erimielisyys", pending:"Harkinta kesken"};
   const modNames = {dopamine:"Dopamiini", noradrenaline:"Noradrenaliini", acetylcholine:"Asetyylikoliini", serotonin:"Serotoniini", gaba:"GABA", glutamate:"Glutamaatti"};
   const api = document.body.dataset.api;
-  let model, selected, selectedRing = 1, current = null, generation = 0;
+  let model, selected, selectedRing = 1, current = null, currentSession = null, generation = 0;
+  const sessionNames = {...decisionNames, contradictory_evidence:"Ristiriita vaatii selvityksen", insufficient_sources:"Lähderyhmiä puuttuu"};
+  const queueNames = {pending_owner_review:"Odota omistajan tarkistusta",stale_requires_review:"Vanhentunut · tarkista uudelleen",blocked_private:"Yksityinen aineisto · estetty",blocked_policy:"Käyttöoikeus estää",blocked_contradictory_evidence:"Ristiriita estää",blocked_insufficient_sources:"Lähderyhmiä puuttuu",blocked_contested:"Perustaja vastustaa",blocked_pending:"Harkinta kesken",blocked_insufficient_evidence:"Viitteitä puuttuu"};
+  const unitValue=v=>typeof v==="number"&&Number.isFinite(v)&&v>=0&&v<=1;
+  const own=(obj,key)=>Object.hasOwn(obj,key);
+  const hex=v=>typeof v==="string"&&/^[a-f0-9]{64}$/.test(v);
+  const identifier=v=>typeof v==="string"&&/^[A-Za-z0-9_.:-]{1,64}$/.test(v);
+  const classification=["public","restricted","sealed"];
+  const classNames={public:"julkinen",restricted:"rajattu",sealed:"suljettu"};
+  const stanceNames={supports:"puoltaa",contradicts:"vastakkainen väite",unknown:"avoin"};
+  const channelNames={forum:"Foorumi",social:"Some",documentation:"Ohjeet",research:"Tutkimus"};
+  const authorityKeys=["binding_authority","external_actions","permission_changes","deployment_approval","consciousness_claim"];
+  function download(data,name){const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),0);}
   function table(headers, rows) {
     const wrap = node("div", ""); wrap.className="table-wrap";
     const t = document.createElement("table"), head=document.createElement("tr");
@@ -74,11 +86,11 @@
       typeof data.comparison.mean_score_delta!=="number"||!Number.isFinite(data.comparison.mean_score_delta))throw Error("Virheellinen kokeen yhteenveto");
     for(const report of [data.modulated,data.baseline]){
       if(!report||report.kind!=="klone-council72-round"||!Array.isArray(report.opinions)||report.opinions.length!==72||
-        new Set(report.opinions.map(o=>o?.member_id)).size!==72||report.opinions.some(o=>!model.members.some(m=>m.id===o?.member_id)||!voteNames[o.vote]||typeof o.score!=="number"||!Number.isFinite(o.score)||o.score<0||o.score>1||
+        new Set(report.opinions.map(o=>o?.member_id)).size!==72||report.opinions.some(o=>!model.members.some(m=>m.id===o?.member_id)||!own(voteNames,o.vote)||typeof o.score!=="number"||!Number.isFinite(o.score)||o.score<0||o.score>1||
           !o.modulators||Object.keys(modNames).some(k=>!unit(o.modulators[k]))||!o.affect||["curiosity","concern","calm","social_openness"].some(k=>!unit(o.affect[k])))||
-        !Array.isArray(report.founder_ballots)||report.founder_ballots.length!==8||new Set(report.founder_ballots.map(f=>f?.member_id)).size!==8||report.founder_ballots.some(f=>!model.founder_ids.includes(f?.member_id)||!voteNames[f.vote])||
+        !Array.isArray(report.founder_ballots)||report.founder_ballots.length!==8||new Set(report.founder_ballots.map(f=>f?.member_id)).size!==8||report.founder_ballots.some(f=>!model.founder_ids.includes(f?.member_id)||!own(voteNames,f.vote))||
         !Array.isArray(report.ring_reports)||report.ring_reports.length!==8||new Set(report.ring_reports.map(r=>r?.ring)).size!==8||report.ring_reports.some(r=>!Number.isInteger(r?.ring)||r.ring<1||r.ring>8||!Array.isArray(r.evidence_refs)||r.evidence_refs.length>8)||
-        !report.decision||!decisionNames[report.decision.status]||authorities.some(k=>report[k]!==false||report.decision[k]!==false)||
+        !report.decision||!own(decisionNames,report.decision.status)||authorities.some(k=>report[k]!==false||report.decision[k]!==false)||
         typeof report.proposal?.goal!=="string"||report.proposal.goal.length>2000||!Array.isArray(report.trace)||report.trace.length>128||!/^[a-f0-9]{64}$/.test(report.trace_sha256))throw Error("Virheellinen tai puutteellinen koeraportti");
     }
     current=data;const panel=byId("experiment-result"),r=data.modulated;panel.replaceChildren();
@@ -93,6 +105,73 @@
     panel.appendChild(table(["Viestinviejä","Rinki","Vastuukuninkaalle","Viitteitä"],r.ring_reports.map(x=>[model.members.find(m=>m.id===x.courier_id)?.name,x.ring,model.members.find(m=>m.id===x.steward_id)?.name,x.evidence_refs?.length??"Ei tietoa"])));
     panel.appendChild(node("p","Päätöslokin SHA-256: "+r.trace_sha256)).className="muted";choose(selected.id);
   }
+  function validateSession(data){
+    const bad=()=>{throw Error("Virheellinen tai puutteellinen neuvostoistunto");};
+    if(!data||data.kind!=="klone-council72-session"||data.schema_version!==1||authorityKeys.some(k=>data[k]!==false)||
+      data.provenance_authenticated!==false||!identifier(data.request?.session_id)||typeof data.request.goal!=="string"||data.request.goal.length>2000||
+      !classification.includes(data.request.classification)||!Array.isArray(data.request.steps)||!Array.isArray(data.rounds)||data.rounds.length<1||data.rounds.length>8||
+      data.request.steps.length!==data.rounds.length||!Array.isArray(data.outbox)||data.outbox.length>64||!data.member_state||Object.keys(data.member_state).length!==72||
+      model.members.some(m=>!data.member_state[String(m.id)]||Object.keys(modNames).some(k=>!unitValue(data.member_state[String(m.id)][k]))))bad();
+    let level=classification.indexOf(data.request.classification), previous="0".repeat(64);const ids=new Set();
+    data.rounds.forEach((r,i)=>{
+      const observations=data.request.steps[i]?.observations;
+      if(!Array.isArray(observations)||observations.length<1||observations.length>32)bad();
+      observations.forEach(o=>{
+        if(!o||!identifier(o.id)||ids.has(o.id)||!model.members.some(m=>m.id===o.courier_id&&m.ring===1)||
+          !identifier(o.source_group)||!identifier(o.claim_key)||!["supports","contradicts","unknown"].includes(o.stance)||
+          typeof o.summary!=="string"||o.summary.length>512||typeof o.source_ref!=="string"||o.source_ref.length>256||!classification.includes(o.classification)||
+          !o.signals||["evidence_quality","uncertainty","risk","novelty","reward","threat","social_feedback"].some(k=>!unitValue(o.signals[k]))||
+          (o.supersedes!==null&&!ids.has(o.supersedes)))bad();
+        ids.add(o.id);level=Math.max(level,classification.indexOf(o.classification));
+      });
+      if(!r||r.index!==i+1||r.previous_hash!==previous||!hex(r.event_hash)||!hex(r.state_sha256)||!hex(r.previous_state_sha256)||
+        !own(sessionNames,r.review_status)||r.classification!==classification[level]||!unitValue(r.mean_state_delta)||
+        !Array.isArray(r.conflicts)||r.conflicts.length>256||!Array.isArray(r.rings)||r.rings.length!==8||
+        new Set(r.rings.map(x=>x?.ring)).size!==8||r.rings.some(x=>!Number.isInteger(x?.ring)||x.ring<1||x.ring>8||
+          !Number.isInteger(x.claimed_source_groups)||x.claimed_source_groups<0||x.claimed_source_groups>256||
+          !Number.isInteger(x.supporting_source_groups)||x.supporting_source_groups<0||x.supporting_source_groups>x.claimed_source_groups||
+          x.authenticated_sources!==0||x.quorum_met!==(x.supporting_source_groups>=2)||!Array.isArray(x.unknown_observation_ids)||x.unknown_observation_ids.length>256)||
+        !Array.isArray(r.founder_ballots)||r.founder_ballots.length!==8||r.founder_ballots.some(f=>!model.founder_ids.includes(f?.member_id)||!own(voteNames,f.vote))||
+        r.permission_preview?.preview_only!==true||r.permission_preview.caller_authenticated!==false)bad();
+      previous=r.event_hash;
+    });
+    if(data.classification!==classification[level]||data.trace_sha256!==previous)bad();
+    data.outbox.forEach(q=>{
+      const courier=model.members.find(m=>m.courier_for===q?.king_id);
+      if(!q||!courier||q.courier_id!==courier.id||!Number.isInteger(q.round)||q.round<1||q.round>data.rounds.length||
+        !own(queueNames,q.status)||typeof q.message!=="string"||q.message.length>2000||q.origin_event_hash!==data.rounds[q.round-1].event_hash||
+        authorityKeys.some(k=>q[k]!==false)||q.delivery_enabled!==false||q.issuer_authenticated!==false||q.owner_review_required!==true||q.account!==null||q.destination!==null||
+        (q.round!==data.rounds.length&&q.status!=="stale_requires_review")||
+        (q.status==="pending_owner_review"&&(data.classification!=="public"||data.rounds.at(-1).review_status!=="endorsed_for_review"||data.rounds.at(-1).permission_preview.decision!=="allowed")))bad();
+    });
+  }
+  function renderSessionRound(index){
+    const data=currentSession,r=data.rounds[index],panel=byId("session-round-detail");panel.replaceChildren();
+    document.querySelectorAll("#session-rounds button").forEach((b,i)=>{b.classList.toggle("active",i===index);b.setAttribute("aria-pressed",String(i===index));});
+    panel.appendChild(node("h3","Kierros "+r.index+" · "+sessionNames[r.review_status]));
+    panel.appendChild(node("p","Tilamuutos "+r.mean_state_delta+" · luokittelu "+classNames[r.classification]+" · Hypervisorin esikatselu: "+(r.permission_preview.decision==="allowed"?"ehdotus sallittu":"estetty")));
+    panel.appendChild(table(["Rinki","Lähderyhmiä","Puoltavia ryhmiä / 2","Avoimia havaintoja"],r.rings.map(x=>[x.ring,x.claimed_source_groups,x.supporting_source_groups,x.unknown_observation_ids.length])));
+    if(r.conflicts.length){panel.appendChild(node("h3","Nämä väitteet riitelevät"));panel.appendChild(table(["Väite","Ringit","Havainnot"],r.conflicts.map(c=>[c.claim_key,Array.isArray(c.rings)?c.rings.join(", "):"Ei tietoa",Array.isArray(c.observation_ids)?c.observation_ids.join(", "):"Ei tietoa"])));}
+    panel.appendChild(node("h3","Kierroksen uudet havainnot"));
+    data.request.steps[index].observations.forEach(o=>{const detail=node("details","");detail.appendChild(node("summary",o.id+" · "+stanceNames[o.stance]+" · "+o.source_group));
+      const courier=model.members.find(m=>m.id===o.courier_id),king=model.members.find(m=>m.id===courier.courier_for);
+      detail.appendChild(node("p",courier.name+" → "+king.name+" · "+classNames[o.classification]));detail.appendChild(node("p",o.summary));detail.appendChild(node("p","Lähdeviite: "+o.source_ref));
+      if(o.supersedes)detail.appendChild(node("p","Korvaa väitteen "+o.supersedes+". Alkuperäinen säilyy aiemmassa kierroksessa."));panel.appendChild(detail);});
+    panel.appendChild(table(["Perustaja","Kanta"],r.founder_ballots.map(f=>[model.members.find(m=>m.id===f.member_id).name,voteNames[f.vote]])));
+  }
+  function renderSession(data){
+    validateSession(data);renderReport(data.latest_experiment);currentSession=data;
+    byId("session-panel").hidden=false;byId("save-session").disabled=false;
+    byId("session-summary").textContent=(data.request.source_kind==="synthetic_fixture"?"Synteettinen istunto":"Käyttäjän havaintoväitteet")+" · "+data.rounds.length+" kierrosta · "+data.active_observation_count+" aktiivista havaintoa · "+classNames[data.classification];
+    byId("session-rounds").replaceChildren();data.rounds.forEach((r,i)=>{const b=node("button",r.index+" · "+sessionNames[r.review_status]);b.addEventListener("click",()=>renderSessionRound(i));byId("session-rounds").appendChild(b);});
+    const outbox=byId("session-outbox");outbox.replaceChildren();
+    if(!data.outbox.length)outbox.appendChild(node("p","Ei viestiluonnoksia."));
+    data.outbox.forEach(q=>{const d=node("details","");d.appendChild(node("summary",model.members.find(m=>m.id===q.king_id).name+" → "+model.members.find(m=>m.id===q.courier_id).name+" · "+queueNames[q.status]));
+      d.appendChild(node("p","Kierros "+q.round+" · "+(channelNames[q.channel]||"Kanava avoin")+" · vastaanottaja ja tili avoinna"));d.appendChild(node("p",q.message));d.appendChild(node("p","KLONE · tekoälyneuvoston tarkistamaton luonnos. Omistajan tarkistus tarvitaan."));outbox.appendChild(d);});
+    byId("session-integrity").textContent="Istuntoketjun SHA-256: "+data.trace_sha256+". Selain tarkistaa rakenteen ja ketjuviitteet. Kryptografinen replay tehdään Pythonissa; alkuperää ei ole autentikoitu.";
+    if(api)byId("session-input").value=JSON.stringify(data.request,null,2);
+    renderSessionRound(data.rounds.length-1);
+  }
   async function request(path,payload){const response=await fetch(api+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});if(!response.ok)throw Error("Paikallinen API hylkäsi pyynnön ("+response.status+"). Tarkista viitteet, kanta ja luokittelu.");return response.json();}
   try {
     const response=await fetch(document.body.dataset.catalog);if(!response.ok)throw Error("Rooliluetteloa ei löytynyt");model=await response.json();
@@ -101,12 +180,30 @@
     map();choose(model.rings[8].member_ids[1]);status("72 roolia ladattu · ei koetta avattuna · ulkoiset toimet pois käytöstä");
     byId("proposal-input").value=JSON.stringify(demo(),null,2);
     model.founder_ids.forEach(id=>{const o=node("option",model.members.find(m=>m.id===id).name);o.value=String(id);byId("draft-king").appendChild(o);});
-    byId("local-controls").hidden=!api;
+    byId("local-controls").hidden=!api;byId("session-controls").hidden=!api;
+    const template=await fetch(byId("session-template").href);if(template.ok)byId("session-input").value=JSON.stringify(await template.json(),null,2);
   } catch(error){status("Rakennetta ei voitu ladata: "+error.message);return;}
   byId("report-file").addEventListener("change",async()=>{const read=++generation,file=byId("report-file").files?.[0];if(!file)return;
-    try{if(file.size>524288)throw Error("Raportin enimmäiskoko on 512 KiB");const data=JSON.parse(await file.text());if(read!==generation)return;renderReport(data);status("Koe luettu paikallisesti. Raportin väitteet eivät anna julkaisuvaltuutta.");}catch(e){status("Raporttia ei hyväksytty: "+e.message);}});
+    try{if(file.size>2097152)throw Error("Raportin enimmäiskoko on 2 MiB");const data=JSON.parse(await file.text());if(read!==generation)return;
+      if(data?.kind==="klone-council72-session"){renderSession(data);status("Istunto luettu paikallisesti · "+data.rounds.length+" kierrosta · mitään ei lähetetty.");}
+      else{renderReport(data);currentSession=null;byId("session-panel").hidden=true;byId("save-session").disabled=true;status("Koe luettu paikallisesti. Raportin väitteet eivät anna julkaisuvaltuutta.");}
+    }catch(e){status("Raporttia ei hyväksytty: "+e.message);}});
   byId("download-input").addEventListener("click",()=>{const blob=new Blob([JSON.stringify(demo(),null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="council72-synteettinen-tehtava.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),0);});
-  byId("simulate").addEventListener("click",async()=>{if(!api)return;const own=++generation;try{const result=await request("/simulate",JSON.parse(byId("proposal-input").value));if(own!==generation)return;renderReport(result);status("Paikallinen koe valmis. Ei ulkoisia toimia.");}catch(e){status(e.message);}});
+  byId("simulate").addEventListener("click",async()=>{if(!api)return;const own=++generation;try{const result=await request("/simulate",JSON.parse(byId("proposal-input").value));if(own!==generation)return;renderReport(result);currentSession=null;byId("session-panel").hidden=true;byId("save-session").disabled=true;status("Paikallinen koe valmis. Ei ulkoisia toimia.");}catch(e){status(e.message);}});
+  byId("save-session").addEventListener("click",()=>{if(currentSession)download(currentSession,"council72-istunto-"+currentSession.request.session_id+".json");});
+  byId("run-session").addEventListener("click",async()=>{if(!api)return;const own=++generation;try{
+    if(byId("session-input").value.length>2097152)throw Error("Istunnon tehtävä on liian suuri");
+    const result=await request("/session",JSON.parse(byId("session-input").value));if(own!==generation)return;renderSession(result);status("Istunto laskettu. Tallenna raportti, jotta voit jatkaa myöhemmin.");
+  }catch(e){status(e.message);}});
+  byId("memory-observation").addEventListener("click",async()=>{if(!api)return;const own=++generation;try{
+    if(byId("session-input").value.length>2097152)throw Error("Istunnon tehtävä on liian suuri");const input=JSON.parse(byId("session-input").value);
+    if(!Array.isArray(input.steps)||input.steps.length>=8)throw Error("Istuntoon mahtuu enintään kahdeksan kierrosta");
+    const result=await request("/memory-observation",{limit:50});if(own!==generation)return;
+    if(input.steps.some(s=>s.observations?.some(o=>o.id===result.observation.id)))throw Error("Sama muistiotos on jo mukana. Sitä ei lisätty toistamiseen.");
+    input.steps.push({observations:[result.observation],dispatches:[]});byId("session-input").value=JSON.stringify(input,null,2);
+    status("Julkisen muistin otos lisätty lomakkeelle uutena avoimena havaintona. Luku kirjattiin auditointiin. Aja kierrokset erikseen.");
+  }catch(e){status(e.message);}});
   byId("draft").addEventListener("click",async()=>{if(!api||!current){status("Avaa tai simuloi ensin koe.");return;}try{const king=Number(byId("draft-king").value),courier=model.members.find(m=>m.courier_for===king);
+    if(currentSession){status("Muodosta istunnon viestit sen tehtävä-JSONin dispatches-kentässä. Istunnon lähde- ja ristiriitatarkistukset tarvitaan ensin.");return;}
     const result=await request("/draft",{proposal:current.modulated.proposal,king_id:king,courier_id:courier.id,channel:byId("draft-channel").value,message:byId("draft-message").value});byId("draft-result").textContent=JSON.stringify(result,null,2);status("Luonnos muodostettu. Vastaanottaja ja tili ovat vielä määrittelemättä. Mitään ei lähetetty.");}catch(e){status(e.message);}});
 })();

@@ -1,10 +1,16 @@
-"""Bounded, stateless council research API; no repository or network access."""
+"""Bounded council simulations plus an explicit, audited public memory count probe."""
 from typing import Annotated, Literal
+from sqlite3 import Error as SQLiteError
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from .council72 import catalog, deliberate, draft_dispatch, experiment
+from .council72_session import run_session
+from .api import get_repository
+from .council72_memory import public_memory_observation
+from .hypervisor_dispatch import DispatchDenied
+from .repository import KloneRepository
 
 router = APIRouter(prefix="/api/cognition/council72", tags=["experimental council72"])
 Unit = Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)]
@@ -41,6 +47,72 @@ class DraftRequest(BaseModel):
     courier_id: int = Field(ge=1, le=72)
     channel: Literal["forum", "social", "documentation", "research"]
     message: str = Field(min_length=1, max_length=2000)
+
+
+Identifier = Annotated[str, StringConstraints(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.:-]+$")]
+
+
+class SessionObservation(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    id: Identifier
+    courier_id: int = Field(ge=1, le=72)
+    source_ref: str = Field(min_length=1, max_length=256)
+    source_group: Identifier
+    claim_key: Identifier
+    stance: Literal["supports", "contradicts", "unknown"]
+    summary: str = Field(min_length=1, max_length=512)
+    classification: Literal["public", "restricted", "sealed"] = "public"
+    signals: Signals = Field(default_factory=Signals)
+    supersedes: Identifier | None = None
+    observed_at: str | None = Field(default=None, min_length=1, max_length=64)
+
+
+class SessionDispatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    king_id: int = Field(ge=1, le=72)
+    courier_id: int = Field(ge=1, le=72)
+    channel: Literal["forum", "social", "documentation", "research"]
+    message: str = Field(min_length=1, max_length=2000)
+
+
+class SessionStep(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    observations: list[SessionObservation] = Field(min_length=1, max_length=32)
+    founder_votes: dict[str, Literal["endorse", "oppose", "defer"]] | None = Field(default=None, max_length=8)
+    dispatches: list[SessionDispatch] = Field(default_factory=list, max_length=8)
+
+
+class SessionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    session_id: Identifier
+    goal: str = Field(min_length=1, max_length=2000)
+    classification: Literal["public", "restricted", "sealed"] = "public"
+    source_kind: Literal["user_claims", "synthetic_fixture"] = "user_claims"
+    steps: list[SessionStep] = Field(min_length=1, max_length=8)
+
+
+@router.post("/session")
+def council_session(request: SessionRequest):
+    try:
+        return run_session(request.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+class MemoryObservationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    limit: int = Field(default=50, ge=1, le=200)
+
+
+@router.post("/memory-observation")
+def council_memory_observation(request: MemoryObservationRequest,
+                               repository: KloneRepository = Depends(get_repository)):
+    try:
+        return public_memory_observation(repository, limit=request.limit)
+    except DispatchDenied as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except (OSError, SQLiteError) as exc:
+        raise HTTPException(status_code=503, detail="Muistihavainnon auditointi ei valmistunut.") from exc
 
 
 @router.get("/catalog")

@@ -224,10 +224,14 @@
     "LOPUKSI VAIN YKSI KYSYMYS: KUKA PERKELE PÄÄSTI UNIVERSUMIN LAATUVALVONNAN LÄPI?"
   ];
   let hexCounter=0;
+  function curseAt(index){
+    const i=Math.min(71,Math.max(0,Math.floor(Number(index)||0)));
+    const ring=Math.floor(i/8),seat=i%8;
+    const intro=hellIntros[ring],ending=hellEndings[seat];
+    return "Rinki "+(ring+1)+", paikka "+(seat+1)+". Kirous "+(i+1)+"/72. "+intro+" "+ending;
+  }
   function curse72(){
-    const index=hexCounter++%72;
-    const intro=hellIntros[index%9],ending=hellEndings[Math.floor(index/9)%8];
-    return "Kirous "+(index+1)+"/72. "+intro+" "+ending;
+    return curseAt(hexCounter++%72);
   }
   function phonetics(value){
     const p=el("hellvoice-style")?.value||"hell";
@@ -267,5 +271,5 @@
     const text=curse72();
     say(text,true);return text;
   }
-  window.NokiHellvoice={say,play:schedule,playMimic,stop,roast,curse72,profiles:Object.keys(profiles)};
+  window.NokiHellvoice={say,play:schedule,playMimic,stop,roast,curse72,curseAt,profiles:Object.keys(profiles)};
 })();

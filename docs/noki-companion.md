@@ -17,20 +17,21 @@ nykyiset uskonnot, akateeminen tutkimus ja taideideat erotetaan toisistaan.
    joten tämä **ei ole täysin mukautettu neural voice model**.
 4. **Grimoire-tietokirjasto:** `noki-grimoire.json` sisältää 72 Goetia-nimeä + 66 käsitteellistä
    merkintää (yhteensä **138 tietuetta**) ja **18 nimettyä julkista lähdettä**.
-   Tiivistelmät linkitetään alkuperäisiin lähteisiin. Tämä on rajattu tutkittu hakemisto,
+   Tietueet sisältävät myös 72 Goetia-hahmon arvonimet Petersonin tekstiedition mukaisesti ja 21 keskeisen hahmon tarkemmat kuvaukset. Tiivistelmät linkitetään alkuperäisiin lähteisiin. Tämä on rajattu tutkittu hakemisto,
    **ei koko internetin sisältö eikä reaaliaikainen tutkimusindeksi**.
 5. **Lähdehaku:** hakusana, aihealue, nimien klikkaaminen, näytettävä selitys ja alkuperäinen lähde.
    Hakutulos voi myös antaa Nokin paikalliseen keskusteluun lähteeseen sidotun vastauksen.
 6. **Poikkialainen taideideoiden generaattori:** yhdistää kaksi satunnaista tietuetta
    luovaksi kuvalliseksi/äänelliseksi ehdotukseksi. Merkintä on aina "fiktiivinen assosiaatio";
    se ei ole tieteellinen väite tai uuden okkulttisen opin paljastus.
-7. **Keskustelu KLONEssa:** vain eksplisiittisellä valinnalla ja annettuun dialogue corpus -lähdepolkuun.
+7. **72-paikkainen ääni- ja kirousneuvosto:** yhdeksän fiktiivistä rinkiä, kussakin kahdeksan valittavaa ääni-istuinta. Rinkki+istuin muodostaa 72 räikeää repliikkiyhdistelmää. Tämä on KLONEn/Nokin keksitty rakenteellinen toteutus eikä autenttinen Ars Goetian organisaatio.
+8. **Keskustelu KLONEssa:** vain eksplisiittisellä valinnalla ja annettuun dialogue corpus -lähdepolkuun.
    `/api/clone-chat/status` sekä `/api/clone-chat/respond`, `mode=bounded`, max 12 historian viestiä.
    Ulkoinen kielimalli ei ole tällä hetkellä käytössä, vaikka käyttäjä antaisi API-avaimen.
-8. **Matki ääntäni:** enintään 4 sekuntia paikallista ääninäytettä,
-   madallettu ja rosoiseksi suodatettu toisto. Puheentunnistusnapit erikseen;
+9. **Demonimatki ääntäni:** enintään 4 sekuntia paikallista ääninäytettä,
+   kolmen rinnakkaisen eri nopeuksisen äänen, särön, suodattimen ja rajatun viiveen muodostama monikerrosääni. Puheentunnistusnapit erikseen;
    selaimen speech recognition voi käyttää ulkoista tunnistuspalvelua.
-9. **Turpa kiinni:** keskeyttää äänen, mikrofonin ja KLONEen mahdollisesti odottavan HTTP-pyynnön.
+10. **Turpa kiinni:** keskeyttää äänen, mikrofonin ja KLONEen mahdollisesti odottavan HTTP-pyynnön.
 
 ### Tiedepohjaiset rajat
 

@@ -186,7 +186,7 @@
   const roughness=document.getElementById("roughness"),roughnessOut=document.getElementById("roughness-out");
   let imageUrl=null,recognition=null,currentImage=false,ctx=null,voiceIndex=0,roastIndex=0;
   let liveRecorder=null,liveStream=null,recordTimer=null,discardRecord=false,playbackNode=null;
-  let kloneHistory=[],klonePending=false;
+  let kloneHistory=[],klonePending=false,kloneController=null,kloneRequestNonce=0;
   let synthNodes=[];
   const roasts=[
     "KRRRÄÄ! Tervetuloa keskeneräisten nerojen hautausmaalle. Minä olen talonmies. Perkele.",
@@ -271,6 +271,8 @@
   document.getElementById("savage").addEventListener("click",roast);
   document.getElementById("chat").addEventListener("submit",function(e){e.preventDefault();const input=document.getElementById("message");const msg=input.value;getAudio();void dispatchReply(msg);input.value="";});
   function stopAll(discard){
+    kloneRequestNonce++;
+    if(kloneController){kloneController.abort();kloneController=null;}
     if("speechSynthesis" in window){window.speechSynthesis.cancel();}
     stage.classList.remove("speaking");
     if(recognition){try{recognition.abort();}catch(e){}recognition=null;}
@@ -369,12 +371,14 @@
     if(!source){engineFeedback("KLONE-aineiston polku puuttuu. Täytä polku tai poista moottori käytöstä.");return;}
     if(source.length>512){engineFeedback("Aineiston polku on liian pitkä.");return;}
     klonePending=true;
+    const myNonce=++kloneRequestNonce;
+    kloneController=new AbortController();
     const sendButton=document.querySelector("#chat button[type=submit]");
     sendButton.disabled=true;
     engineFeedback("KLONE käsittelee viestiä paikallisesti...");
     try{
       const response=await fetch("/api/clone-chat/respond",{
-        method:"POST",credentials:"same-origin",cache:"no-store",
+        method:"POST",credentials:"same-origin",cache:"no-store",signal:kloneController.signal,
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({source_path:source,message:msg,mode:"bounded",history:kloneHistory.slice(-12)})
       });
@@ -384,6 +388,7 @@
         throw new Error(detail);
       }
       const result=await response.json();
+      if(myNonce!==kloneRequestNonce){return;}
       if(!result.reply||typeof result.reply.content!=="string"){throw new Error("Virheellinen KLONE-vastaus");}
       const content=result.reply.content.trim().slice(0,1800);
       kloneHistory.push({role:"user",speaker:"you",content:msg},{role:"assistant",speaker:"klone",content:content});
@@ -393,9 +398,10 @@
         (result.answer?.supported?" – aineistoon perustuva vastaus.":" – evidenssi rajallinen tai ei osumaa.")+
         (result.llm_call_performed?" Ulkoinen malli käytössä.":" Ei ulkoista kielimallikutsua."));
     }catch(e){
+      if(e.name==="AbortError"||myNonce!==kloneRequestNonce){return;}
       engineFeedback("KLONE-virhe: "+e.message+" – paikallinen tila toimii edelleen.");
       say("KRRÖH! KLONE ei vastannut: tarkista aineiston polku ja yhteys. En keksi lähteitä omasta päästäni.",false);
-    }finally{klonePending=false;sendButton.disabled=false;}
+    }finally{klonePending=false;kloneController=null;sendButton.disabled=false;}
   }
   document.getElementById("talk-engine").addEventListener("click",function(){
     const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;

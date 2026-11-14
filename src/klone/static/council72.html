@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'">
+<title>KLONE · 72-paikkainen neuvosto</title><link rel="stylesheet" href="/static/council72.css">
+<script src="/static/council72-view.js" defer></script></head>
+<body data-catalog="/static/council72-catalog.json" data-api="/api/cognition/council72">
+<header><a href="/">← KLONE-työpöytä</a><span class="pill">TUTKIMUSMALLI · V1</span></header>
+<main><section class="hero"><p class="eyebrow">KOTIPESÄ / NEUVOSTO 72</p><h1>Yhdeksän rinkiä.<br>Yksi yhteinen päämäärä.</h1>
+<p class="intro">72 erikoistunutta näkökulmaa. Kahdeksan perustajakuningasta.<br>Ulkoa havaintoja sisään, harkittuja luonnoksia takaisin Limbon kautta.</p>
+<div class="stats"><div><strong>72</strong><span>omaa tehtävää</span></div><div><strong>9 × 8</strong><span>rinkiä ja paikkaa</span></div><div><strong>6</strong><span>laskennallista säädintä</span></div><div><strong>0</strong><span>automaattista julkaisua</span></div></div></section>
+<p id="status" role="status">Ladataan neuvoston rakennetta…</p>
+<div class="workspace"><section class="map-panel"><div class="panel-heading"><div><p class="eyebrow">RAKENNE</p><h2>Ulkomaasta perustaan</h2></div><span class="pill">VALITSE PAIKKA</span></div>
+<svg id="council-map" viewBox="0 0 1000 1000" role="group" aria-label="Yhdeksän rinkiä ja 72 valittavaa paikkaa"></svg>
+<p class="muted">Ulommainen: Limbo · sisimmäinen: Kadotus. Kultaiset paikat ovat perustajia. Voit valita jäsenen myös alla olevasta listasta.</p>
+<div class="boundary"><strong>Kuninkailla on viimeinen sana neuvoston sisällä.</strong><p>KLONEn käyttöoikeudet, auditointi ja omistajan päätös pysyvät erillisinä. Malli tutkii toiminnallista itsemallia; subjektiivista tietoisuutta sillä ei todeta.</p></div></section>
+<section class="detail-panel"><nav id="ring-tabs" aria-label="Valitse rinki"></nav><div class="ring-heading"><p id="ring-number" class="eyebrow"></p><h2 id="ring-title"></h2><p id="ring-domain"></p><p id="ring-steward" class="muted"></p></div>
+<div id="members" class="member-grid"></div><article id="member-detail" class="member-detail" aria-live="polite"></article></section></div>
+<section class="experiment panel"><div class="panel-heading"><div><p class="eyebrow">KOKEET JA TIEDONKULKU</p><h2>Mitä muuttui, kun tunnepainotus muuttui?</h2></div></div>
+<p>Vertaa samaa syötettä tunnepainotuksella ja ilman sitä. Tulokset ovat simulaation väitteitä. Viitteiden löytyminen ei yksin todenna niiden sisältöä.</p>
+<div class="actions"><label class="file-button">Avaa kokeen JSON <input id="report-file" type="file" accept="application/json,.json"></label><button id="download-input">Lataa synteettinen tehtäväpohja</button></div>
+<p class="muted">Sites-näkymä lukee tiedoston selaimessa. Muodosta koe Termuxissa: <code>python -m klone.council72 --input tehtava.json --output koe.json</code></p>
+<div id="experiment-result"><p class="muted">Ei koetta avattuna. Neuvoston rakenne on silti kokonaan tutkittavissa.</p></div>
+<details id="local-controls" hidden><summary>Aja koe KLONEn paikallisella API:lla</summary><p>Tämä käyttää nykyistä KLONE-palvelinta. Kokeella ei kirjoiteta muistiin tai suoriteta ulkoisia tehtäviä.</p>
+<label>Rajattu tehtävä JSONina<textarea id="proposal-input" rows="12" spellcheck="false"></textarea></label><button id="simulate">Simuloi ja vertaa</button>
+<h3>Kuninkaan viestiluonnos omalle Limbon viestinviejälle</h3><div class="draft-fields"><label>Perustaja<select id="draft-king"></select></label><label>Kanavatyyppi<select id="draft-channel"><option value="forum">Foorumi</option><option value="social">Some</option><option value="documentation">Dokumentaatio</option><option value="research">Tutkimus</option></select></label></div>
+<label>Luonnoksen sisältö<textarea id="draft-message" rows="3" maxlength="2000"></textarea></label><button id="draft">Muodosta tarkistettava luonnos</button><pre id="draft-result"></pre></details>
+</section><footer><p>Dante ja Ars Goetia ovat roolien kirjallisia viitteitä. Tekniset tehtävät ja persoonaparametrit ovat KLONEn omaa suunnittelua.</p><p>Tämä sivu ei julkaise mitään. Kanavat ja tilit ovat määrittelemättä.</p></footer></main></body></html>

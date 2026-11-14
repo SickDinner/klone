@@ -215,7 +215,7 @@
     <p id="report" aria-live="polite">Kuvaa ei ole valittu.</p>
     <p class="hint">Ei kuvien latausta palvelimelle, ei automaattista tallennusta. Kameravalinta riippuu Android-selaimesta.</p>
   </section>
-  <p class="muted">Prototyyppi. Noki ei vielä ole tekoälyagentti, eikä sillä ole pääsyä KLONEn muistiin, huoneisiin tai oikeuksiin. <a href="/chat">Avaa KLONEn keskusteluhuone</a>.</p>
+  <p class="muted">Noki on fiktiivinen kauhuhahmo. Grimoire on lähteistetty hakemisto ja KLONE-keskustelu on käyttäjän aktivoima rajattu palvelu. Noki ei saa automaattisesti pääsyä KLONEn muistiin, huoneisiin tai oikeuksiin. <a href="/chat">Avaa KLONEn keskusteluhuone</a>.</p>
 </main>
 <script src="/static/noki-hellvoice.js"></script>
 <script src="/static/noki-grimoire.js"></script>
@@ -238,12 +238,12 @@
     "KROK! Tämän näyttelyn vartija palkattiin eilen, ja se ehti jo vaihtaa ammattia."
   ];
   const artRoasts=[
-    "KRRÄÄ! Paperi selvisi hengissä. Se on jo enemmän kuin moni esteetikko pystyy lupaamaan.",
-    "KROOOH! Värit kinastelevat kuin perilliset hautajaisissa. Mitataanpa, kumpi voittaa.",
-    "KRAK! Voi perkele, sävyt ovat taas mellakassa. Mutta nyt puhutaan mittareista eikä ennusteta kummituksia."
+    "Voi vittu! Paperi selvisi hengissä. Se on enemmän kuin monen kuraattorin itsetunto pystyy lupaamaan.",
+    "Saatanan värimellakka! Nämä sävyt riitelevät kuin perikunta kalmiston parkkipaikalla.",
+    "HÄ-HÄ! Täällä mitataan kuvapisteitä eikä ennusteta manausten toimivuutta, senkin kosminen kassakone."
   ];
-  const greetings=["KRRRÄÄÄH!!!","KROO-AARK!!!","GRÄÄÄ-RRRÄK!!!","KRAK-KRAK-KRÖÖÖH!!!"];
-  function setState(value){state.textContent=value;}
+  // Näyttelijän äänitehosteet ovat NokiHellvoice-moduulissa.
+    function setState(value){state.textContent=value;}
   function flutter(){stage.classList.remove("excited");void stage.offsetWidth;stage.classList.add("excited");}
   function volume(){return Math.min(.55,Math.max(0,Number(roughness.value)/100*.55));}
   function getAudio(){
@@ -254,64 +254,40 @@
     return ctx;
   }
   function synthCaw(){
-    const audio=getAudio();if(!audio||volume()===0){return;}
-    const start=audio.currentTime+.015, loud=volume();
-    const compressor=audio.createDynamicsCompressor();
-    compressor.threshold.value=-18;compressor.knee.value=12;compressor.ratio.value=8;
-    compressor.attack.value=.004;compressor.release.value=.15;
-    compressor.connect(audio.destination);
-    for(let i=0;i<4;i++){
-      const offset=i*.17;
-      const osc=audio.createOscillator(),filter=audio.createBiquadFilter(),gain=audio.createGain();
-      osc.type=i%2?"square":"sawtooth";
-      osc.frequency.setValueAtTime(290+i*45,start+offset);
-      osc.frequency.exponentialRampToValueAtTime(95+i*17,start+offset+.16);
-      filter.type="bandpass";filter.frequency.value=650+i*105;filter.Q.value=1.5;
-      gain.gain.setValueAtTime(.0001,start+offset);
-      gain.gain.exponentialRampToValueAtTime(Math.max(.002,loud*.25),start+offset+.018);
-      gain.gain.exponentialRampToValueAtTime(.0001,start+offset+.16);
-      osc.connect(filter);filter.connect(gain);gain.connect(compressor);
-      osc.start(start+offset);osc.stop(start+offset+.17);synthNodes.push(osc);
-      osc.onended=function(){synthNodes=synthNodes.filter(function(n){return n!==osc;});};
+    if(window.NokiHellvoice){window.NokiHellvoice.play("growl");}
+  }
+  function say(line,withFx){
+    if(window.NokiHellvoice){window.NokiHellvoice.say(line,Boolean(withFx));flutter();return;}
+    speech.textContent=String(line);setState("Perusääni (äänimoduuli puuttuu)");
+    if("speechSynthesis" in window){
+      window.speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(String(line));u.lang="fi-FI";u.pitch=.45;u.rate=.7;u.volume=.3;
+      window.speechSynthesis.speak(u);
     }
-    window.setTimeout(function(){try{compressor.disconnect();}catch(e){}},1600);
   }
-  function say(line,withCaw){
-    const head=withCaw?greetings[voiceIndex++%greetings.length]+" ":"";
-    speech.textContent=head+line;setState("Puhuu");flutter();
-    if(withCaw){synthCaw();}
-    if(!("speechSynthesis" in window)){setState("Teksti valmis – ääni ei tuettu");return;}
-    window.speechSynthesis.cancel();
-    const u=new SpeechSynthesisUtterance(phoneticTTS(head+line));
-    u.lang="fi-FI";
-    const style=document.getElementById("croak-style").value;
-    u.rate=style==="gremlin"?1.12+(voiceIndex%3)*.09:style==="witch"?.82+(voiceIndex%4)*.045:.69+(voiceIndex%3)*.065;
-    u.pitch=style==="gremlin"?1.53+(voiceIndex%3)*.12:style==="witch"?.68+(voiceIndex%3)*.13:.35+(voiceIndex%3)*.11;
-    u.volume=Math.max(.2,Math.min(.85,.25+volume()));
-    const voices=window.speechSynthesis.getVoices();
-    const finnish=voices.find(function(v){return v.lang.toLowerCase().startsWith("fi");});
-    if(finnish){u.voice=finnish;}
-    stage.classList.add("speaking");
-    u.onend=function(){setState("Valmiina");stage.classList.remove("speaking");};
-    u.onerror=function(){setState("Puheääntä ei saatavilla");stage.classList.remove("speaking");};
-    window.speechSynthesis.speak(u);
+  function roast(){
+    if(window.NokiHellvoice){window.NokiHellvoice.roast();flutter();}
+    else{say(roasts[roastIndex++%roasts.length],true);}
   }
-  function roast(){say(roasts[roastIndex++%roasts.length],true);}
-  function reply(text,mimic){
-    const msg=text.trim().slice(0,250),q=msg.toLowerCase();
-    if(!msg){say("Puhu jotain, senkin hiljaisuuden keräilijä.",false);return;}
-    if(mimic){say("Minä kuulin: "+msg+". RRRÄÄK! KOR-KOR-KRAK! Eihän tuollaista edes papukaija kehtaisi lausua!",true);}
-    else if(q.includes("taide")||q.includes("piir")||q.includes("kuva")){say(currentImage?"Kuvan mittarit ovat alla. Äläkä väitä niistä löytyvän kohtaloa, minä lasken pikseleitä.":"Näytä piirros. Minä voin ainakin laskea, kuinka pahasti värit ovat riidoissa.",true);}
-    else if(q.includes("nimi")||q.includes("kuka")){say("Noki. Kuolematon vain veroviraston näkökulmasta. KRAK!",true);}
+
+    function reply(text,mimic){
+    const msg=String(text||"").trim().slice(0,260),q=msg.toLowerCase();
+    if(!msg){say("Vittu nyt jotain sanoja, tämä hiljaisuus saisi jo sakot.",false);return;}
+    if(mimic){say("Minä kuulin: "+msg+". Voi perkele mikä puristus. Jos ajatukset olisivat takuutuotteita, tuo menisi välittömästi palautukseen!",true);return;}
+    if(q.includes("taide")||q.includes("piir")||q.includes("kuva")){
+      say(currentImage?"Kuvan mittarit ovat alhaalla. Toistan: pikselit eivät ole kirottuja, vain huonosti johdettuja.":"Näytä se saatanan piirros. Minä lasken viivoja ja sinä saat päättää, mikä helvetti siellä irvistää.",true);
+    }else if(q.includes("nimi")||q.includes("kuka")){say("Noki, kuoleman kirjanpitäjän virheellinen alihankkija. Ei takuita, ei palautusoikeutta, aivan vitun loistavaa.",true);}
     else if(q.includes("moi")||q.includes("hei")||q.includes("terve")){roast();}
-    else{say("Sinä sanoit: "+msg+". KRAH! Minun älykkyyteni on toistaiseksi ohjelmoitua nalkutusta, älä nyt odota Shakespearea, perkele.",true);}
+    else{say("Kuulin: "+msg+". Voi perkele! Tämä on paikallinen näyttelijä eikä mikään kaikkitietävä demoni. Kysy Grimoiresta jotain täsmällistä.",true);}
   }
-  roughness.addEventListener("input",function(){roughnessOut.value=roughness.value+" %";});
-  document.getElementById("hello").addEventListener("click",function(){say("KRRRÖÖÖ!!! Kraa, kraa, KRÄÄÄÄH! Mitä helvettiä täällä taas taiteillaan? Minä vaadin vahingonkorvauksia sulkasadosta!",true);});
-  document.getElementById("animate").addEventListener("click",function(){flutter();synthCaw();setState("Sätkii");});
+
+    roughness.addEventListener("input",function(){roughnessOut.value=roughness.value+" %";});
+  document.getElementById("hello").addEventListener("click",function(){say("VOI SAATANAN SURKEAA! TÄÄLLÄ PUHUU KUOLEMAN KASSAKONE! HA-HA-HÄÄÄ! HAISTA VITTU, KOSMOS! KUIN RUOSTEINEN LIHAMYLLY SYLKEE KIRKONKELLOJA!",true);});
+  document.getElementById("animate").addEventListener("click",function(){flutter();sfx("scream");setState("Värisee");});
   document.getElementById("savage").addEventListener("click",roast);
   document.getElementById("chat").addEventListener("submit",function(e){e.preventDefault();const input=document.getElementById("message");const msg=input.value;getAudio();void dispatchReply(msg);input.value="";});
   function stopAll(discard){
+    if(window.NokiHellvoice){window.NokiHellvoice.stop();}
     kloneRequestNonce++;
     if(kloneController){kloneController.abort();kloneController=null;}
     if("speechSynthesis" in window){window.speechSynthesis.cancel();}
@@ -328,62 +304,11 @@
     setState("Hiljaa");
   }
   document.getElementById("stop").addEventListener("click",function(){stopAll(true);});
-  function phoneticTTS(value){
-    const mode=document.getElementById("croak-style").value;
-    if(mode==="witch"){
-      return value.replace(/\bKRRRÄÄÄH\b/gi,"krrrrääääh!").replace(/\bKRAK\b/g,"krrhák").replace(/([sr])\1{2,}/gi,"$1$1$1").replace(/s(?=[aeiouyäö])/gi,"sh");
-    }
-    if(mode==="gremlin"){return value.replace(/KRRRÄÄÄH/gi,"kriäääk!").replace(/KRAK/gi,"kikräk!").replace(/r(?=[aeiouyäö])/gi,"rr");}
-    return value.replace(/KRRRÄÄÄH/gi,"KRR-ÖÄÄH!").replace(/KRAK/gi,"KRR-AK!");
-  }
   function sfx(kind){
-    const audio=getAudio();if(!audio||volume()===0){setState("Ääniefekti vaimennettu");return;}
-    flutter();
-    const start=audio.currentTime+.015, loud=Math.min(.38,volume()*.65),limit=audio.createDynamicsCompressor();
-    limit.threshold.value=-23;limit.ratio.value=12;limit.attack.value=.005;limit.release.value=.12;
-    limit.connect(audio.destination);
-    function tone(at,dur,from,to,wave,amp){
-      const osc=audio.createOscillator(),g=audio.createGain(),f=audio.createBiquadFilter();
-      osc.type=wave;osc.frequency.setValueAtTime(Math.max(45,from),start+at);
-      osc.frequency.exponentialRampToValueAtTime(Math.max(45,to),start+at+dur);
-      f.type="bandpass";f.frequency.value=850;f.Q.value=.6;
-      g.gain.setValueAtTime(.0001,start+at);
-      g.gain.linearRampToValueAtTime(loud*amp,start+at+Math.min(.028,dur/4));
-      g.gain.exponentialRampToValueAtTime(.0001,start+at+dur);
-      osc.connect(f);f.connect(g);g.connect(limit);
-      osc.start(start+at);osc.stop(start+at+dur+.012);synthNodes.push(osc);
-      osc.onended=function(){synthNodes=synthNodes.filter(function(n){return n!==osc;});try{osc.disconnect();g.disconnect();f.disconnect();}catch(e){}};
-    }
-    function noise(at,dur,amp){
-      const n=Math.ceil(audio.sampleRate*dur),buf=audio.createBuffer(1,n,audio.sampleRate),d=buf.getChannelData(0);
-      for(let i=0;i<n;i++){d[i]=(Math.random()*2-1);}
-      const node=audio.createBufferSource(),filter=audio.createBiquadFilter(),gain=audio.createGain();
-      node.buffer=buf;filter.type="bandpass";filter.frequency.value=620;filter.Q.value=.8;
-      gain.gain.setValueAtTime(.0001,start+at);
-      gain.gain.linearRampToValueAtTime(loud*amp,start+at+.015);
-      gain.gain.exponentialRampToValueAtTime(.0001,start+at+dur);
-      node.connect(filter);filter.connect(gain);gain.connect(limit);
-      node.start(start+at);node.stop(start+at+dur+.002);synthNodes.push(node);
-      node.onended=function(){synthNodes=synthNodes.filter(function(n){return n!==node;});try{node.disconnect();filter.disconnect();gain.disconnect();}catch(e){}};
-    }
-    if(kind==="witch"){
-      for(let i=0;i<9;i++){const p=i%3; tone(i*.135,.12,510+p*72-i*17,230+p*38,"sawtooth",.65);if(i%2===0)tone(i*.135+.025,.075,820-i*20,340,"square",.22);}
-      noise(.52,.24,.19);
-      speech.textContent="HÄ-HÄ-HÄÄÄ! KHI-HI-HI! KRR-KÄK-KÄK-KÄÄÄ! Tämän noidan kieli on solmussa ja nauru pahempi!";
-    }else if(kind==="snort"){
-      noise(0,.18,.6);tone(.12,.19,390,88,"sawtooth",.8);noise(.25,.20,.38);speech.textContent="FRR-PHHRÖÖT! KRRÄH! Räkäisen komea suoritus.";
-    }else if(kind==="squeak"){
-      tone(0,.61,96,950,"sawtooth",.65);tone(.27,.45,720,113,"square",.35);noise(.3,.28,.22);speech.textContent="KRRRIIII-ÖÖÖK! Saranalla on viimeinen voitelu menossa.";
-    }else if(kind==="bones"){
-      for(let i=0;i<11;i++){tone(i*.065,.035,880+(i%3)*140,200,"triangle",.7);}
-      speech.textContent="KLAK-KLOK-KLAK! Kuolleiden kastanjetit. Rytmiryhmä on jo haudattu.";
-    }else if(kind==="heckle"){
-      for(let i=0;i<10;i++){tone(i*.095,.085,420+i%3*150,220-i%2*42,i%2?"square":"sawtooth",.5);}
-      speech.textContent="HÄH! HÖH! HEH-HÖR-HÄÄÄ! Mitä, menikö arvostelu tunteisiin? Minulla ei ole edes tunteille vakuutusta.";
-    }
-    setState("Rääkkyy: "+kind);window.setTimeout(function(){try{limit.disconnect();}catch(e){} if(state.textContent==="Rääkkyy: "+kind){setState("Valmiina");}},2000);
+    if(window.NokiHellvoice){window.NokiHellvoice.play(kind);return;}
+    setState("Äänimoduuli puuttuu: "+kind);
   }
-  for(const kind of ["witch","snort","squeak","bones","heckle"]){
+    for(const kind of ["witch","snort","squeak","bones","heckle"]){
     document.getElementById(kind).addEventListener("click",function(){sfx(kind);});
   }
   function engineFeedback(t){document.getElementById("engine-feedback").textContent=t;}
@@ -407,7 +332,12 @@
   async function dispatchReply(text){
     const msg=String(text||"").trim().slice(0,320);
     if(!msg){say("Jaa? Hiljaisuuskin on parempi kuin huonosti ohjelmoitu teatteri.",false);return;}
-    if(!document.getElementById("engine-enable").checked){reply(msg,false);return;}
+    if(!document.getElementById("engine-enable").checked){
+      const factual=window.NokiGrimoire?.ready?window.NokiGrimoire.answer(msg):null;
+      if(factual){say("Vittu, nyt löytyi ihan lähdekin! "+factual+" Ja muista: minä olen kauhudramaattinen näyttelijä, en historioitsijoiden ylituomari.",true);}
+      else{reply(msg,false);}
+      return;
+    }
     if(klonePending){engineFeedback("Odota edellistä vastausta.");return;}
     const source=document.getElementById("engine-source").value.trim();
     if(!source){engineFeedback("KLONE-aineiston polku puuttuu. Täytä polku tai poista moottori käytöstä.");return;}
@@ -527,6 +457,14 @@
     }
   }
   document.getElementById("mimic").addEventListener("click",startMimic);
+  for(const name of ["hellvoice-intensity","hellvoice-chaos"]){
+    const slider=document.getElementById(name),out=document.getElementById(name+"-label");
+    if(slider&&out){slider.addEventListener("input",function(){out.textContent=slider.value+" %";});}
+  }
+  document.querySelectorAll("[data-hellfx]").forEach(function(b){
+    b.addEventListener("click",function(){sfx(b.dataset.hellfx);});
+  });
+
   function releaseImage(){if(imageUrl){URL.revokeObjectURL(imageUrl);imageUrl=null;}preview.removeAttribute("src");preview.style.display="none";currentImage=false;}
   function analyze(img){
     let w=Math.min(240,img.naturalWidth),h=Math.max(1,Math.round(w*img.naturalHeight/img.naturalWidth));

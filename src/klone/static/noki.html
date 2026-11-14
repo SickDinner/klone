@@ -152,92 +152,215 @@
 <script>
 (function(){
   "use strict";
-  var stage=document.getElementById("stage"), speech=document.getElementById("speech"), state=document.getElementById("state");
-  var file=document.getElementById("file"), preview=document.getElementById("preview"), report=document.getElementById("report");
-  var imageUrl=null, recognition=null, currentImage=false;
-  function tell(msg, aloud){
-    speech.textContent=msg; state.textContent=aloud?"Puhuu":"Valmiina";
-    if(!aloud){return;}
-    if(!("speechSynthesis" in window)){state.textContent="Ääni ei tuettu";return;}
-    window.speechSynthesis.cancel();
-    var u=new SpeechSynthesisUtterance(msg);
-    u.lang="fi-FI";u.rate=.94;u.pitch=.82;
-    var voices=window.speechSynthesis.getVoices();
-    var finnish=voices.find(function(v){return v.lang.toLowerCase().startsWith("fi");});
-    if(finnish){u.voice=finnish;}
-    u.onend=function(){state.textContent="Valmiina";stage.classList.remove("speaking");};
-    u.onerror=function(){state.textContent="Puhe ei saatavilla";stage.classList.remove("speaking");};
-    stage.classList.add("speaking");window.speechSynthesis.speak(u);
-  }
+  const stage=document.getElementById("stage"),speech=document.getElementById("speech"),state=document.getElementById("state");
+  const file=document.getElementById("file"),preview=document.getElementById("preview"),report=document.getElementById("report");
+  const roughness=document.getElementById("roughness"),roughnessOut=document.getElementById("roughness-out");
+  let imageUrl=null,recognition=null,currentImage=false,ctx=null,voiceIndex=0,roastIndex=0;
+  let liveRecorder=null,liveStream=null,recordTimer=null,discardRecord=false,playbackNode=null;
+  let synthNodes=[];
+  const roasts=[
+    "KRRRÄÄ! Tervetuloa keskeneräisten nerojen hautausmaalle. Minä olen talonmies. Perkele.",
+    "KROOOAH! Jos kaaos olisi valuuttaa, tämän pesän vuokra olisi jo maksettu. Kuolinpesästä vielä puuttuu kuitti.",
+    "KRAK KRAK! Nyt näyttää siltä, että taidemuseon palohälytin yritti maalata omakuvan. En valita, sehän on sukua minulle.",
+    "GRRÄÄ! Lisää väriä. Kuolema on jo mustavalkoinen, eikä sekään valita valaistuksesta.",
+    "KRRRÖÖH! Sinä piirrät, minä nalkutan. Meidän taiteellinen yhteisömme tarvitsee vain yhden toimivan aivosolun, ja se on lomalla.",
+    "KROK! Tämän näyttelyn vartija palkattiin eilen, ja se ehti jo vaihtaa ammattia."
+  ];
+  const artRoasts=[
+    "KRRÄÄ! Paperi selvisi hengissä. Se on jo enemmän kuin moni esteetikko pystyy lupaamaan.",
+    "KROOOH! Värit kinastelevat kuin perilliset hautajaisissa. Mitataanpa, kumpi voittaa.",
+    "KRAK! Voi perkele, sävyt ovat taas mellakassa. Mutta nyt puhutaan mittareista eikä ennusteta kummituksia."
+  ];
+  const greetings=["KRRRÄÄÄH!!!","KROO-AARK!!!","GRÄÄÄ-RRRÄK!!!","KRAK-KRAK-KRÖÖÖH!!!"];
+  function setState(value){state.textContent=value;}
   function flutter(){stage.classList.remove("excited");void stage.offsetWidth;stage.classList.add("excited");}
-  function reply(text){
-    var q=text.trim().toLowerCase();
-    if(!q){tell("Kirjoita ensin jotakin.",true);return;}
-    if(q.includes("taide")||q.includes("piir")||q.includes("kuva")){
-      tell(currentImage?"Kuvan tekniset mittarit ovat alempana. Kerro myös, mitä muotoja itse löydät.":"Näytä teos Taidelaboratorion painikkeesta. Katson ensin värit ja kontrastin.",true);
-    }else if(q.includes("nimi")||q.includes("kuka")){
-      tell("Olen Noki, KLONEn kokeellinen korppikumppani. Kraa.",true);
-    }else if(q.includes("terve")||q.includes("moi")||q.includes("hei")){
-      tell("Kraa! Mitä tänään piirretään?",true);
-    }else{
-      tell("Kuulin: "+text.trim().slice(0,135)+". Tämä versio käyttää yksinkertaisia paikallisia vastauksia, ei kielimallia.",true);
-    }
-    flutter();
+  function volume(){return Math.min(.55,Math.max(0,Number(roughness.value)/100*.55));}
+  function getAudio(){
+    const Audio=window.AudioContext||window.webkitAudioContext;
+    if(!Audio){return null;}
+    if(!ctx){ctx=new Audio();}
+    if(ctx.state==="suspended"){ctx.resume().catch(function(){});}
+    return ctx;
   }
-  document.getElementById("hello").addEventListener("click",function(){flutter();tell("Kraa! Olen Noki. Värit ensin, merkitykset löydetään matkan varrella.",true);});
-  document.getElementById("animate").addEventListener("click",function(){flutter();tell("Siivet liikkeelle! Kraa.",true);});
-  document.getElementById("stop").addEventListener("click",function(){if("speechSynthesis" in window){window.speechSynthesis.cancel();}if(recognition){recognition.stop();}stage.classList.remove("speaking");state.textContent="Hiljaa";});
-  document.getElementById("chat").addEventListener("submit",function(e){e.preventDefault();var input=document.getElementById("message");reply(input.value);input.value="";});
+  function synthCaw(){
+    const audio=getAudio();if(!audio||volume()===0){return;}
+    const start=audio.currentTime+.015, loud=volume();
+    const compressor=audio.createDynamicsCompressor();
+    compressor.threshold.value=-18;compressor.knee.value=12;compressor.ratio.value=8;
+    compressor.attack.value=.004;compressor.release.value=.15;
+    compressor.connect(audio.destination);
+    for(let i=0;i<4;i++){
+      const offset=i*.17;
+      const osc=audio.createOscillator(),filter=audio.createBiquadFilter(),gain=audio.createGain();
+      osc.type=i%2?"square":"sawtooth";
+      osc.frequency.setValueAtTime(290+i*45,start+offset);
+      osc.frequency.exponentialRampToValueAtTime(95+i*17,start+offset+.16);
+      filter.type="bandpass";filter.frequency.value=650+i*105;filter.Q.value=1.5;
+      gain.gain.setValueAtTime(.0001,start+offset);
+      gain.gain.exponentialRampToValueAtTime(Math.max(.002,loud*.25),start+offset+.018);
+      gain.gain.exponentialRampToValueAtTime(.0001,start+offset+.16);
+      osc.connect(filter);filter.connect(gain);gain.connect(compressor);
+      osc.start(start+offset);osc.stop(start+offset+.17);synthNodes.push(osc);
+      osc.onended=function(){synthNodes=synthNodes.filter(function(n){return n!==osc;});};
+    }
+    window.setTimeout(function(){try{compressor.disconnect();}catch(e){}},1600);
+  }
+  function say(line,withCaw){
+    const head=withCaw?greetings[voiceIndex++%greetings.length]+" ":"";
+    speech.textContent=head+line;setState("Puhuu");flutter();
+    if(withCaw){synthCaw();}
+    if(!("speechSynthesis" in window)){setState("Teksti valmis – ääni ei tuettu");return;}
+    window.speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(head+line);
+    u.lang="fi-FI";u.rate=.75+(voiceIndex%4)*.07;u.pitch=.42+(voiceIndex%3)*.11;
+    u.volume=Math.max(.2,Math.min(.85,.25+volume()));
+    const voices=window.speechSynthesis.getVoices();
+    const finnish=voices.find(function(v){return v.lang.toLowerCase().startsWith("fi");});
+    if(finnish){u.voice=finnish;}
+    stage.classList.add("speaking");
+    u.onend=function(){setState("Valmiina");stage.classList.remove("speaking");};
+    u.onerror=function(){setState("Puheääntä ei saatavilla");stage.classList.remove("speaking");};
+    window.speechSynthesis.speak(u);
+  }
+  function roast(){say(roasts[roastIndex++%roasts.length],true);}
+  function reply(text,mimic){
+    const msg=text.trim().slice(0,250),q=msg.toLowerCase();
+    if(!msg){say("Puhu jotain, senkin hiljaisuuden keräilijä.",false);return;}
+    if(mimic){say("Minä kuulin: "+msg+". RRRÄÄK! KOR-KOR-KRAK! Eihän tuollaista edes papukaija kehtaisi lausua!",true);}
+    else if(q.includes("taide")||q.includes("piir")||q.includes("kuva")){say(currentImage?"Kuvan mittarit ovat alla. Äläkä väitä niistä löytyvän kohtaloa, minä lasken pikseleitä.":"Näytä piirros. Minä voin ainakin laskea, kuinka pahasti värit ovat riidoissa.",true);}
+    else if(q.includes("nimi")||q.includes("kuka")){say("Noki. Kuolematon vain veroviraston näkökulmasta. KRAK!",true);}
+    else if(q.includes("moi")||q.includes("hei")||q.includes("terve")){roast();}
+    else{say("Sinä sanoit: "+msg+". KRAH! Minun älykkyyteni on toistaiseksi ohjelmoitua nalkutusta, älä nyt odota Shakespearea, perkele.",true);}
+  }
+  roughness.addEventListener("input",function(){roughnessOut.value=roughness.value+" %";});
+  document.getElementById("hello").addEventListener("click",function(){say("KRRRÖÖÖ!!! Kraa, kraa, KRÄÄÄÄH! Mitä helvettiä täällä taas taiteillaan? Minä vaadin vahingonkorvauksia sulkasadosta!",true);});
+  document.getElementById("animate").addEventListener("click",function(){flutter();synthCaw();setState("Sätkii");});
+  document.getElementById("savage").addEventListener("click",roast);
+  document.getElementById("chat").addEventListener("submit",function(e){e.preventDefault();const input=document.getElementById("message");reply(input.value,false);input.value="";});
+  function stopAll(discard){
+    if("speechSynthesis" in window){window.speechSynthesis.cancel();}
+    stage.classList.remove("speaking");
+    if(recognition){try{recognition.abort();}catch(e){}recognition=null;}
+    if(liveRecorder && liveRecorder.state!=="inactive"){
+      discardRecord=discard;
+      try{liveRecorder.stop();}catch(e){}
+    }
+    if(liveStream){liveStream.getTracks().forEach(function(t){t.stop();});liveStream=null;}
+    if(recordTimer){clearTimeout(recordTimer);recordTimer=null;}
+    if(playbackNode){try{playbackNode.stop();}catch(e){}playbackNode=null;}
+    synthNodes.forEach(function(n){try{n.stop();}catch(e){}});synthNodes=[];
+    setState("Hiljaa");
+  }
+  document.getElementById("stop").addEventListener("click",function(){stopAll(true);});
   document.getElementById("listen").addEventListener("click",function(){
-    var SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-    if(!SpeechRecognition){tell("Tämä selain ei tue puheentunnistusta. Voit kirjoittaa viestin.",false);return;}
-    if(recognition){recognition.stop();recognition=null;return;}
-    recognition=new SpeechRecognition();recognition.lang="fi-FI";recognition.interimResults=false;recognition.maxAlternatives=1;
-    recognition.onresult=function(e){var words=e.results[0][0].transcript;document.getElementById("message").value=words;reply(words);};
-    recognition.onerror=function(){state.textContent="Mikrofoni ei käytössä";};
-    recognition.onend=function(){recognition=null;if(state.textContent==="Kuuntelee"){state.textContent="Valmiina";}};
-    try{recognition.start();state.textContent="Kuuntelee";}catch(e){recognition=null;tell("Mikrofoni ei käynnistynyt.",false);}
+    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SpeechRecognition){say("Puheentunnistus ei toimi tällä selaimella. Kokeile neljän sekunnin äänenmatkintaa.",false);return;}
+    if(recognition){try{recognition.stop();}catch(e){}recognition=null;return;}
+    recognition=new SpeechRecognition();
+    recognition.lang="fi-FI";recognition.interimResults=false;recognition.maxAlternatives=1;
+    recognition.onresult=function(e){const words=e.results[0][0].transcript;document.getElementById("message").value=words;reply(words,true);};
+    recognition.onerror=function(){setState("Puheentunnistus epäonnistui");};
+    recognition.onend=function(){recognition=null;if(state.textContent==="Kuuntelee"){setState("Valmiina");}};
+    try{recognition.start();setState("Kuuntelee sanoja");}catch(e){recognition=null;setState("Mikrofoni ei käynnistynyt");}
   });
+  function distortion(audio){
+    const shaper=audio.createWaveShaper();
+    const c=new Float32Array(2048);
+    for(let i=0;i<c.length;i++){const x=i*2/(c.length-1)-1;c[i]=Math.tanh(2.2*x);}
+    shaper.curve=c;shaper.oversample="2x";return shaper;
+  }
+  function playMimic(buffer){
+    const audio=getAudio();
+    if(!audio){setState("Äänentoisto ei käytettävissä");return;}
+    const src=audio.createBufferSource(),hp=audio.createBiquadFilter(),lp=audio.createBiquadFilter();
+    const grit=distortion(audio),gain=audio.createGain(),limiter=audio.createDynamicsCompressor();
+    src.buffer=buffer;src.playbackRate.value=.68;
+    hp.type="highpass";hp.frequency.value=155;lp.type="lowpass";lp.frequency.value=2200;
+    limiter.threshold.value=-20;limiter.ratio.value=10;
+    gain.gain.value=Math.min(.58,.20+volume()*.65);
+    src.connect(hp);hp.connect(lp);lp.connect(grit);grit.connect(gain);gain.connect(limiter);limiter.connect(audio.destination);
+    playbackNode=src;setState("Matkii raakuen");
+    speech.textContent="KRRRÄÄÄ! Kuuntele, nyt korppi matkii neljän sekunnin äänesi matalampana ja rosoisempana.";
+    src.onended=function(){playbackNode=null;setState("Valmiina");[hp,lp,grit,gain,limiter].forEach(function(n){try{n.disconnect();}catch(e){}});};
+    try{src.start();}catch(e){playbackNode=null;setState("Äänen toisto epäonnistui");}
+  }
+  async function startMimic(){
+    if(liveRecorder && liveRecorder.state==="recording"){liveRecorder.stop();return;}
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder){
+      say("Tämä selain ei tue paikallista ääninäytteen matkimista.",false);return;
+    }
+    if(liveStream){return;}
+    try{
+      const audio=getAudio();
+      if(!audio){say("Tämä selain ei tue äänikäsittelyä.",false);return;}
+      liveStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:false},video:false});
+      const chunks=[];
+      const types=["audio/webm;codecs=opus","audio/mp4","audio/webm"];
+      const chosen=types.find(function(t){return MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t);});
+      const recorder=chosen?new MediaRecorder(liveStream,{mimeType:chosen}):new MediaRecorder(liveStream);
+      liveRecorder=recorder;discardRecord=false;
+      recorder.ondataavailable=function(e){if(e.data&&e.data.size){chunks.push(e.data);}};
+      recorder.onerror=function(){setState("Tallennus epäonnistui");if(liveStream){liveStream.getTracks().forEach(function(t){t.stop();});liveStream=null;}};
+      recorder.onstop=async function(){
+        if(recordTimer){clearTimeout(recordTimer);recordTimer=null;}
+        if(liveStream){liveStream.getTracks().forEach(function(t){t.stop();});liveStream=null;}
+        liveRecorder=null;
+        if(discardRecord){discardRecord=false;return;}
+        try{
+          const blob=new Blob(chunks,{type:recorder.mimeType||"audio/webm"});
+          if(!blob.size||blob.size>2*1024*1024){throw new Error("Näyte on tyhjä tai liian suuri");}
+          const array=await blob.arrayBuffer();
+          const buffer=await audio.decodeAudioData(array);
+          playMimic(buffer);
+        }catch(e){setState("Ääninäytettä ei voitu toistaa: "+e.message);}
+      };
+      recorder.start();
+      setState("Nauhoittaa 4 sekuntia");speech.textContent="Nyt puhu mikrofoniin. Korppi ottaa neljä sekuntia ja matkii sinua – vain paikallisesti.";
+      recordTimer=window.setTimeout(function(){if(recorder.state==="recording"){recorder.stop();}},4000);
+    }catch(e){
+      if(liveStream){liveStream.getTracks().forEach(function(t){t.stop();});liveStream=null;}
+      liveRecorder=null;setState("Mikrofonin käyttö estetty tai ei saatavilla");
+    }
+  }
+  document.getElementById("mimic").addEventListener("click",startMimic);
   function releaseImage(){if(imageUrl){URL.revokeObjectURL(imageUrl);imageUrl=null;}preview.removeAttribute("src");preview.style.display="none";currentImage=false;}
   function analyze(img){
-    var w=Math.min(240,img.naturalWidth),h=Math.max(1,Math.round(w*img.naturalHeight/img.naturalWidth));
+    let w=Math.min(240,img.naturalWidth),h=Math.max(1,Math.round(w*img.naturalHeight/img.naturalWidth));
     if(h>240){h=240;w=Math.max(1,Math.round(h*img.naturalWidth/img.naturalHeight));}
-    var canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;
-    var ctx=canvas.getContext("2d",{willReadFrequently:true});
-    if(!ctx){throw new Error("Kuvakäsittely ei käytettävissä");}
-    ctx.drawImage(img,0,0,w,h);
-    var pix=ctx.getImageData(0,0,w,h).data, lum=new Float32Array(w*h),sum=0,sumSq=0,sat=0,sym=0,symN=0,edges=0,edgeN=0;
-    for(var y=0;y<h;y++){for(var x=0;x<w;x++){
-      var i=y*w+x,k=i*4,r=pix[k],g=pix[k+1],b=pix[k+2],v=(.2126*r+.7152*g+.0722*b)/255;
+    const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;
+    const c=canvas.getContext("2d",{willReadFrequently:true});
+    if(!c){throw new Error("Kuvakäsittely ei käytettävissä");}
+    c.drawImage(img,0,0,w,h);
+    const pix=c.getImageData(0,0,w,h).data,lum=new Float32Array(w*h);
+    let sum=0,sumSq=0,sat=0,sym=0,symN=0,edges=0,edgeN=0;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const i=y*w+x,k=i*4,r=pix[k],g=pix[k+1],b=pix[k+2],v=(.2126*r+.7152*g+.0722*b)/255;
       lum[i]=v;sum+=v;sumSq+=v*v;sat+=(Math.max(r,g,b)-Math.min(r,g,b))/255;
       if(x>0){edges+=Math.abs(v-lum[i-1]);edgeN++;}
       if(y>0){edges+=Math.abs(v-lum[i-w]);edgeN++;}
-    }}
-    for(var y2=0;y2<h;y2++){for(var x2=0;x2<Math.floor(w/2);x2++){
-      sym+=Math.abs(lum[y2*w+x2]-lum[y2*w+w-1-x2]);symN++;
-    }}
-    var n=w*h,mean=sum/n,contrast=Math.sqrt(Math.max(0,sumSq/n-mean*mean));
-    var symmetry=symN?1-sym/symN:1;
-    var bright=mean<.38?"tumma":mean>.68?"vaalea":"keskisävyinen";
-    var colors=sat/n<.12?"hillitty":sat/n>.39?"voimakas":"kohtalainen";
-    var edge=edgeN?edges/edgeN:0;
+    }
+    for(let y=0;y<h;y++)for(let x=0;x<Math.floor(w/2);x++){sym+=Math.abs(lum[y*w+x]-lum[y*w+w-1-x]);symN++;}
+    const n=w*h,mean=sum/n,contrast=Math.sqrt(Math.max(0,sumSq/n-mean*mean));
+    const symmetry=symN?1-sym/symN:1,edge=edgeN?edges/edgeN:0;
+    const bright=mean<.38?"tumma":mean>.68?"vaalea":"keskisävyinen";
+    const colors=sat/n<.12?"hillitty":sat/n>.39?"voimakas":"kohtalainen";
     return "Koko: "+img.naturalWidth+" × "+img.naturalHeight+" px\n"+
       "Kirkkaus: "+Math.round(mean*100)+" / 100 ("+bright+")\n"+
       "Kontrasti: "+Math.round(contrast*100)+" / 100\n"+
       "Värivaihtelu: "+Math.round(sat/n*100)+" / 100 ("+colors+")\n"+
       "Viivaston / reunojen vaihtelu: "+Math.round(edge*100)+" / 100\n"+
       "Peilisymmetrian samankaltaisuus: "+Math.round(symmetry*100)+" / 100\n"+
-      "Nokin havainto: Tämä on pikselipohjainen mittaus, ei tulkinta kuvan aiheesta.";
+      "Nokin huomio: Nämä ovat pikselilaskelmia, eivät kuva-aiheiden tai taiteilijan tulkintaa.";
   }
   file.addEventListener("change",function(){
-    var f=file.files&&file.files[0];if(!f){return;}
+    const f=file.files&&file.files[0];if(!f){return;}
     if(!f.type.startsWith("image/")||f.size>12*1024*1024){report.textContent="Valitse alle 12 Mt:n kuvatiedosto.";return;}
     releaseImage();imageUrl=URL.createObjectURL(f);preview.src=imageUrl;preview.style.display="block";
-    preview.onload=function(){try{report.textContent=analyze(preview);currentImage=true;tell("Kuvan tekninen tarkastelu valmistui. Mittarit löytyvät alta.",true);flutter();}catch(e){report.textContent="Kuvaa ei voitu analysoida: "+e.message;}};
+    preview.onload=function(){try{report.textContent=analyze(preview);currentImage=true;say(artRoasts[roastIndex++%artRoasts.length]+" Mittarit ovat alla.",true);}catch(e){report.textContent="Kuvaa ei voitu analysoida: "+e.message;}};
     preview.onerror=function(){report.textContent="Kuvan avaus epäonnistui.";releaseImage();};
   });
-  document.getElementById("clear").addEventListener("click",function(){releaseImage();file.value="";report.textContent="Kuvaa ei ole valittu.";tell("Kuva poistettu tästä näkymästä.",false);});
-  window.addEventListener("pagehide",releaseImage);
+  document.getElementById("clear").addEventListener("click",function(){releaseImage();file.value="";report.textContent="Kuvaa ei ole valittu.";speech.textContent="Kuva poistettu tästä näkymästä.";});
+  window.addEventListener("pagehide",function(){stopAll(true);releaseImage();if(ctx&&ctx.state!=="closed"){ctx.close().catch(function(){});}});
 })();
 </script>
 </body>

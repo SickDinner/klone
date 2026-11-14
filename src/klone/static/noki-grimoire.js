@@ -20,7 +20,7 @@
     return String(value||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase("fi");
   }
   function itemText(x){
-    return [x.title,x.name,x.summary,x.description,x.category,...(x.tags||[])].filter(Boolean).join(" ");
+    return [x.title,x.name,x.summary,x.description,x.category,...(x.tags||[]),...(x.ranks||[])].filter(Boolean).join(" ");
   }
   function sourceById(id){return library.sources.find(s=>s.id===id);}
   function buildSource(id){
@@ -37,6 +37,7 @@
     detailEl.append(node("h3","",item.title||("Ars Goetia #"+item.order+": "+item.name)));
     detailEl.append(node("p","",item.summary||item.description));
     detailEl.append(node("p","meta-row","Luokka: "+(library.categories[item.category]||item.category)+(item.order?" · luettelon numero "+item.order:"")));
+    if(item.ranks?.length){detailEl.append(node("p","meta-row","Kirjalliset arvonimet: "+item.ranks.join(", ")+". Nämä eivät ole vahvistettuja yliluonnollisia arvoja."));}
     const links=node("div","source-links");
     (item.sources||[]).forEach(id=>links.append(buildSource(id)));
     detailEl.append(links);

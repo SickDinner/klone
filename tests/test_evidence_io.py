@@ -90,14 +90,43 @@ class EvidenceIOTests(unittest.TestCase):
                         self.fail("raced symlink must not yield a descriptor")
             self.assertEqual(list(outside.iterdir()), [])
 
-    @unittest.skipUnless(evidence_io._DIR_FD and hasattr(os, "O_PATH"),
-                         "requires Linux path descriptors")
+    @unittest.skipUnless(evidence_io._DIR_FD, "requires directory descriptors")
     def test_directory_descriptors_without_o_path_remain_supported(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "source"
+            root = Path(tmp)
+            parent = root / "parent"
+            parent.mkdir()
+            path = parent / "source"
             path.write_bytes(b"original")
-            with patch.object(evidence_io.os, "O_PATH", 0):
-                self.assertEqual(read_bounded(path, 100), b"original")
+            real_open = os.open
+            native_path_flag = getattr(os, "O_PATH", 0)
+            virtual_parent = Path("/parent")
+            opened = []
+
+            def open_in_fixture(name, flags, *args, **kwargs):
+                opened.append(os.fspath(name))
+                self.assertFalse(flags & native_path_flag)
+                self.assertTrue(flags & os.O_DIRECTORY)
+                self.assertTrue(flags & os.O_NOFOLLOW)
+                # Simulate a readable filesystem root with a real temporary
+                # directory. Android's actual '/' need not permit listing.
+                target = root if os.fspath(name) == "/" else name
+                return real_open(target, flags, *args, **kwargs)
+
+            # This unit test isolates the directory walk from path validation;
+            # the other tests cover real paths, permissions and symlink races.
+            with (patch.object(evidence_io, "checked_path", return_value=virtual_parent),
+                  patch.object(evidence_io.os, "O_PATH", 0, create=True),
+                  patch.object(evidence_io.os, "open", side_effect=open_in_fixture)):
+                with directory_handle(virtual_parent) as descriptor:
+                    leaf = real_open("source", os.O_RDONLY | os.O_NOFOLLOW,
+                                     dir_fd=descriptor)
+                    with os.fdopen(leaf, "rb") as handle:
+                        self.assertEqual(handle.read(), b"original")
+            self.assertEqual(opened, ["/", "parent"])
+            with self.assertRaises(OSError) as error:
+                os.fstat(descriptor)
+            self.assertEqual(error.exception.errno, errno.EBADF)
 
     def test_report_cannot_replace_original_artifact(self):
         with tempfile.TemporaryDirectory() as tmp:

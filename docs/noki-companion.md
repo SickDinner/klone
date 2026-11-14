@@ -1,80 +1,96 @@
-# Noki – KLONE-korppikumppani (v0.3 – noitanauru ja KLONE-keskustelu)
+# Noki v0.4 – HELVETTIMYLLY / lähteistetty Grimoire
 
-Tämä vaihe lisää itsenäisen, paikallisessa selaimessa toimivan korppihahmon.
-Se ei muuta KLONEn muistia, room-permissioneita, audit-ketjua eikä ingest-logiikkaa.
+Noki on fiktiivinen, sarkastinen kauhupunk-korppi KLONEn paikallisessa käyttöliittymässä.
+Sen yliluonnollinen rooli, myrkylliset herjat, kauhukuvasto ja demonin äänet ovat **näyttelijäpersoona**.
+Taustalla oleva lähdehakemisto on **tietokirjasto**, jossa käsikirjoitusperinteet,
+nykyiset uskonnot, akateeminen tutkimus ja taideideat erotetaan toisistaan.
 
-## Käynnistys ja käyttö
+## Ominaisuudet
 
-Kun haara on käytössä palvelimen lähdekoodissa, avaa
-`http://127.0.0.1:8000/noki` samassa Android-laitteessa, jolla KLONE-palvelin toimii.
+1. **Ulkoasu:** groteski, tarkoituksella rikkinäinen pikselikorppi, ilman hahmon diagnooseja tai väitteitä todellisista demoneista.
+2. **Hellvoice:** WebAudio tuottaa noitanaurun, sylkevät kurkkuäänet, hissin, pitkän kimeän huudon, matalan murinan,
+   metallikolinoita, käkätyksen, synteettisen hautajaissoinnin, häiriöäänen ja **9 × 8 = 72 -äänen kuoron**.
+   Kuoro on 72 lyhyttä synteettistä äänitapahtumaa, ei 72 itsenäistä persoonallisuutta.
+3. **Puhe:** laitteen oma `speechSynthesis` tuottaa puhutut sanat neljällä hahmotusprofiililla.
+   Ääni-ilme syntyy foneettisesta muunnoksesta, korkeudesta, nopeudesta ja päälle miksatuista
+   WebAudio-äänistä. Selaimen puhesynteesiä ei pysty yleisesti ohjaamaan koko DSP-ketjun läpi,
+   joten tämä **ei ole täysin mukautettu neural voice model**.
+4. **Grimoire-tietokirjasto:** `noki-grimoire.json` sisältää 72 Goetia-nimeä + 66 käsitteellistä
+   merkintää (yhteensä **138 tietuetta**) ja **18 nimettyä julkista lähdettä**.
+   Tiivistelmät linkitetään alkuperäisiin lähteisiin. Tämä on rajattu tutkittu hakemisto,
+   **ei koko internetin sisältö eikä reaaliaikainen tutkimusindeksi**.
+5. **Lähdehaku:** hakusana, aihealue, nimien klikkaaminen, näytettävä selitys ja alkuperäinen lähde.
+   Hakutulos voi myös antaa Nokin paikalliseen keskusteluun lähteeseen sidotun vastauksen.
+6. **Poikkialainen taideideoiden generaattori:** yhdistää kaksi satunnaista tietuetta
+   luovaksi kuvalliseksi/äänelliseksi ehdotukseksi. Merkintä on aina "fiktiivinen assosiaatio";
+   se ei ole tieteellinen väite tai uuden okkulttisen opin paljastus.
+7. **Keskustelu KLONEssa:** vain eksplisiittisellä valinnalla ja annettuun dialogue corpus -lähdepolkuun.
+   `/api/clone-chat/status` sekä `/api/clone-chat/respond`, `mode=bounded`, max 12 historian viestiä.
+   Ulkoinen kielimalli ei ole tällä hetkellä käytössä, vaikka käyttäjä antaisi API-avaimen.
+8. **Matki ääntäni:** enintään 4 sekuntia paikallista ääninäytettä,
+   madallettu ja rosoiseksi suodatettu toisto. Puheentunnistusnapit erikseen;
+   selaimen speech recognition voi käyttää ulkoista tunnistuspalvelua.
+9. **Turpa kiinni:** keskeyttää äänen, mikrofonin ja KLONEen mahdollisesti odottavan HTTP-pyynnön.
 
-- **KRRRÄÄ! Huuda:** paikallinen WebAudio raakuntageneraattori ja selaimen `speechSynthesis`-puhe, jossa on vaihtelevia foneettisia äänteitä, matala äänenkorkeus ja painotettuja huudahduksia. Suomiäänen laatu riippuu selaimen saatavilla olevista puheäänistä.
-- **Sätki!:** korpin repaleiset siivet ja ruiskut heiluvat retroanimaatiossa.
-- **Nalkuta:** kiertää paikallisia synkän ironisia/sarkastisia repliikkejä. Tämä on käsikirjoitettu persoona eikä kielimalli.
-- **Matki sanojani:** puheentunnistus poimii lausutut sanat ja Noki sanoo ne takaisin omalla TTS-tyylillään. Chrome saattaa lähettää puheen palvelimelle tunnistusta varten, joten ominaisuus on vapaaehtoinen.
-- **Matki ääntäni (4 s):** kameraa ei avata. Käyttäjän painikkeella sallima mikrofoni tallentaa vain enintään neljän sekunnin pätkän selaimen muistiin. Ääni käsitellään paikallisesti (0,68× toistonopeus, suotimet, särö, kompressori), minkä jälkeen sitä ei säilytetä. Tämä on suora äänenmuokkaus, ei pysyvä ääniklooni.
-- **Raakunnan voimakkuus:** äänen sisäinen taso on rajoitettu; puhelimen äänenvoimakkuus on edelleen käyttäjän hallussa. Käytä kohtuullista äänenvoimakkuutta kuulokkeilla.
-- **Turpa tukkoon:** keskeyttää puheen, raakunnan ja käynnissä olevan mikrofoni-/matkimistoiminnon.
-- **Viesti:** avainsanoihin reagoiva, tarkoituksella ronski paikallinen nalkutus; ei kielimallia.
-- **Valitse / kuvaa teos:** kuvan avaus selaimessa ja paikallinen kirkkauden, kontrastin, värivaihtelun, reunavarianssin ja peilisymmetrian mittaus. Ei tunnista kuvan aiheita. Kuvien kokoa rajoitetaan 12 megaan.
-- **Tyhjennä:** poistaa tämän sivun kuvaesikatselun ja vapauttaa väliaikaisen object URL:n.
+### Tiedepohjaiset rajat
 
-## Uutta v0.3:ssa
+- **Ars Goetia / Pseudomonarchia**: historiallisia tekstejä, joilla on käsikirjoitus- ja nimivariantteja.
+- **Satanismi**: tutkittuja moderneja liikkeitä ja historiallisia syytöksiä; ei yhtä yhtenäistä oppia.
+- **Haitilainen Vodou**: elävä uskonto ja kulttuuri; **ei synonyymi demonologialle**, eikä sen henkiä nimeta Ars Goetian demoneiksi.
+- **Šamanismi**: useita eri perinteitä; huomioidaan termien ja yhteisöjen moninaisuus.
+- **Tajunnan tutkimus**: neurotiedettä, vaikutus- ja riskitutkimusta;
+  ei annoksia, hankintaohjeita, käyttöneuvoja eikä teoksista pääteltyjä diagnooseja.
 
-Noki saa lisää ohjelmallisia ääniä, jotka tuotetaan laitteen WebAudio-rajapinnalla:
-**Noitanauru** (yhdeksän käkättävää, taajuudeltaan muuntuvaa pulssia),
-**Räkäinen pärskähdys** (suodatettu kohina), **Ruostunut sarana** (nouseva ja laskeva kitinä),
-**Luunkalina** (11 lyhyttä kolahdusta) ja **Ilkeä ilkunauru**.
-Selaimen `speechSynthesis`-puheeseen lisätään valittava äänihahmo:
-Käkänoita, Karskikorppi tai Riivattu peikko. Foneettinen muokkaus,
-puhenopeus ja äänenkorkeus vaihtelevat; puheen luonnollisuus ja huutojen
-äänenlaatu riippuvat laitteesta.
+## Käynnissä oleva KLONE Termuxissa – päivitä staattiset neljä tiedostoa turvallisesti
 
-**Keskustelu-API:** KLONE-yhteys voidaan kytkeä erikseen päälle.
-`Tarkista KLONE-yhteys` tekee `GET /api/clone-chat/status` -pyynnön.
-Lähdepolun ollessa annettu `Lähetä` tai erikseen käynnistetty
-`Kysy KLONElta puhumalla` tekee `POST /api/clone-chat/respond`
--pyynnön saman palvelimen rajapintaan, `mode=bounded`.
-Historiasta lähetetään korkeintaan 12 aiempaa viestiä.
-Jos lähdepolkua ei ole tai backend epäonnistuu, Noki näyttää virheen
-eikä keksi aineistoväitettä. `Tyhjennä istunto` tyhjentää tilapäisen
-selaimen muistissa olevan viestihistorian. Kuvia tai äänen raakatallennetta
-ei liitetä keskustelun HTTP-pyyntöön.
-
-**Rajoitus:** nykyinen KLONE-keskustelumoottori tuottaa *bounded_local*
--vastaukset paikallisesta dialogikorpuksesta. Vaikka API-avain olisi
-tallennettu, ulkoinen LLM-kutsu on tällä hetkellä palvelinpuolella
-nimenomaisesti pois käytöstä, kunnes luokiteltu ulosmenevä tiedonsiirto
-on hyväksytty. Nokin persoona ja WebAudio ovat käyttöliittymäkerroksessa;
-se ei tee ulkoisia mallikutsuja eikä saa erikoisoikeuksia.
-
-## Android / Termux – kokeile ilman nykyisen KLONEn vaihtamista
-
-Jos nykyinen kehityskopio on `~/klone-next` ja palvelin käyttää sitä:
+Näin saat Nokin toimimaan ilman palvelimen uudelleenkäynnistystä ja
+ilman että vaihdat KLONEn nykyisen Git-haaran.
 
 ```sh
-cd ~/klone-next
-git fetch origin feat/noki-raven-companion-20261114
-git show origin/feat/noki-raven-companion-20261114:src/klone/static/noki.html > src/klone/static/noki.html
+cd ~/klone-next || exit 1
+git fetch origin feat/noki-raven-companion-20261114 || exit 1
+
+TMP="$(mktemp -d)"
+for f in noki.html noki-hellvoice.js noki-grimoire.js noki-grimoire.json; do
+  git show "FETCH_HEAD:src/klone/static/$f" > "$TMP/$f" || {
+    echo "Puutteellinen lataus: $f"; rm -rf "$TMP"; exit 1;
+  }
+done
+
+mkdir -p src/klone/static ~/klone-var/noki-backup
+for f in noki.html noki-hellvoice.js noki-grimoire.js noki-grimoire.json; do
+  if [ -f "src/klone/static/$f" ]; then
+    cp "src/klone/static/$f" "$HOME/klone-var/noki-backup/$f" 2>/dev/null || true
+  fi
+  cp "$TMP/$f" "src/klone/static/$f" || exit 1
+done
+rm -rf "$TMP"
+
+for f in noki.html noki-hellvoice.js noki-grimoire.js noki-grimoire.json; do
+  curl -sS -o /dev/null -w "$f: HTTP %{http_code}\n" "http://127.0.0.1:8000/static/$f"
+done
 ```
 
-Tämän jälkeen vanha palvelin tarjoaa prototyypin osoitteessa
-`http://127.0.0.1:8000/static/noki.html` ilman uudelleenkäynnistystä,
-jos se jo käyttää samaa `src/klone/static`-hakemistoa. Tämä vain kopioi
-uuden staattisen tiedoston eikä ota uutta backend-koodia käyttöön.
 
-Jos haluat nimenomaan siistin `/noki`-osoitteen, ota haara myöhemmin
-käyttöön hallitusti ja käynnistä palvelin uudelleen.
+Avaa selaimessa: `http://127.0.0.1:8000/static/noki.html?v=4`.
+Jos `/noki`-reitti ei vielä ole käytössä, käytä nimenomaan `/static/noki.html`.
 
-## Testit
+## Testit haaran lähdekoodissa
 
 ```sh
-PYTHONPATH=src python -m unittest discover -s tests -p 'test_noki_companion.py'
+PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -p 'test_noki_companion.py'
 ```
 
-## Turvallisuusrajat / jatkokehitys
+Testaa myös selaimessa käyttöoikeudet: mikrofonin tulee aktivoitua vain napista;
+KLONEen viestejä tulee lähteä vain erikseen käyttöön otetusta keskustelutilasta.
+Muista, että selaimen speech recognition -tunnistus voi käyttää verkkopalvelua.
 
-- Ei piilotettua kameran tai mikrofonin aktivointia. Ainoastaan erillinen kameravalinta tai mikrofonipainike aktivoi laitteet.
-- Ei API-avaimia, taustalatausta tai pysyvää tallennusta. Huom: **Matki sanojani** käyttää selaimen puheentunnistusta, joka voi käsitellä ääntä verkossa; **Matki ääntäni** tekee käsittelyn paikallisesti.
-- Ei pääsyä KLONEn memory-/room-/audit-dataan ilman erillistä, suunniteltua lupamallia.
-- Hahmon huoneeseen integrointi, kuvan semanttinen analyysi ja keskustelumalli ovat myöhempiä erillisiä vaiheita; niitä ei pidä väittää toteutetuiksi.
+## Lisäkehitys
+
+- Kontrollerin oikeustarkastus, jos tietokirjaston tietueet halutaan myöhemmin KLONEn varsinaiseen Media Lakeen.
+- Lähteiden päivitys uutena kontrolloituna importterina, joka erottaa tekijänoikeuslisenssit,
+  lähdeprovenienssin, luokitellut huoneet ja julkiset metatiedot.
+- Turvallisessa paikallisympäristössä erillinen DSP-putki tai tarkoitukseen koulutettu TTS,
+  jos Androidin vakio-`speechSynthesis` ei ole tarpeeksi groteski.
+- Eri aineistojen käyttäminen automaattiseen keskusteluun edellyttää uutta
+  luokitellun ulosmenevän tiedonsiirron ja pääsyoikeuksien suunnittelua.

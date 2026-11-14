@@ -85,7 +85,7 @@ class NokiCompanionTests(unittest.TestCase):
         self.assertIn("recorder.stop();}},4000)", html)
         self.assertIn('fetch("/api/clone-chat/status"', html)
         self.assertIn('fetch("/api/clone-chat/respond"', html)
-        self.assertIn('"mode":"bounded"', html)
+        self.assertIn('mode:"bounded"', html)
         self.assertIn('kloneController.abort()', html)
         self.assertIn('if(!document.getElementById("engine-enable").checked)', html)
         self.assertIn("kloneHistory.slice(-12)", html)

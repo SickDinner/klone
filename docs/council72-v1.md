@@ -134,6 +134,17 @@ Tuntemattomat kentät, boolean-luvut, ei-finiittiset luvut ja rajojen ylitykset
 hylätään. Viitteitä on enintään kahdeksan per rinki ja tavoite enintään 2000 merkkiä.
 Luettelon saa `--catalog`-valinnalla. Tulostiedostoa ei korvata uudelleenajolla.
 
+Android/Termux voi sallia tunnettuun tiedostopolkuun kulkemisen mutta estää
+juurihakemiston `/` avaamisen luettavaksi. Suojattu tiedostokerros käyttää
+Linuxissa `O_PATH`-hakemistokahvoja myös polun alussa. Hakemistoja ei listata;
+polkukomponentit lukitaan edelleen `O_DIRECTORY`- ja `O_NOFOLLOW`-lipuilla.
+Tiedoston lukeminen vaatii tavalliset lukuoikeudet, ja uusien raporttien
+kirjoitus säilyy yksinomaisena. Muille tuetuille alustoille jää aiempi
+hakemistokahva tai siirrettävä tarkistuspolku. Taustalla ovat
+[Linuxin open(2)-rajapinnan O_PATH-säännöt](https://man7.org/linux/man-pages/man2/open.2.html).
+Work-testit toistavat rajoituksen, mutta fyysisen Androidin hyväksyntä
+edellyttää korjatun version testien ja CLI-viennin ajoa puhelimessa.
+
 Paikallinen näkymä on `/council72`. API:t:
 
 - `GET /api/cognition/council72/catalog`

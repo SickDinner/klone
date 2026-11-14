@@ -139,12 +139,35 @@ def _opinion(member: dict, signals: dict, modulation: bool) -> dict:
             "modulators": modulators, "affect": affect, "policy_mode": policy["mode"]}
 
 
-def deliberate(proposal: dict, *, modulation: bool = True) -> dict:
+def validate_context(context: dict) -> dict:
+    """Explicit research state; never a permission or authenticated memory."""
+    if not isinstance(context, dict) or set(context) != {"member_modulators", "ring_signals"}:
+        raise ValueError("invalid council context")
+    states, signals = context["member_modulators"], context["ring_signals"]
+    if not isinstance(states, dict) or set(states) != {str(i) for i in range(1, 73)}:
+        raise ValueError("all 72 member states required")
+    for state in states.values():
+        if not isinstance(state, dict) or set(state) != set(NAMES):
+            raise ValueError("six member modulators required")
+        for name, value in state.items():
+            _unit(value, name)
+    if not isinstance(signals, dict) or set(signals) != set("12345678"):
+        raise ValueError("all eight ring signals required")
+    for signal in signals.values():
+        if not isinstance(signal, dict) or set(signal) != set(SIGNALS):
+            raise ValueError("all seven signals required")
+        for name, value in signal.items():
+            _unit(value, name)
+    return deepcopy(context)
+
+
+def deliberate(proposal: dict, *, modulation: bool = True, context: dict | None = None) -> dict:
     if type(modulation) is not bool:
         raise ValueError("modulation must be boolean")
     proposal = validate_proposal(proposal)
     model = _catalog()
     by_id = {m["id"]: m for m in model["members"]}
+    context = validate_context(context) if context is not None else None
     trace = []
 
     def record(kind, data):
@@ -152,8 +175,20 @@ def deliberate(proposal: dict, *, modulation: bool = True) -> dict:
                  "previous_hash": trace[-1]["event_hash"] if trace else "0" * 64}
         trace.append({**event, "event_hash": digest(event)})
 
-    record("proposal_received", {"proposal_sha256": digest(proposal), "catalog_sha256": digest(model)})
-    opinions = [_opinion(m, proposal["signals"], modulation) for m in model["members"]]
+    received = {"proposal_sha256": digest(proposal), "catalog_sha256": digest(model)}
+    if context is not None:
+        received["context_sha256"] = digest(context)
+    record("proposal_received", received)
+    opinions = []
+    for member in model["members"]:
+        signals = proposal["signals"]
+        if context is not None:
+            signal_ring = (member.get("stewards_ring") or
+                           (by_id[member["courier_for"]]["stewards_ring"]
+                            if member.get("courier_for") else member["ring"]))
+            signals = context["ring_signals"][str(signal_ring)]
+            member = {**member, "baseline_modulators": context["member_modulators"][str(member["id"])]}
+        opinions.append(_opinion(member, signals, modulation))
     for opinion in opinions:
         record("member_opinion", opinion)
     reports = []
@@ -204,18 +239,32 @@ def deliberate(proposal: dict, *, modulation: bool = True) -> dict:
                                    "advisory_dissent": sum(o["vote"] == "oppose" for o in opinions if o["ring"] < 9)},
             "trace": trace, "trace_sha256": trace[-1]["event_hash"],
             "functional_workspace": workspace.snapshot(), "functional_probe_digest": workspace.trace_digest(),
-            "external_information_scope": "caller_supplied_claims_via_limbo_model", **AUTHORITY}
+            "external_information_scope": "caller_supplied_claims_via_limbo_model",
+            **({"context": context} if context is not None else {}), **AUTHORITY}
+
+
+def _replay_equal(actual, expected):
+    """JSON number formatting may vary; booleans must never equal 0 or 1."""
+    if type(expected) is bool or type(actual) is bool:
+        return type(actual) is type(expected) and actual == expected
+    if isinstance(expected, dict):
+        return isinstance(actual, dict) and actual.keys() == expected.keys() and all(
+            _replay_equal(actual[k], value) for k, value in expected.items())
+    if isinstance(expected, list):
+        return isinstance(actual, list) and len(actual) == len(expected) and all(
+            _replay_equal(a, b) for a, b in zip(actual, expected))
+    return actual == expected
 
 
 def replay_matches(report: dict) -> bool:
     try:
-        return report == deliberate(report["proposal"], modulation=report["modulation"])
+        return _replay_equal(report, deliberate(report["proposal"], modulation=report["modulation"], context=report.get("context")))
     except (ValueError, KeyError, TypeError, RecursionError):
         return False
 
 
-def experiment(proposal: dict) -> dict:
-    modulated, baseline = deliberate(proposal), deliberate(proposal, modulation=False)
+def experiment(proposal: dict, *, context: dict | None = None) -> dict:
+    modulated, baseline = deliberate(proposal, context=context), deliberate(proposal, modulation=False, context=context)
     return {"schema_version": 1, "kind": "klone-council72-experiment",
             "modulated": modulated, "baseline": baseline,
             "comparison": {"changed_opinions": sum(a["vote"] != b["vote"] for a,b in

@@ -43,4 +43,10 @@
 <button id="run-review" disabled>Koettele lähteet ja muodosta kehitysjono</button><p class="muted">Avaa tai aja ensin istunto. Koe käyttää viimeisen kierroksen alkuperäistä alkutilaa. Lähteitä tutkitaan aakkosjärjestyksessä oletuksena 16 ryhmää; mahdolliset puuttuvat kokeet näytetään erikseen.</p></details>
 <div class="actions"><button id="save-review" disabled>Tallenna kehitysjono ja poistokokeet</button></div><div id="review-result"><p class="muted">Ei kehitysjonoa avattuna. Termux: <code>python -m klone.council72_review --input istunto.json --budget-minutes 60 --output kehitysjono.json</code></p></div>
 </section>
+<section class="panel experiment" id="briefing-panel"><div class="panel-heading"><div><p class="eyebrow">KADOTUS / PERUSTAJAKOKOUS</p><h2>Kuninkaiden yhteinen katselmus</h2></div><span class="pill">8 VASTUUTA · 72 ROOLIA</span></div>
+<p>Kokoa jokaisen kuninkaan väitteet, korjaushistoria, eriävät kannat ja tehtävät yhteen. Saat myös yhden budjettiin mahtuvan seuraavan askeleen sekä erikseen kopioitavat testikomennot.</p>
+<div id="briefing-controls" hidden><button id="run-briefing" disabled>Muodosta kuninkaiden katselmus</button><p class="muted">Käyttää yllä valittuja osa-alueiden tiloja ja aikabudjettia. Avaa ensin istunto. Konsolidointi muodostaa viitteistetyn väitehakemiston.</p></div>
+<div class="actions"><button id="save-briefing" disabled>Tallenna katselmus</button></div>
+<div id="briefing-result"><p class="muted">Avaa katselmuksen JSON. Termux: <code>python -m klone.council72_briefing --input kehitysjono.json --output katselmus.json</code></p></div>
+</section>
 <footer><p>Dante ja Ars Goetia ovat roolien kirjallisia viitteitä. Tekniset tehtävät ja persoonaparametrit ovat KLONEn omaa suunnittelua.</p><p>Tämä sivu ei julkaise mitään. Kanavat ja tilit ovat määrittelemättä.</p></footer></main></body></html>

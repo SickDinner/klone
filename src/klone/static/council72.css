@@ -10,3 +10,9 @@
 #review-panel .panel-heading{flex-wrap:wrap}
 @media(max-width:900px){.domain-states{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.domain-states{grid-template-columns:1fr}}
+.founder-briefings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px}
+.founder-briefings>details{min-width:0;border-top:2px solid var(--gold);padding:18px 0}
+#briefing-panel .panel-heading{flex-wrap:wrap}
+#briefing-panel button{margin:8px 0}
+#briefing-panel li{margin:7px 0;overflow-wrap:anywhere}
+@media(max-width:900px){.founder-briefings{grid-template-columns:1fr}}

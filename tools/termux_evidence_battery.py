@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from klone.evidence_io import checked_path, directory_handle, json_object, read_bounded
 from klone.evidence_network import MAX_LOG, assemble_packet, canonical, validate_run
 from klone.evidence_run_context import context_id, digest, suite_snapshot, validate_environment
+from klone.council72_contract import MAX_CONTRACT, load_contract
 
 PROBE = r'''
 import importlib.metadata as metadata
@@ -153,7 +154,8 @@ def run_stage(command: list[str], root: Path, env: dict, timeout: int) -> tuple[
             "capture_complete": complete, "timed_out": timed_out}, raw
 
 
-def run_battery(root: Path, output: Path, timeout: int = 240, *, python: Path | None = None) -> dict:
+def run_battery(root: Path, output: Path, timeout: int = 240, *, python: Path | None = None,
+                experiment_contract: Path | None = None) -> dict:
     root = checked_path(root, directory=True)
     output = checked_path(output)
     validate_destination(root, output)
@@ -167,6 +169,13 @@ def run_battery(root: Path, output: Path, timeout: int = 240, *, python: Path | 
     if any(env.get(k) for k in ("PYTEST_ADDOPTS", "PYTEST_PLUGINS")):
         raise ValueError("clear PYTEST_ADDOPTS and PYTEST_PLUGINS before collecting exact commands")
     before = checkout(root)
+    binding = None
+    if experiment_contract is not None:
+        contract, file_hash = load_contract(experiment_contract)
+        if contract["spec"]["target_commit"] != before["commit"]:
+            raise ValueError("experiment contract target commit differs from checkout")
+        binding = {"contract_sha256": contract["contract_sha256"], "file_sha256": file_hash,
+                   "after_file_sha256": None}
     probe = probe_python(python, root, env)
     suite_before, collector_before = suite_snapshot(root), collector_digest(root)
     commands = stage_commands(root, python)
@@ -174,6 +183,8 @@ def run_battery(root: Path, output: Path, timeout: int = 240, *, python: Path | 
                  "python_prefix": probe["prefix"], "virtualenv_reported": True,
                  "commands": commands, "environment_overrides": overrides, "timeout_seconds": timeout,
                  "test_suite_before": suite_before, "collector_sha256": collector_before}
+    if binding is not None:
+        execution["experiment_contract"] = binding
     execution["comparison_id"] = context_id(probe["environment"], execution)
     # Bound metadata before reserving the new evidence directory or executing tests.
     if len(canonical({"environment": probe["environment"], "execution": execution})) > 48000:
@@ -198,11 +209,17 @@ def run_battery(root: Path, output: Path, timeout: int = 240, *, python: Path | 
             files[name + ".log"] = {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
         after = checkout(root)
         after_probe = probe_python(python, root, env)
+        if binding is not None:
+            try:
+                binding["after_file_sha256"] = hashlib.sha256(read_bounded(experiment_contract, MAX_CONTRACT)).hexdigest()
+            except (ValueError, OSError):
+                binding["after_file_sha256"] = None
         execution.update(test_suite_after=suite_snapshot(root), collector_after_sha256=collector_digest(root),
                          environment_after_sha256=digest(after_probe["environment"]))
         execution["context_consistent"] = (execution["test_suite_before"] == execution["test_suite_after"]
                                             and collector_before == execution["collector_after_sha256"]
-                                            and probe["environment"] == after_probe["environment"])
+                                            and probe["environment"] == after_probe["environment"]
+                                            and (binding is None or binding["file_sha256"] == binding["after_file_sha256"]))
         required_ok = all(stages[n]["status"] == "passed" for n in commands if n != "torch_probe")
         consistent = before["commit"] == after["commit"] and not before["dirty"] and not after["dirty"]
         complete = all(stage["capture_complete"] for stage in stages.values())
@@ -230,11 +247,14 @@ def main(argv=None):
     parser.add_argument("--output", "--output-dir", dest="output", type=Path, required=True)
     parser.add_argument("--python", type=Path, help="Existing virtualenv interpreter, including outside the worktree")
     parser.add_argument("--timeout", type=int, default=240)
+    parser.add_argument("--experiment-contract", type=Path, help="registered acceptance contract, read before/after tests")
     args = parser.parse_args(argv)
     if args.timeout < 1 or args.timeout > 3600:
         parser.error("timeout must be 1..3600")
     try:
         kwargs = {"python": args.python} if args.python is not None else {}
+        if args.experiment_contract is not None:
+            kwargs["experiment_contract"] = args.experiment_contract
         report = run_battery(args.root, args.output, args.timeout, **kwargs)
     except (ValueError, OSError, subprocess.SubprocessError, UnicodeError, RecursionError) as exc:
         parser.error(str(exc))

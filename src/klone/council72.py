@@ -128,9 +128,12 @@ def _opinion(member: dict, signals: dict, modulation: bool) -> dict:
               "calm": clamp((modulators["serotonin"] + modulators["gaba"]) / 2),
               "social_openness": clamp((modulators["serotonin"] + social) / 2)}
     adjustment = (.12 * (affect["curiosity"] - .25) + .08 * (policy["attention"] - .4375)
-                  - .12 * (affect["concern"] - .25)) if modulation else 0.0
+                  - .12 * (affect["concern"] - .25) + .04 * (affect["calm"] - .5)
+                  + .04 * (affect["social_openness"] - .5)) if modulation else 0.0
     score = clamp(.62*q + .18*reward + .12*n - .35*r - .20*u - .15*threat + .08*social
-                  - .1*member["traits"]["risk_aversion"]*r + adjustment)
+                  - .1*member["traits"]["risk_aversion"]*r
+                  + .04*(member["traits"]["novelty_bias"]-.5)*n
+                  - .04*(member["traits"]["deliberation"]-.5)*u + adjustment)
     return {"member_id": member["id"], "ring": member["ring"], "score": score,
             "vote": "endorse" if score >= .6 else "oppose" if score <= .35 else "defer",
             "modulators": modulators, "affect": affect, "policy_mode": policy["mode"]}

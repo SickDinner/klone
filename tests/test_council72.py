@@ -139,6 +139,16 @@ class CouncilModelTests(unittest.TestCase):
             self.assertEqual(result['modulated']['proposal']['goal'],self.proposal['goal'])
             self.assertFalse(result['external_actions'])
 
+    def test_each_modulator_has_a_measurable_score_effect(self):
+        from klone.council72 import _opinion
+        member=self.catalog['members'][0]
+        for name in NAMES:
+            low,high=deepcopy(member),deepcopy(member)
+            low['baseline_modulators'][name]=0
+            high['baseline_modulators'][name]=1
+            self.assertNotEqual(_opinion(low,self.proposal['signals'],True)['score'],
+                                _opinion(high,self.proposal['signals'],True)['score'],name)
+
     def test_invalid_signals_and_extra_authority_fields_rejected(self):
         for value in (True,None,'1',-1,1.1,float('nan'),float('inf')):
             proposal=deepcopy(self.proposal);proposal['signals']['risk']=value

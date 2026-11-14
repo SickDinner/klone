@@ -239,7 +239,7 @@ class SessionTests(unittest.TestCase):
             runs = root/'runs'
             runs.mkdir()
             input_file, output = root/'input.json', root/'session.json'
-            input_file.write_text(json.dumps(self.first()))
+            input_file.write_text(json.dumps(self.first()), encoding='utf-8')
             source = input_file.read_bytes()
             self.assertEqual(main(['--input',str(input_file),'--output',str(output),'--runs-root',str(runs)]),0)
             before = output.read_bytes()
@@ -248,10 +248,10 @@ class SessionTests(unittest.TestCase):
                 self.assertEqual(main(['--verify',str(output)]),0)
             self.assertTrue(json.loads(checked.getvalue())['replay_matches'])
             step = root/'step.json'
-            step.write_text(json.dumps(self.input['steps'][1]))
+            step.write_text(json.dumps(self.input['steps'][1]), encoding='utf-8')
             continued = root/'continued.json'
             self.assertEqual(main(['--input',str(step),'--previous',str(output),'--output',str(continued)]),0)
-            self.assertEqual(len(json.loads(continued.read_text())['rounds']),2)
+            self.assertEqual(len(json.loads(continued.read_text(encoding='utf-8'))['rounds']),2)
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 main(['--demo','--output',str(output)])
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
@@ -262,7 +262,7 @@ class SessionTests(unittest.TestCase):
             tampered = json.loads(before)
             tampered['member_state']['9']['dopamine'] = 0
             altered = root/'altered.json'
-            altered.write_text(json.dumps(tampered))
+            altered.write_text(json.dumps(tampered), encoding='utf-8')
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 main(['--verify',str(altered)])
 
@@ -271,7 +271,7 @@ class SessionTests(unittest.TestCase):
 
     def test_packaged_template_matches_executable_demo_and_eight_round_limit(self):
         template = Path(__file__).parents[1]/'src/klone/static/council72-session-demo.json'
-        self.assertEqual(json.loads(template.read_text()), demo_session())
+        self.assertEqual(json.loads(template.read_text(encoding='utf-8')), demo_session())
         request = self.first()
         row = deepcopy(request['steps'][0]['observations'][0])
         previous = row['id']

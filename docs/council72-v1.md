@@ -145,6 +145,16 @@ hakemistokahva tai siirrettävä tarkistuspolku. Taustalla ovat
 Work-testit toistavat rajoituksen, mutta fyysisen Androidin hyväksyntä
 edellyttää korjatun version testien ja CLI-viennin ajoa puhelimessa.
 
+Käyttäjän jakama Termux-ajo 14.11.2026 commitilla
+`e69a85a2c2586ab8fab26158aaf97d97e42951ce` tuotti 38 onnistunutta ja yhden
+epäonnistuneen testin (Python 3.13.13, neljä onnistunutta subtestiä).
+Neuvoston ja sen API:n kaikki 27 testiä onnistuivat. Epäonnistuminen koski
+yhteensopivuustestiä, joka poisti `O_PATH`-tuen mutta oletti oikeuden lukea
+todellista juurihakemistoa. Testi käyttää nyt eristettyä, oikeaan väliaikaiseen
+hakemistoon sidottua juurta. Tuotannon tiedostokerros säilyy ennallaan.
+Tämä havainto on käyttäjän välittämä testitulos; CLI-viennin onnistuminen
+Androidissa jäi vielä vahvistamatta. Alkuperäisiä testiaineistoja ei muuteta.
+
 Paikallinen näkymä on `/council72`. API:t:
 
 - `GET /api/cognition/council72/catalog`

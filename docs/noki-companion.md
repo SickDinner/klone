@@ -1,4 +1,4 @@
-# Noki – KLONE-korppikumppani (v0.2 – raadollinen Noki)
+# Noki – KLONE-korppikumppani (v0.3 – noitanauru ja KLONE-keskustelu)
 
 Tämä vaihe lisää itsenäisen, paikallisessa selaimessa toimivan korppihahmon.
 Se ei muuta KLONEn muistia, room-permissioneita, audit-ketjua eikä ingest-logiikkaa.
@@ -18,6 +18,35 @@ Kun haara on käytössä palvelimen lähdekoodissa, avaa
 - **Viesti:** avainsanoihin reagoiva, tarkoituksella ronski paikallinen nalkutus; ei kielimallia.
 - **Valitse / kuvaa teos:** kuvan avaus selaimessa ja paikallinen kirkkauden, kontrastin, värivaihtelun, reunavarianssin ja peilisymmetrian mittaus. Ei tunnista kuvan aiheita. Kuvien kokoa rajoitetaan 12 megaan.
 - **Tyhjennä:** poistaa tämän sivun kuvaesikatselun ja vapauttaa väliaikaisen object URL:n.
+
+## Uutta v0.3:ssa
+
+Noki saa lisää ohjelmallisia ääniä, jotka tuotetaan laitteen WebAudio-rajapinnalla:
+**Noitanauru** (yhdeksän käkättävää, taajuudeltaan muuntuvaa pulssia),
+**Räkäinen pärskähdys** (suodatettu kohina), **Ruostunut sarana** (nouseva ja laskeva kitinä),
+**Luunkalina** (11 lyhyttä kolahdusta) ja **Ilkeä ilkunauru**.
+Selaimen `speechSynthesis`-puheeseen lisätään valittava äänihahmo:
+Käkänoita, Karskikorppi tai Riivattu peikko. Foneettinen muokkaus,
+puhenopeus ja äänenkorkeus vaihtelevat; puheen luonnollisuus ja huutojen
+äänenlaatu riippuvat laitteesta.
+
+**Keskustelu-API:** KLONE-yhteys voidaan kytkeä erikseen päälle.
+`Tarkista KLONE-yhteys` tekee `GET /api/clone-chat/status` -pyynnön.
+Lähdepolun ollessa annettu `Lähetä` tai erikseen käynnistetty
+`Kysy KLONElta puhumalla` tekee `POST /api/clone-chat/respond`
+-pyynnön saman palvelimen rajapintaan, `mode=bounded`.
+Historiasta lähetetään korkeintaan 12 aiempaa viestiä.
+Jos lähdepolkua ei ole tai backend epäonnistuu, Noki näyttää virheen
+eikä keksi aineistoväitettä. `Tyhjennä istunto` tyhjentää tilapäisen
+selaimen muistissa olevan viestihistorian. Kuvia tai äänen raakatallennetta
+ei liitetä keskustelun HTTP-pyyntöön.
+
+**Rajoitus:** nykyinen KLONE-keskustelumoottori tuottaa *bounded_local*
+-vastaukset paikallisesta dialogikorpuksesta. Vaikka API-avain olisi
+tallennettu, ulkoinen LLM-kutsu on tällä hetkellä palvelinpuolella
+nimenomaisesti pois käytöstä, kunnes luokiteltu ulosmenevä tiedonsiirto
+on hyväksytty. Nokin persoona ja WebAudio ovat käyttöliittymäkerroksessa;
+se ei tee ulkoisia mallikutsuja eikä saa erikoisoikeuksia.
 
 ## Android / Termux – kokeile ilman nykyisen KLONEn vaihtamista
 

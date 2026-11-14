@@ -150,14 +150,21 @@
       "name": "Bael",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Goetian tekstissä Bael on kuninkaaksi kuvattu ensimmäinen henki. Kuvausten mukaan se esiintyy kissan, rupikonnan ja ihmisen hahmoissa.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "kuningas"
+      ],
+      "ranks": [
+        "kuningas"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-02",
@@ -165,14 +172,21 @@
       "name": "Agares",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Käsikirjoitus kuvaa herttuan vanhaksi mieheksi, joka ratsastaa krokotiililla ja kantaa haukkaa.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-03",
@@ -180,14 +194,21 @@
       "name": "Vassago",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Goetian kolmas henki, prinssiksi nimetty hahmo, jolle teksti liittää menneiden ja kadonneiden asioiden paljastamisen.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "prinssi"
+      ],
+      "ranks": [
+        "prinssi"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-04",
@@ -195,14 +216,21 @@
       "name": "Gamigin",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Markiisiksi kuvattu henki esiintyy tekstissä pienenä hevosena tai aasina; kertomus liittää hahmoon tieteen ja oppineisuuden.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "markiisi"
+      ],
+      "ranks": [
+        "markiisi"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-05",
@@ -210,14 +238,21 @@
       "name": "Marbas",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Presidentti, joka esiintyy tekstissä leijonan hahmossa ja jonka toimialaksi kuvataan muun muassa käsityö- ja mekaanisia taitoja.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "presidentti"
+      ],
+      "ranks": [
+        "presidentti"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-06",
@@ -231,8 +266,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-07",
@@ -240,14 +281,21 @@
       "name": "Amon",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Markiisiksi nimetyn Amonin kuvauksessa yhdistyvät suden, käärmeen ja korpin piirteet; motiivi sopii kauhukuvitukseen.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "markiisi"
+      ],
+      "ranks": [
+        "markiisi"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-08",
@@ -255,14 +303,21 @@
       "name": "Barbatos",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Herttua, jonka kuvaukseen liittyy lintujen laulun ja muiden eläinten äänien ymmärtämisen myyttinen kyky.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-09",
@@ -270,14 +325,21 @@
       "name": "Paimon",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Tekstissä 9. henki, kuninkaaksi kuvattu Paimon. Kuuluu käsikirjoitusten mytologiseen luetteloon.",
+      "description": "Yhdeksäs henki ja kuninkaaksi kuvattu Paimon; tarinassa hän ratsastaa dromedaarilla, soittajat kulkevat edellä ja ääni on aluksi kova ja vaikeasti ymmärrettävä. Kirjallista demonologiaa, ei havainto todellisesta olennosta.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "kuningas"
+      ],
+      "ranks": [
+        "kuningas"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-10",
@@ -285,14 +347,21 @@
       "name": "Buer",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Presidentti, jolle kirjallinen kuvaus liittää filosofian, yrttitiedon ja luonnonopetuksen.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "presidentti"
+      ],
+      "ranks": [
+        "presidentti"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-11",
@@ -306,8 +375,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-12",
@@ -321,8 +396,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "prinssi"
+      ],
+      "ranks": [
+        "prinssi"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-13",
@@ -330,14 +411,21 @@
       "name": "Beleth",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Kuninkaaksi kuvattu henki tulee kertomuksessa vaalealla hevosella, jota edeltävät torvet ja soittimet.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "kuningas"
+      ],
+      "ranks": [
+        "kuningas"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-14",
@@ -351,8 +439,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "markiisi"
+      ],
+      "ranks": [
+        "markiisi"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-15",
@@ -366,8 +460,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-16",
@@ -381,8 +481,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-17",
@@ -396,8 +502,16 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "jaarli",
+        "presidentti"
+      ],
+      "ranks": [
+        "jaarli",
+        "presidentti"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-18",
@@ -411,8 +525,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-19",
@@ -426,8 +546,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-20",
@@ -435,14 +561,21 @@
       "name": "Purson",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Kuninkaaksi kuvattu hahmo esiintyy leijonakasvoisena, karhulla ratsastavana ja käärmettä kantavana olentona.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "kuningas"
+      ],
+      "ranks": [
+        "kuningas"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-21",
@@ -450,14 +583,23 @@
       "name": "Morax",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Jaarlin ja presidentin arvoinen kuvitteellinen hahmo, jota kuvataan ihmiskasvoiseksi häräksi.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "jaarli",
+        "presidentti"
+      ],
+      "ranks": [
+        "jaarli",
+        "presidentti"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-22",
@@ -471,8 +613,16 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "jaarli",
+        "prinssi"
+      ],
+      "ranks": [
+        "jaarli",
+        "prinssi"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-23",
@@ -486,8 +636,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-24",
@@ -495,14 +651,21 @@
       "name": "Naberius",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Naberius, tekstin 24. henki: mustan variksen hahmo on kirjallinen kuvaus.",
+      "description": "Goetian 24. henki on markiisi ja esiintyy tekstissä mustana varislintuna; kertomuksessa korostuvat puhetaito ja retoriikka.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "markiisi"
+      ],
+      "ranks": [
+        "markiisi"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-25",
@@ -510,14 +673,21 @@
       "name": "Glasya Labolas",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Presidentiksi nimetty hahmo, joka kuvataan siivekkäänä koirana. Tekstissä siihen liitetään väkivaltaista myyttistä kykykuvastoa.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "presidentti"
+      ],
+      "ranks": [
+        "presidentti"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-26",
@@ -525,14 +695,21 @@
       "name": "Bune",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Herttuaksi kutsuttu kolmen pään lohikäärme, jonka teksti yhdistää hautojen, rikkauksien ja puhetaidon motiiveihin.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-27",
@@ -546,8 +723,16 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "markiisi",
+        "jaarli"
+      ],
+      "ranks": [
+        "markiisi",
+        "jaarli"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-28",
@@ -561,8 +746,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-29",
@@ -570,14 +761,21 @@
       "name": "Astaroth",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Herttuaksi nimetty hahmo esiintyy kuvauksessa lohikäärmeellä ratsastavana epäkauniina enkelinä, jolla on käärme kädessään.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-30",
@@ -591,8 +789,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "markiisi"
+      ],
+      "ranks": [
+        "markiisi"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-31",
@@ -606,8 +810,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "presidentti"
+      ],
+      "ranks": [
+        "presidentti"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-32",
@@ -615,14 +825,21 @@
       "name": "Asmoday",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Kuninkaaksi nimetty kolmipäinen hahmo, jonka tekstissä esiintyvät härän, ihmisen ja pässin piirteet sekä lohikäärme.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "kuningas"
+      ],
+      "ranks": [
+        "kuningas"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-33",
@@ -636,8 +853,16 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "prinssi",
+        "presidentti"
+      ],
+      "ranks": [
+        "prinssi",
+        "presidentti"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-34",
@@ -651,8 +876,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "jaarli"
+      ],
+      "ranks": [
+        "jaarli"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-35",
@@ -666,8 +897,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "markiisi"
+      ],
+      "ranks": [
+        "markiisi"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-36",
@@ -675,14 +912,21 @@
       "name": "Stolas",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Prinssiksi kutsuttu henki esiintyy varhaisen tekstivariantin mukaan yöhaikaran eli 'night raven' -linnun muodossa; myöhempi tulkinta on usein pöllö.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "prinssi"
+      ],
+      "ranks": [
+        "prinssi"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-37",
@@ -696,8 +940,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "markiisi"
+      ],
+      "ranks": [
+        "markiisi"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-38",
@@ -711,8 +961,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "jaarli"
+      ],
+      "ranks": [
+        "jaarli"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-39",
@@ -726,8 +982,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "presidentti"
+      ],
+      "ranks": [
+        "presidentti"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-40",
@@ -741,8 +1003,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "jaarli"
+      ],
+      "ranks": [
+        "jaarli"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-41",
@@ -756,8 +1024,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-42",
@@ -771,8 +1045,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-43",
@@ -786,8 +1066,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "markiisi"
+      ],
+      "ranks": [
+        "markiisi"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-44",
@@ -801,8 +1087,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "markiisi"
+      ],
+      "ranks": [
+        "markiisi"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-45",
@@ -816,8 +1108,16 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "kuningas",
+        "jaarli"
+      ],
+      "ranks": [
+        "kuningas",
+        "jaarli"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-46",
@@ -831,8 +1131,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "jaarli"
+      ],
+      "ranks": [
+        "jaarli"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-47",
@@ -846,8 +1152,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-48",
@@ -861,8 +1173,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "presidentti"
+      ],
+      "ranks": [
+        "presidentti"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-49",
@@ -876,8 +1194,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-50",
@@ -891,8 +1215,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "ritari"
+      ],
+      "ranks": [
+        "ritari"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-51",
@@ -906,8 +1236,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "kuningas"
+      ],
+      "ranks": [
+        "kuningas"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-52",
@@ -921,8 +1257,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-53",
@@ -936,8 +1278,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "presidentti"
+      ],
+      "ranks": [
+        "presidentti"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-54",
@@ -951,8 +1299,16 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua",
+        "jaarli"
+      ],
+      "ranks": [
+        "herttua",
+        "jaarli"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-55",
@@ -966,8 +1322,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "prinssi"
+      ],
+      "ranks": [
+        "prinssi"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-56",
@@ -981,8 +1343,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-57",
@@ -996,8 +1364,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "presidentti"
+      ],
+      "ranks": [
+        "presidentti"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-58",
@@ -1011,8 +1385,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "presidentti"
+      ],
+      "ranks": [
+        "presidentti"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-59",
@@ -1026,8 +1406,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "markiisi"
+      ],
+      "ranks": [
+        "markiisi"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-60",
@@ -1041,8 +1427,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-61",
@@ -1056,8 +1448,16 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "kuningas",
+        "presidentti"
+      ],
+      "ranks": [
+        "kuningas",
+        "presidentti"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-62",
@@ -1071,8 +1471,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "presidentti"
+      ],
+      "ranks": [
+        "presidentti"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-63",
@@ -1086,8 +1492,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "markiisi"
+      ],
+      "ranks": [
+        "markiisi"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-64",
@@ -1101,8 +1513,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-65",
@@ -1116,8 +1534,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "markiisi"
+      ],
+      "ranks": [
+        "markiisi"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-66",
@@ -1131,8 +1555,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "markiisi"
+      ],
+      "ranks": [
+        "markiisi"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-67",
@@ -1146,8 +1576,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-68",
@@ -1155,14 +1591,21 @@
       "name": "Belial",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Kuninkaaksi nimetty hahmo kuvataan tekstissä tulisissa vaunuissa istuvana enkelinä. Lähde kertoo tarunomaisesta hierarkiasta.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "kuningas"
+      ],
+      "ranks": [
+        "kuningas"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-69",
@@ -1176,8 +1619,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "markiisi"
+      ],
+      "ranks": [
+        "markiisi"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-70",
@@ -1191,8 +1640,14 @@
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "prinssi"
+      ],
+      "ranks": [
+        "prinssi"
+      ],
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-71",
@@ -1200,14 +1655,21 @@
       "name": "Dantalion",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Herttuaksi kutsuttu monikasvoinen kirjallinen hahmo, jolla on kirja kädessään; tarina liittää siihen ihmisten ajatusten tuntemisen.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "herttua"
+      ],
+      "ranks": [
+        "herttua"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     },
     {
       "id": "goetia-72",
@@ -1215,14 +1677,21 @@
       "name": "Andromalius",
       "category": "goetia",
       "tradition": "Lemegeton, Ars Goetia",
-      "description": "Nimi Ars Goetian käsikirjoitusperinteen 72 hengen luettelosta. Yksityiskohtaiset attribuutit tarkistettava alkutekstistä.",
+      "description": "Goetian 72. henki, jaarliksi kuvattu miehenhahmo, jolla on kädessään käärme ja jonka myyttisiin tehtäviin kuuluu varkaiden löytäminen.",
       "sources": [
         "peterson-goetia"
       ],
       "tags": [
         "ars goetia",
-        "demonologia"
-      ]
+        "demonologia",
+        "jaarli"
+      ],
+      "ranks": [
+        "jaarli"
+      ],
+      "detail_level": "tiivistetty ensisijaisesta tekstieditiosta",
+      "rank_source": "peterson-goetia",
+      "rank_note": "Arvonimet ovat Petersonin editoiman käsikirjoitustradition kirjallista luokittelua; käsikirjoitusvariantit eroavat."
     }
   ],
   "entries": [

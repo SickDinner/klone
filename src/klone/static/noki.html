@@ -163,7 +163,7 @@
   <section class="panel" aria-label="Keskustele Nokin kanssa">
     <h2>Juttele Nokille</h2>
     <form id="chat"><input id="message" type="text" maxlength="320" autocomplete="off" aria-label="Viesti Nokille" placeholder="Kirjoita tai sanele idea..."><button class="primary" type="submit">Lähetä</button></form>
-    <div class="toolbar"><button id="listen" type="button">Matki sanojani</button><button id="mimic" class="primary" type="button">Matki ääntäni (4 s)</button><button id="talk-engine" type="button">Kysy KLONElta puhumalla</button></div><label for="roughness" class="muted">Ääniefektien voimakkuus <output id="roughness-out" for="roughness">35 %</output></label><input type="range" id="roughness" min="0" max="100" value="35" style="width:100%;accent-color:#61d8c9" aria-label="Raakunnan voimakkuus">
+    <div class="toolbar"><button id="listen" type="button">Matki sanojani</button><button id="mimic" class="primary" type="button">Demonimatki ääntäni (4 s)</button><button id="talk-engine" type="button">Kysy KLONElta puhumalla</button></div><label for="roughness" class="muted">Ääniefektien voimakkuus <output id="roughness-out" for="roughness">35 %</output></label><input type="range" id="roughness" min="0" max="100" value="35" style="width:100%;accent-color:#61d8c9" aria-label="Raakunnan voimakkuus">
     <label for="hellvoice-style" class="field-label">Ääni: ei enää raakuntaa, vaan fiktiivinen helvettikurkku</label>
     <select id="hellvoice-style" aria-label="Kauhudemonin äänihahmo" style="background:#15202d;color:#ecfbfc;border:1px solid #456f76;border-radius:10px;padding:12px">
       <option value="hell">Helvetin ulosottomies – matala ja muriseva</option>
@@ -185,7 +185,7 @@
       <p class="meta-row" id="engine-feedback" role="status" aria-live="polite">KLONE-moottori ei ole käytössä. Paikallinen nalkutus toimii ilman aineistoa.</p>
       <p class="hint">Jos valitset KLONE-tilan, kirjoittamasi tai mikrofonilla tunnistettu viesti lähetetään oman laitteesi KLONE-palvelimelle. Taidekuvaa tai äänen raakadataa ei lähetetä. Nykyinen API vastaa vain rajatusta dialogiaineistosta, eikä ulkoinen GPT ole käytössä.</p>
     </div>
-    <div class="hint">Matki sanojani käyttää selaimen puheentunnistusta, joka voi käyttää verkkopalvelua. Matki ääntäni nauhoittaa vain enintään 4 sekuntia paikallisesti ja toistaa äänen korppimaiseksi käsiteltynä. Äänitiedostoja ei tallenneta pysyvästi eikä lähetetä KLONElle. Molemmat käynnistyvät vain omasta painikkeesta.</div>
+    <div class="hint">Matki sanojani käyttää selaimen puheentunnistusta, joka voi käyttää verkkopalvelua. Demonimatki ääntäni nauhoittaa vain enintään 4 sekuntia paikallisesti ja toistaa äänen useana madallettuna ja säröytettynä haamukerroksena. Äänitiedostoja ei tallenneta pysyvästi eikä lähetetä KLONElle. Molemmat käynnistyvät vain omasta painikkeesta.</div>
   </section>
 <section class="panel" id="grimoire" aria-label="Nokin lähteistetty Grimoire-tietokirjasto">
     <div class="panel-head"><h2>Grimoire: musta kirjasto</h2><span class="badge">72 nimeä + tutkimus</span></div>
@@ -226,7 +226,7 @@
   const file=document.getElementById("file"),preview=document.getElementById("preview"),report=document.getElementById("report");
   const roughness=document.getElementById("roughness"),roughnessOut=document.getElementById("roughness-out");
   let imageUrl=null,recognition=null,currentImage=false,ctx=null,voiceIndex=0,roastIndex=0;
-  let liveRecorder=null,liveStream=null,recordTimer=null,discardRecord=false,playbackNode=null;
+  let liveRecorder=null,liveStream=null,recordTimer=null,discardRecord=false,playbackNode=null,mimicGeneration=0;
   let kloneHistory=[],klonePending=false,kloneController=null,kloneRequestNonce=0;
   let synthNodes=[];
   const roasts=[
@@ -287,6 +287,7 @@
   document.getElementById("savage").addEventListener("click",roast);
   document.getElementById("chat").addEventListener("submit",function(e){e.preventDefault();const input=document.getElementById("message");const msg=input.value;getAudio();void dispatchReply(msg);input.value="";});
   function stopAll(discard){
+    mimicGeneration++;
     if(window.NokiHellvoice){window.NokiHellvoice.stop();}
     kloneRequestNonce++;
     if(kloneController){kloneController.abort();kloneController=null;}
@@ -404,6 +405,7 @@
     shaper.curve=c;shaper.oversample="2x";return shaper;
   }
   function playMimic(buffer){
+    if(window.NokiHellvoice?.playMimic){window.NokiHellvoice.playMimic(buffer);flutter();return;}
     const audio=getAudio();
     if(!audio){setState("Äänentoisto ei käytettävissä");return;}
     const src=audio.createBufferSource(),hp=audio.createBiquadFilter(),lp=audio.createBiquadFilter();
@@ -428,6 +430,7 @@
       const audio=getAudio();
       if(!audio){say("Tämä selain ei tue äänikäsittelyä.",false);return;}
       liveStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:false},video:false});
+      const thisMimic=++mimicGeneration;
       const chunks=[];
       const types=["audio/webm;codecs=opus","audio/mp4","audio/webm"];
       const chosen=types.find(function(t){return MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t);});
@@ -445,6 +448,7 @@
           if(!blob.size||blob.size>2*1024*1024){throw new Error("Näyte on tyhjä tai liian suuri");}
           const array=await blob.arrayBuffer();
           const buffer=await audio.decodeAudioData(array);
+          if(thisMimic!==mimicGeneration){return;}
           playMimic(buffer);
         }catch(e){setState("Ääninäytettä ei voitu toistaa: "+e.message);}
       };

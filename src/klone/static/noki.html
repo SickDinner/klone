@@ -39,6 +39,9 @@
     .field-label{display:block;font-size:.88rem;color:#cde6e8}.field-label input{margin-top:6px}
     .meta-row{font-size:.81rem;color:#b3d4d7;word-break:break-word}.mode-panel input[type=text]{width:100%}
     .grimoire-results{display:flex;flex-wrap:wrap;gap:7px;max-height:290px;overflow-y:auto;scrollbar-width:thin;padding:7px 0}
+    .council-seats{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;margin:4px 0 10px}.council-seats button{min-width:0;padding:9px 0;font-size:.78rem;border-radius:8px}
+    .council-ring-label{font-size:.79rem;font-weight:700;color:#b7dcda;margin:8px 0 4px}.council-active{background:#a33855!important;border-color:#db91a7!important}
+
     .grimoire-hit{padding:8px 11px;font-size:.87rem;background:#213642;border-color:#345f64}
     .grimoire-detail{border:1px solid #456570;background:rgba(7,19,27,.75);padding:12px;border-radius:12px;margin-top:10px;min-height:30px}
     .grimoire-detail:empty{display:none}.grimoire-detail h3{font-size:1.03rem;margin:5px 0}
@@ -187,7 +190,13 @@
     </div>
     <div class="hint">Matki sanojani käyttää selaimen puheentunnistusta, joka voi käyttää verkkopalvelua. Demonimatki ääntäni nauhoittaa vain enintään 4 sekuntia paikallisesti ja toistaa äänen useana madallettuna ja säröytettynä haamukerroksena. Äänitiedostoja ei tallenneta pysyvästi eikä lähetetä KLONElle. Molemmat käynnistyvät vain omasta painikkeesta.</div>
   </section>
-<section class="panel" id="grimoire" aria-label="Nokin lähteistetty Grimoire-tietokirjasto">
+<section class="panel" aria-label="72 kirouksen kuvitteellinen neuvosto">
+    <div class="panel-head"><h2>72-paikkainen pirun neuvosto</h2><span class="badge">9 × 8</span></div>
+    <p class="muted">Valitse helvetin rinki ja sen ääni-istuin. Jokaisella on oma ällöttävä, kiroileva repliikkiyhdistelmä. Tämä on Nokin kuvitteellinen ääninäyttämö, ei väite Ars Goetian alkuperäisestä organisaatiosta.</p>
+    <div id="council-grid" aria-label="72 istuimen äänipaneeli"></div>
+    <p id="council-feedback" class="meta-row" aria-live="polite">Valitse paikka 1–72. Noki huutaa valitun kirouksen.</p>
+  </section>
+  <section class="panel" id="grimoire" aria-label="Nokin lähteistetty Grimoire-tietokirjasto">
     <div class="panel-head"><h2>Grimoire: musta kirjasto</h2><span class="badge">72 nimeä + tutkimus</span></div>
     <p class="muted">Historiallisia tekstejä, tutkittuja uskontoja, kuvakieltä ja tajunnantutkimusta. Lähteisiin viittaavat merkinnät eivät ole todisteita yliluonnollisista olennoista. Nokin rääväsuinen persoona on erillinen fiktiokerros.</p>
     <label for="grimoire-query" class="field-label">Hae käsitettä, henkilöä tai perinnettä</label>
@@ -461,6 +470,28 @@
     }
   }
   document.getElementById("mimic").addEventListener("click",startMimic);
+  (function buildCouncil(){
+    const root=document.getElementById("council-grid"),feedback=document.getElementById("council-feedback");
+    const rings=["Limbo","Himo","Mässäily","Ahneus","Viha","Harhaoppi","Väkivalta","Petos","Kadotus"];
+    for(let r=0;r<9;r++){
+      const label=document.createElement("p");label.className="council-ring-label";
+      label.textContent="Rinki "+(r+1)+": "+rings[r];root.append(label);
+      const row=document.createElement("div");row.className="council-seats";root.append(row);
+      for(let seat=0;seat<8;seat++){
+        const index=r*8+seat,btn=document.createElement("button");
+        btn.type="button";btn.textContent=String(index+1).padStart(2,"0");
+        btn.setAttribute("aria-label","Rinki "+(r+1)+" "+rings[r]+", paikka "+(seat+1)+", kirous "+(index+1));
+        btn.addEventListener("click",function(){
+          if(!window.NokiHellvoice){feedback.textContent="Äänimoduulia ei ladattu.";return;}
+          root.querySelectorAll("button").forEach(b=>b.classList.remove("council-active"));
+          btn.classList.add("council-active");
+          feedback.textContent="Valittuna rinki "+(r+1)+" ("+rings[r]+"), paikka "+(seat+1)+". Tämä on fiktiivinen rooli.";
+          window.NokiHellvoice.say(window.NokiHellvoice.curseAt(index),true);
+        });
+        row.append(btn);
+      }
+    }
+  })();
   for(const name of ["hellvoice-intensity","hellvoice-chaos"]){
     const slider=document.getElementById(name),out=document.getElementById(name+"-label");
     if(slider&&out){slider.addEventListener("input",function(){out.textContent=slider.value+" %";});}

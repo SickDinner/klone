@@ -197,7 +197,8 @@ def _build(review):
 def build_briefing(review):
     if not review_replays(review):
         raise ValueError("review must replay before briefing")
-    return _build(review)
+    # Nested source reports must use their canonical numeric representation.
+    return _build(review_session(review["session"], **review["options"]))
 
 
 def briefing_replays(report):

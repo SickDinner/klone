@@ -177,6 +177,7 @@
   function clearReview(){
     currentReview=null;byId("save-review").disabled=true;
     currentBriefing=null;byId("save-briefing").disabled=true;
+    byId("run-briefing").disabled=!api||!currentSession;
     byId("briefing-result").replaceChildren(node("p","Avaa katselmuksen JSON tai muodosta uusi avoimesta istunnosta paikallisessa KLONEssa."));
     byId("review-result").replaceChildren(node("p","Muodosta kehitysjono avoimesta istunnosta tai avaa aiemmin tallennettu kehitysjonon JSON."));
   }

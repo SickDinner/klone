@@ -36,6 +36,15 @@ class ReviewTests(unittest.TestCase):
         self.assertFalse(report["source_analysis"]["history_rewritten"])
         self.assertEqual(report["source_analysis"]["status_sensitive_cases"], 2)
 
+    def test_browser_integral_number_export_retains_canonical_review_hash(self):
+        report = review_session(self.session)
+        def number(s):
+            value = float(s)
+            return int(value) if value.is_integer() else value
+        exported = json.loads(json.dumps(report), parse_float=number)
+        self.assertTrue(review_replays(exported))
+        self.assertEqual(review_session(exported["session"], **exported["options"]), report)
+
     def test_withdrawal_matches_independent_single_round_reconstruction(self):
         request = self.first_request()
         session = run_session(request)

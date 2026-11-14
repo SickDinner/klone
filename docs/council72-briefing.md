@@ -57,6 +57,10 @@ Tuodun raportin tavoitetta, havaintoja tai muokattua komentotekstiä ei
 upoteta ajettavaan lohkoon. Muu raportin rakennetarkistus ei korvaa Pythonin
 täydellistä toistoa.
 
+Johdetut tiivisteet käyttävät uudelleen muodostettua kanonista istuntoa ja
+katselmusta. Selaimen JSON-viennin `0.0` → `0` -esitysmuutos säilyttää toiston;
+boolean-arvon false vaihtaminen nollaksi hylätään edelleen.
+
 ## Käyttö Termuxissa
 
 ```bash

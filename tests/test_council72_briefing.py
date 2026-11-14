@@ -34,6 +34,14 @@ class BriefingTests(unittest.TestCase):
         self.assertFalse(report["consolidation"]["memory_write_enabled"])
         self.assertIsNone(report["collective"]["common_goal_achieved"])
 
+    def test_browser_numeric_roundtrip_preserves_nested_hashes(self):
+        def number(s):
+            value = float(s)
+            return int(value) if value.is_integer() else value
+        exported = json.loads(json.dumps(self.report), parse_float=number)
+        self.assertTrue(briefing_replays(exported))
+        self.assertEqual(build_briefing(exported["review"]), self.report)
+
     def test_all_seventy_two_roles_and_eight_routes_come_from_real_catalog(self):
         model = catalog()
         founders = self.report["founders"]

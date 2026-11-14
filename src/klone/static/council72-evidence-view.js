@@ -6,6 +6,8 @@
   const states={met_for_review:"Täyttyy tarkistettavaksi",not_met:"Ei täyty",unknown:"Avoin"};
   const classes={public:"Julkinen",restricted:"Rajattu",sealed:"Suljettu"};
   const stages={syntax:"Syntaksi",cognition:"Kognitiotestit",full:"Koko testisarja",local_deploy:"Local Deploy"};
+  const logStates={passed:"Läpi",failed:"Epäonnistui",unknown:"Avoin",not_present:"Puuttuu",unavailable:"Ei käytettävissä"};
+  const reasons={different_or_unknown_commit:"Commit on toinen tai avoin",different_or_unknown_environment:"Vaaditun ympäristön ajo puuttuu",v2_execution_context_required:"V2-ajokonteksti puuttuu",contract_binding_missing_changed_or_different:"Koesopimus puuttuu, vaihtui tai poikkeaa",incomplete_or_inconsistent_artifacts:"Aineistossa tai ajokontekstissa on puutteita",contradictory_evidence:"Manifesti ja loki ovat ristiriidassa",log_does_not_establish_status:"Lokista puuttuu tunnistettu tulos",consistent_reported_failure:"Manifesti, exit ja loki ilmoittavat virheen",pytest_pass_count_unavailable:"Pytestin läpäisseiden määrä puuttuu",reported_pass_count_below_locked_minimum:"Läpäisseiden määrä alittaa lukitun rajan",locally_consistent_stage_claim:"Manifesti, exit ja loki täsmäävät"};
   const domains=["hypervisor","permissions","audit","memory","cognition","research","genomics","media","simulation","android","ci","deployment"];
   const domainRing={hypervisor:7,permissions:7,audit:8,memory:3,cognition:2,research:6,genomics:8,media:1,simulation:6,android:4,ci:8,deployment:7};
   let model,current=null,readId=0;
@@ -38,13 +40,13 @@
     panel.appendChild(table(["Kriteeri","Osa-alue","Ympäristö","Vaihe","Vähintään läpi"],s.criteria.map(r=>[r.id,r.domain,r.environment,stages[r.stage],r.min_passed])));
     if(!evidence)return;
     panel.appendChild(node("h2","Kriteerit alkuperäisen aineiston perusteella"));
-    data.criteria.forEach(r=>{const card=node("article","");card.className="task-card";card.appendChild(node("h3",r.criterion.id+" · "+states[r.status]));card.appendChild(node("p",r.matching_runs+" ajoa kohdecommitissa ja vaaditussa ympäristössä. Domain on sopimuksen tehtäväluokka; koko osa-alueen kattavuutta siitä ei päätellä."));
-      card.appendChild(table(["Ajo","Tulkinta","Tila / exit","Lokin tila","Syy"],r.cases.map(c=>[c.run_name,states[c.status],c.declared_status+" / "+(c.declared_exit_code??"avoin"),c.log_reported_status,c.reason])));panel.appendChild(card);});
+    data.criteria.forEach(r=>{const card=node("article","");card.className="task-card";card.appendChild(node("h3",r.criterion.id+" · "+states[r.status]));card.appendChild(node("p",r.matching_runs+" ajoa kohdecommitissa ja vaaditussa ympäristössä. Osa-alue on sopimuksen tehtäväluokka; koko osa-alueen kattavuutta siitä ei päätellä."));
+      card.appendChild(table(["Ajo","Tulkinta","Tila / exit","Lokin tila","Syy"],r.cases.map(c=>[c.run_name,states[c.status],(logStates[c.declared_status]||"Avoin")+" / "+(c.declared_exit_code??"avoin"),logStates[c.log_reported_status]||"Avoin",reasons[c.reason]||("Selvitettävä: "+c.reason)])));panel.appendChild(card);});
     panel.appendChild(node("h2","Alkuperä, eheys ja CI erillisinä"));
     data.runs.forEach(r=>{const details=node("details","");details.appendChild(node("summary",r.run_name));details.appendChild(table(["Havainto","Raportin ilmoittama tulos"],[
       ["Manifestin SHA-256",r.manifest.sha256],["Paketti vastaa aineistoa",r.trust.packet_matches_source===true?"Täsmää":r.trust.packet_matches_source===false?"Ei täsmää":"Avoin"],
-      ["Laatuluokka",r.quality?.category],["Todistajan allekirjoitus",r.attestation.state+" / "+r.attestation.reason],
-      ["GitHub CI -väite",r.github.state],["Testin suoritus autentikoitu","Ei"],["Käyttöönoton hyväksyntä","Ei"]]));panel.appendChild(details);});
+      ["Laatuluokka",({verified:"Paikallisesti eheä",incomplete:"Puutteellinen",contradictory:"Ristiriitainen",unexamined:"Tutkimatta"}[r.quality?.category]||"Avoin")],["Todistajan allekirjoitus",({not_provided:"Ei annettu",verified_signature:"Täsmää luotettuun avaimeen",packet_unavailable:"Paketti puuttuu",verification_unavailable:"Tarkistus ei käytettävissä",rejected:"Hylätty"}[r.attestation.state]||"Avoin")],
+      ["GitHub CI -väite",({unavailable:"CI-tulos puuttuu",reported_success:"Ilmoitettu onnistuminen",reported_failure:"Ilmoitettu epäonnistuminen",unknown:"Avoin"}[r.github.state]||"Avoin")],["Testin suoritus autentikoitu","Ei"],["Käyttöönoton hyväksyntä","Ei"]]));panel.appendChild(details);});
     panel.appendChild(node("p","Havaintokierros sisältää "+data.criteria.length+" havaintoa yhdestä paikallisen aineiston lähderyhmästä. Eri nimet tai kopioidut ajot eivät tuo itsenäisiä lähteitä."));
     panel.appendChild(node("p","Evidenssikatselmuksen SHA-256: "+data.evidence_sha256)).className="muted";
   }

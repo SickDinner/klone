@@ -1,6 +1,9 @@
-"""Smoke checks for the opt-in local-first Noki prototype."""
+"""Noki: opt-in companion, public-source index and voice rack regression checks."""
+import json
 import unittest
+
 from fastapi.testclient import TestClient
+
 from klone.main import create_app
 
 
@@ -8,66 +11,104 @@ class NokiCompanionTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(create_app())
 
-    def test_noki_page_is_served(self):
+    def get_html(self):
         response = self.client.get("/noki")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("text/html", response.headers["content-type"])
-        self.assertIn('lang="fi"', response.text)
-        self.assertIn("Noki", response.text)
+        return response.text
 
-    def test_static_path_is_available(self):
-        response = self.client.get("/static/noki.html")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("Taidelaboratorio", response.text)
+    def get_static(self, name):
+        response = self.client.get("/static/" + name)
+        self.assertEqual(response.status_code, 200, name)
+        return response
 
-    def test_ragged_voice_and_opt_in_mimic_are_present(self):
-        html = self.client.get("/noki").text
-        self.assertIn('class="syringe syringe-left"', html)
-        self.assertIn('class="syringe syringe-right"', html)
-        self.assertIn('id="savage"', html)
-        self.assertIn('id="mimic"', html)
-        self.assertIn('id="roughness"', html)
-        self.assertIn('KRRRÄÄÄ', html)
-        self.assertIn('getUserMedia', html)
-        self.assertIn('SpeechRecognition', html)
-        self.assertIn('MediaRecorder', html)
-        self.assertIn('decodeAudioData', html)
-        self.assertIn('src.playbackRate.value=.68', html)
-        self.assertIn('noiseSuppression:false', html)
-        self.assertIn('discardRecord', html)
-        self.assertIn('setTimeout(function(){if(recorder.state==="recording"){recorder.stop();}},4000)', html)
+    def test_noki_page_is_served_in_finnish(self):
+        html = self.get_html()
+        self.assertIn('lang="fi"', html)
+        self.assertIn("Noki v0.4", html)
+        self.assertIn("Taidelaboratorio", html)
 
-    def test_prototype_privacy_and_controls_are_explicit(self):
-        html = self.client.get("/noki").text
-        self.assertIn('id="listen"', html)
-        self.assertIn('id="stop"', html)
-        self.assertIn('capture="environment"', html)
-        self.assertIn('speechSynthesis', html)
-        self.assertIn('createObjectURL', html)
-        self.assertIn("Ei kuvien latausta palvelimelle", html)
+    def test_read_only_grimoire_has_72_goetia_spirits_and_sources(self):
+        data = self.get_static("noki-grimoire.json").json()
+        self.assertEqual(data["schema_version"], 1)
+        self.assertEqual(len(data["spirits"]), 72)
+        self.assertEqual([s["order"] for s in data["spirits"]], list(range(1, 73)))
+        self.assertEqual(data["spirits"][8]["name"], "Paimon")
+        self.assertEqual(data["spirits"][23]["name"], "Naberius")
+        self.assertEqual(data["spirits"][-1]["name"], "Andromalius")
+        self.assertGreaterEqual(len(data["entries"]), 60)
+        self.assertGreaterEqual(len(data["sources"]), 15)
+        self.assertEqual(data["total_entries"], len(data["entries"]) + 72)
+        self.assertEqual(len({s["id"] for s in data["sources"]}), len(data["sources"]))
+        self.assertEqual(len({e["id"] for e in data["entries"]}), len(data["entries"]))
+        ids = {s["id"] for s in data["sources"]}
+        for item in data["entries"] + data["spirits"]:
+            self.assertTrue(item["sources"])
+            self.assertTrue(set(item["sources"]).issubset(ids))
+        for source in data["sources"]:
+            self.assertTrue(source["url"].startswith("https://"))
+
+    def test_vodou_and_psychedelic_sources_stay_distinct(self):
+        data = self.get_static("noki-grimoire.json").json()
+        vodou = " ".join(e["summary"] for e in data["entries"] if e["category"] == "vodou")
+        self.assertIn("elävä uskonto", vodou)
+        self.assertIn("eivät ole Ars Goetian demoneita", vodou)
+        psychedelic = [e for e in data["entries"] if e["category"] == "tajunta"]
+        self.assertTrue(any("5-HT2A" in e["title"] for e in psychedelic))
+        self.assertTrue(any("hait" in e["title"].lower() or "hait" in e["summary"].lower() for e in psychedelic))
+
+    def test_soundboard_is_distinct_from_research(self):
+        html = self.get_html()
+        self.assertIn('id="hellvoice-style"', html)
+        self.assertIn('id="hellvoice-intensity"', html)
+        self.assertIn('id="hellvoice-chaos"', html)
+        self.assertIn('data-hellfx="chorus72"', html)
+        for effect in ["witch", "snort", "squeak", "bones", "heckle"]:
+            self.assertIn('id="' + effect + '"', html)
+        voice = self.get_static("noki-hellvoice.js").text
+        self.assertIn("NokiHellvoice", voice)
+        self.assertIn("case \"chorus72\"", voice)
+        self.assertIn("for(let ring=0;ring<9;ring++)", voice)
+        self.assertIn("for(let seat=0;seat<8;seat++)", voice)
+        self.assertIn("speechSynthesis", voice)
+        self.assertIn("createDynamicsCompressor", voice)
+        self.assertIn("phonetics", voice)
+        self.assertNotIn("getUserMedia", voice)
+
+    def test_mimic_and_consented_chat_controls(self):
+        html = self.get_html()
+        for id_ in ["listen","mimic","talk-engine","engine-enable","engine-source","engine-clear","stop"]:
+            self.assertIn('id="' + id_ + '"', html)
+        self.assertIn("getUserMedia", html)
+        self.assertIn("MediaRecorder", html)
+        self.assertIn("decodeAudioData", html)
+        self.assertIn("noiseSuppression:false", html)
+        self.assertIn("recorder.stop();}},4000)", html)
         self.assertIn('fetch("/api/clone-chat/status"', html)
         self.assertIn('fetch("/api/clone-chat/respond"', html)
         self.assertIn('"mode":"bounded"', html)
-        self.assertIn('id="engine-enable"', html)
-        self.assertIn('id="engine-source"', html)
-        self.assertIn('id="talk-engine"', html)
-        self.assertIn('id="witch"', html)
-        self.assertIn('id="snort"', html)
-        self.assertIn('id="squeak"', html)
-        self.assertIn('id="bones"', html)
-        self.assertIn('id="heckle"', html)
-        self.assertIn("phoneticTTS", html)
-        self.assertIn("function sfx(", html)
-        self.assertIn("if(!document.getElementById(\"engine-enable\").checked)", html)
+        self.assertIn('kloneController.abort()', html)
+        self.assertIn('if(!document.getElementById("engine-enable").checked)', html)
         self.assertIn("kloneHistory.slice(-12)", html)
-        self.assertIn("kloneController.abort()", html)
         self.assertIn("AbortError", html)
-        self.assertIn("Käkänoita", html)
-        self.assertNotIn('fetch("https:', html)
-        self.assertNotIn('fetch("http:', html)
+
+    def test_local_only_code_and_safe_rendering(self):
+        html = self.get_html()
+        self.assertIn('<script src="/static/noki-hellvoice.js"></script>', html)
+        self.assertIn('<script src="/static/noki-grimoire.js"></script>', html)
+        self.assertIn("Ei kuvien latausta palvelimelle", html)
+        self.assertIn('capture="environment"', html)
+        self.assertIn("NokiGrimoire.answer", html)
         self.assertNotIn("localStorage", html)
-        self.assertNotIn("<script src=", html)
         self.assertNotIn("https://", html)
+        knowledge = self.get_static("noki-grimoire.js").text
+        self.assertIn('fetch("/static/noki-grimoire.json"', knowledge)
+        self.assertIn("textContent", knowledge)
+        self.assertIn("noopener noreferrer", knowledge)
+        self.assertNotIn("innerHTML", knowledge)
+        self.assertNotIn("getUserMedia", knowledge)
+        self.assertNotIn('fetch("https:', knowledge)
+        self.assertNotIn('fetch("http:', knowledge)
+
 
 if __name__ == "__main__":
     unittest.main()

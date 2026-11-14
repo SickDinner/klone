@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0d121b">
-  <title>Noki | KLONE</title>
+  <title>Noki v0.4 | KLONE Grimoire</title>
   <style>
     :root{color-scheme:dark;font-family:system-ui,-apple-system,Arial,sans-serif;background:#0d121b;color:#e8f8fa}
     *{box-sizing:border-box}body{margin:0;min-height:100dvh;background:radial-gradient(circle at 50% 21%,#1b3641 0,#101b27 42%,#0b1019 100%)}
@@ -38,6 +38,13 @@
     .switch-label{display:flex;align-items:center;gap:10px;font-weight:650}.switch-label input{width:20px;height:20px;accent-color:#52c6c2}
     .field-label{display:block;font-size:.88rem;color:#cde6e8}.field-label input{margin-top:6px}
     .meta-row{font-size:.81rem;color:#b3d4d7;word-break:break-word}.mode-panel input[type=text]{width:100%}
+    .grimoire-results{display:flex;flex-wrap:wrap;gap:7px;max-height:290px;overflow-y:auto;scrollbar-width:thin;padding:7px 0}
+    .grimoire-hit{padding:8px 11px;font-size:.87rem;background:#213642;border-color:#345f64}
+    .grimoire-detail{border:1px solid #456570;background:rgba(7,19,27,.75);padding:12px;border-radius:12px;margin-top:10px;min-height:30px}
+    .grimoire-detail:empty{display:none}.grimoire-detail h3{font-size:1.03rem;margin:5px 0}
+    .source-links{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px}.source-links a{font-size:.87rem;overflow-wrap:anywhere;text-decoration:underline}
+    .error-label{color:#ffd3ae}
+
     button:disabled{opacity:.55}
 
     @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
@@ -126,15 +133,15 @@
       </g>
     </svg>
     </div>
-    <div class="stage-tag">NOKI / NOITAÄÄNI / v0.3</div>
+    <div class="stage-tag">NOKI / HELVETTIMYLLY / v0.4</div>
   </section>
   <section class="panel" aria-label="Nokin puhe">
-    <div class="panel-head"><h2>Noki räyhää</h2><span class="badge" id="state">Valmiina</span></div>
-    <p id="speech" role="status" aria-live="polite">KRRRÄÄÄ!!! Tervetuloa pesään, perkele. Värit ovat hengissä, seinä ei enää pitkään.</p>
+    <div class="panel-head"><h2>Noki: kirouksia, säröä ja paksua paskaa</h2><span class="badge" id="state">Valmiina</span></div>
+    <p id="speech" role="status" aria-live="polite">Voi helvetin helvetti. Tervetuloa Nokin häiriintyneeseen kauhuteatteriin. Ha-ha-HÄÄÄH! Edes kuolema ei huolinut tätä ääntä.</p>
     <div class="toolbar">
-      <button id="hello" class="primary" type="button">KRRRÄÄ! Huuda</button>
-      <button id="animate" type="button">Sätki!</button>
-      <button id="savage" type="button">Nalkuta</button><button id="stop" type="button">Turpa tukkoon</button>
+      <button id="hello" class="primary" type="button">HUUTOHELVETTI!</button>
+      <button id="animate" type="button">Tärähdä!</button>
+      <button id="savage" type="button">Hauku maailmaa</button><button id="stop" type="button">TURPA KIINNI</button>
     </div>
     <div class="effect-pad" aria-label="Ääniefektit">
       <button id="witch" type="button">🧙 Noitanauru</button>
@@ -142,18 +149,33 @@
       <button id="squeak" type="button">Ruostunut sarana</button>
       <button id="bones" type="button">Luunkalina</button>
       <button id="heckle" type="button">Ilkeä ilkunauru</button>
+      <button data-hellfx="growl" type="button">Mahanpohjamurina</button>
+      <button data-hellfx="gargle" type="button">Vikisevä kurkku</button>
+      <button data-hellfx="hiss" type="button">Käärmeen kuiske</button>
+      <button data-hellfx="scream" type="button">Haudan huuto</button>
+      <button data-hellfx="backwards" type="button">Takaperoinen kirkonkello</button>
+      <button data-hellfx="coffin" type="button">Arkun saranat</button>
+      <button data-hellfx="static" type="button">Räjähtänyt radiokanava</button>
+      <button data-hellfx="funeral" type="button">Hautajaisurut</button>
+      <button data-hellfx="chorus72" type="button">72 helvettikurkkua</button>
     </div>
   </section>
   <section class="panel" aria-label="Keskustele Nokin kanssa">
     <h2>Juttele Nokille</h2>
     <form id="chat"><input id="message" type="text" maxlength="320" autocomplete="off" aria-label="Viesti Nokille" placeholder="Kirjoita tai sanele idea..."><button class="primary" type="submit">Lähetä</button></form>
-    <div class="toolbar"><button id="listen" type="button">Matki sanojani</button><button id="mimic" class="primary" type="button">Matki ääntäni (4 s)</button><button id="talk-engine" type="button">Kysy KLONElta puhumalla</button></div><label for="roughness" class="muted">Raakunnan voimakkuus <output id="roughness-out" for="roughness">45 %</output></label><input type="range" id="roughness" min="0" max="100" value="45" style="width:100%;accent-color:#61d8c9" aria-label="Raakunnan voimakkuus">
-    <label for="croak-style" class="field-label">Äänihahmo</label>
-    <select id="croak-style" aria-label="Nokin äänihahmo" style="background:#15202d;color:#ecfbfc;border:1px solid #456f76;border-radius:10px;padding:12px">
-      <option value="witch">Käkänoita – niljakas nauru</option>
-      <option value="croak">Karskikorppi – matala ja räkäinen</option>
-      <option value="gremlin">Riivattu peikko – nopea ja vinkuva</option>
+    <div class="toolbar"><button id="listen" type="button">Matki sanojani</button><button id="mimic" class="primary" type="button">Matki ääntäni (4 s)</button><button id="talk-engine" type="button">Kysy KLONElta puhumalla</button></div><label for="roughness" class="muted">Ääniefektien voimakkuus <output id="roughness-out" for="roughness">35 %</output></label><input type="range" id="roughness" min="0" max="100" value="35" style="width:100%;accent-color:#61d8c9" aria-label="Raakunnan voimakkuus">
+    <label for="hellvoice-style" class="field-label">Ääni: ei enää raakuntaa, vaan fiktiivinen helvettikurkku</label>
+    <select id="hellvoice-style" aria-label="Kauhudemonin äänihahmo" style="background:#15202d;color:#ecfbfc;border:1px solid #456f76;border-radius:10px;padding:12px">
+      <option value="hell">Helvetin ulosottomies – matala ja muriseva</option>
+      <option value="witch">Nieluvikainen noita – niljakas käkätys</option>
+      <option value="crypt">Ruumiinkellari – jyrisevä ja hidas</option>
+      <option value="glitch">Riivaantunut kasettinauhuri – vinkuva ja säröinen</option>
     </select>
+    <label for="hellvoice-intensity" class="field-label">Äänen särö <output id="hellvoice-intensity-label">36 %</output></label>
+    <input id="hellvoice-intensity" type="range" min="0" max="100" value="36" style="width:100%;accent-color:#b04966">
+    <label for="hellvoice-chaos" class="field-label">Foneettinen kaaos <output id="hellvoice-chaos-label">54 %</output></label>
+    <input id="hellvoice-chaos" type="range" min="0" max="100" value="54" style="width:100%;accent-color:#b04966">
+    <p class="hint">WebAudio tuottaa demonisia kerrosääniä. Androidin oma puhesynteesi säilyttää ymmärrettävät sanat; sitä ei voi selaimessa vapaasti reitittää säröpedaalin läpi.</p>
     <div class="mode-panel">
       <label class="switch-label"><input id="engine-enable" type="checkbox"> Käytä KLONEn oikeaa keskustelu-API:a</label>
       <label class="field-label" for="engine-source">Dialogiaineiston polku Termuxissa (pakollinen keskusteluille)
@@ -164,6 +186,23 @@
       <p class="hint">Jos valitset KLONE-tilan, kirjoittamasi tai mikrofonilla tunnistettu viesti lähetetään oman laitteesi KLONE-palvelimelle. Taidekuvaa tai äänen raakadataa ei lähetetä. Nykyinen API vastaa vain rajatusta dialogiaineistosta, eikä ulkoinen GPT ole käytössä.</p>
     </div>
     <div class="hint">Matki sanojani käyttää selaimen puheentunnistusta, joka voi käyttää verkkopalvelua. Matki ääntäni nauhoittaa vain enintään 4 sekuntia paikallisesti ja toistaa äänen korppimaiseksi käsiteltynä. Äänitiedostoja ei tallenneta pysyvästi eikä lähetetä KLONElle. Molemmat käynnistyvät vain omasta painikkeesta.</div>
+  </section>
+<section class="panel" id="grimoire" aria-label="Nokin lähteistetty Grimoire-tietokirjasto">
+    <div class="panel-head"><h2>Grimoire: musta kirjasto</h2><span class="badge">72 nimeä + tutkimus</span></div>
+    <p class="muted">Historiallisia tekstejä, tutkittuja uskontoja, kuvakieltä ja tajunnantutkimusta. Lähteisiin viittaavat merkinnät eivät ole todisteita yliluonnollisista olennoista. Nokin rääväsuinen persoona on erillinen fiktiokerros.</p>
+    <label for="grimoire-query" class="field-label">Hae käsitettä, henkilöä tai perinnettä</label>
+    <input id="grimoire-query" type="text" maxlength="120" autocomplete="off" placeholder="Paimon, Naberius, Vodou, 5-HT2A...">
+    <label for="grimoire-category" class="field-label" style="margin-top:9px">Rajaa aihealue</label>
+    <select id="grimoire-category" aria-label="Grimoiren aihealue" style="width:100%;background:#15202d;color:#ecfbfc;border:1px solid #456f76;border-radius:10px;padding:12px"><option value="">Kaikki aihealueet</option></select>
+    <div class="toolbar">
+      <button id="grimoire-reset" type="button">Tyhjennä haku</button>
+      <button id="grimoire-random" class="primary" type="button">Keksi poikkitieteinen synkkä taideidea</button>
+    </div>
+    <p id="grimoire-status" class="meta-row" role="status" aria-live="polite">Ladataan lähteitä...</p>
+    <div id="grimoire-results" class="grimoire-results" aria-label="Hakutulokset"></div>
+    <article id="grimoire-detail" class="grimoire-detail" aria-live="polite"></article>
+    <article id="grimoire-rift" class="grimoire-detail"></article>
+    <p id="grimoire-provenance" class="hint"></p>
   </section>
   <section class="panel" aria-label="Kuvallinen analyysi">
     <h2>Taidelaboratorio</h2>
@@ -178,6 +217,8 @@
   </section>
   <p class="muted">Prototyyppi. Noki ei vielä ole tekoälyagentti, eikä sillä ole pääsyä KLONEn muistiin, huoneisiin tai oikeuksiin. <a href="/chat">Avaa KLONEn keskusteluhuone</a>.</p>
 </main>
+<script src="/static/noki-hellvoice.js"></script>
+<script src="/static/noki-grimoire.js"></script>
 <script>
 (function(){
   "use strict";

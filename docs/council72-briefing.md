@@ -97,3 +97,9 @@ verkkoviestien lähetys ja käyttöönoton hyväksyntä eivät kuulu katselmukse
 Nämä ovat jatkokehityskohteita. Tämä muutos toteuttaa toistettavan koonnin,
 väitehakemiston ja tarkistusohjeet; se ei käynnistä 72 kielimallia eikä
 osoita subjektiivisen tietoisuuden syntymistä.
+
+Kohtien 2 ja 3 ensimmäinen rajattu toteutus on nyt
+[tavoitesopimus ja alkuperäiseen testiajoon sidottu havainto](council72-experiment-contract.md).
+Se lukitsee testipatterin hyväksymisrajat ja sitoo tuloksen alkuperäisiin
+tiedostoihin. Allekirjoittajan luottamus, autentikoitu ajankohta, ulkoiset
+CI-adapterit ja koko osa-alueen valmistuminen eivät kuulu tähän sidontaan.

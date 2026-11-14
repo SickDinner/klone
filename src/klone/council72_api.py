@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from .council72 import catalog, deliberate, draft_dispatch, experiment
 from .council72_session import run_session
+from .council72_experiment import build_contract
 from .council72_review import review_session
 from .council72_briefing import build_briefing
 from .api import get_repository
@@ -126,6 +127,35 @@ def council_briefing(request: ReviewRequest):
         session = run_session(request.session.model_dump())
         options = request.model_dump(exclude={"session"})
         return build_briefing(review_session(session, **options))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+class ExperimentIdentity(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    commit: str = Field(pattern=r"^[a-f0-9]{40}$")
+    test_suite_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    collector_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    platform: Literal["linux", "win32", "android"]
+
+
+class ExperimentContractRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    review: ReviewRequest
+    task_id: str = Field(min_length=1, max_length=96)
+    expected: ExperimentIdentity
+    minimum_full_passed: int = Field(default=1, ge=1, le=1000000)
+    maximum_full_skipped: int = Field(default=0, ge=0, le=10000)
+
+
+@router.post("/experiment-contract")
+def council_experiment_contract(request: ExperimentContractRequest):
+    try:
+        session = run_session(request.review.session.model_dump())
+        options = request.review.model_dump(exclude={"session"})
+        briefing = build_briefing(review_session(session, **options))
+        return build_contract(briefing, request.task_id, request.expected.model_dump(),
+            minimum_full_passed=request.minimum_full_passed, maximum_full_skipped=request.maximum_full_skipped)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

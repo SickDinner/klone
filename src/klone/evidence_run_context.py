@@ -57,6 +57,12 @@ def suite_snapshot(root: Path) -> dict:
     return {"sha256": digest(records), "file_count": len(records)}
 
 
+def collector_snapshot(root: Path) -> str:
+    paths = (root / "tools/termux_evidence_battery.py", root / "src/klone/evidence_run_context.py")
+    return digest({p.relative_to(root).as_posix(): hashlib.sha256(read_bounded(p, 1024 * 1024)).hexdigest()
+                   for p in paths})
+
+
 def syntax_check(source: Path) -> dict:
     errors, consumed, count = [], 0, 0
     for path in tree_files(source, python_only=True):

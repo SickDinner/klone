@@ -50,6 +50,9 @@ def _read_json(path: Path, limit: int = 65536) -> dict:
 def validate_run(run: dict) -> None:
     if type(run.get("schema_version")) is not int or run["schema_version"] not in (1, 2):
         raise ValueError("unsupported battery schema")
+    if "experiment_contract_sha256" in run and (not isinstance(run["experiment_contract_sha256"], str)
+                                                or not HEX.fullmatch(run["experiment_contract_sha256"])):
+        raise ValueError("invalid experiment contract digest")
     before, after = run["before"], run["after"]
     commit = before["commit"]
     if not isinstance(commit, str) or not SHA.fullmatch(commit) or after["commit"] != commit:

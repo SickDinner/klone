@@ -20,7 +20,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from klone.evidence_io import checked_path, directory_handle, json_object, read_bounded
 from klone.evidence_network import MAX_LOG, assemble_packet, canonical, validate_run
-from klone.evidence_run_context import context_id, digest, suite_snapshot, validate_environment
+from klone.evidence_run_context import collector_snapshot, context_id, digest, suite_snapshot, validate_environment
 
 PROBE = r'''
 import importlib.metadata as metadata
@@ -114,8 +114,7 @@ def probe_python(python: Path, root: Path, env: dict) -> dict:
 
 
 def collector_digest(root: Path) -> str:
-    paths = (root / "tools/termux_evidence_battery.py", root / "src/klone/evidence_run_context.py")
-    return digest({p.relative_to(root).as_posix(): hashlib.sha256(read_bounded(p, 1024 * 1024)).hexdigest() for p in paths})
+    return collector_snapshot(root)
 
 
 def stage_commands(root: Path, python: Path) -> dict:
@@ -153,7 +152,8 @@ def run_stage(command: list[str], root: Path, env: dict, timeout: int) -> tuple[
             "capture_complete": complete, "timed_out": timed_out}, raw
 
 
-def run_battery(root: Path, output: Path, timeout: int = 240, *, python: Path | None = None) -> dict:
+def run_battery(root: Path, output: Path, timeout: int = 240, *, python: Path | None = None,
+                experiment_contract: Path | None = None) -> dict:
     root = checked_path(root, directory=True)
     output = checked_path(output)
     validate_destination(root, output)
@@ -169,6 +169,12 @@ def run_battery(root: Path, output: Path, timeout: int = 240, *, python: Path | 
     before = checkout(root)
     probe = probe_python(python, root, env)
     suite_before, collector_before = suite_snapshot(root), collector_digest(root)
+    selected_contract = None
+    if experiment_contract is not None:
+        from klone.council72_experiment import validate_run_identity
+        selected_contract = validate_run_identity(json_object(read_bounded(experiment_contract, 2 * 1024 * 1024)),
+            commit=before["commit"], suite_sha256=suite_before["sha256"], collector_sha256=collector_before,
+            platform=probe["environment"]["platform"], clean=not before["dirty"])
     commands = stage_commands(root, python)
     execution = {"context_version": 1, "cwd": str(root), "python_executable": str(python),
                  "python_prefix": probe["prefix"], "virtualenv_reported": True,
@@ -214,6 +220,8 @@ def run_battery(root: Path, output: Path, timeout: int = 240, *, python: Path | 
                   "collection_complete": complete,
                   "overall": "passed" if required_ok and consistent and complete and execution["context_consistent"] else "failed",
                   "device_identity_verified": False, "deployment_approval": False}
+        if selected_contract is not None:
+            report["experiment_contract_sha256"] = selected_contract
         validate_run(report)
         raw = json.dumps(report, indent=2, sort_keys=True).encode()
         if len(raw) > 65536:
@@ -229,12 +237,15 @@ def main(argv=None):
     parser.add_argument("--root", type=Path, default=Path.home() / "klone-next")
     parser.add_argument("--output", "--output-dir", dest="output", type=Path, required=True)
     parser.add_argument("--python", type=Path, help="Existing virtualenv interpreter, including outside the worktree")
+    parser.add_argument("--experiment-contract", type=Path, help="Predeclared Council 72 battery criteria")
     parser.add_argument("--timeout", type=int, default=240)
     args = parser.parse_args(argv)
     if args.timeout < 1 or args.timeout > 3600:
         parser.error("timeout must be 1..3600")
     try:
         kwargs = {"python": args.python} if args.python is not None else {}
+        if args.experiment_contract is not None:
+            kwargs["experiment_contract"] = args.experiment_contract
         report = run_battery(args.root, args.output, args.timeout, **kwargs)
     except (ValueError, OSError, subprocess.SubprocessError, UnicodeError, RecursionError) as exc:
         parser.error(str(exc))

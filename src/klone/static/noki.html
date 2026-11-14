@@ -357,8 +357,9 @@
     }catch(e){engineFeedback("Yhteyttä ei saatu: "+e.message);}
   }
   document.getElementById("engine-status").addEventListener("click",function(){void pingEngine();});
-  document.getElementById("engine-clear").addEventListener("click",function(){kloneHistory=[];engineFeedback("Istunnon tilapäinen keskusteluhistoria tyhjennetty.");});
+  document.getElementById("engine-clear").addEventListener("click",function(){kloneRequestNonce++;if(kloneController){kloneController.abort();kloneController=null;}kloneHistory=[];engineFeedback("Istunnon tilapäinen keskusteluhistoria tyhjennetty.");});
   document.getElementById("engine-enable").addEventListener("change",function(){
+    kloneRequestNonce++;if(kloneController){kloneController.abort();kloneController=null;}
     kloneHistory=[];
     engineFeedback(this.checked?"KLONE-keskustelu käytössä, jos aineiston polku on annettu. Viestit lähetetään vain lähetyspainikkeella.":"Vain paikallinen nalkutus käytössä.");
   });

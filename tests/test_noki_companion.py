@@ -62,6 +62,10 @@ class NokiCompanionTests(unittest.TestCase):
         self.assertIn('id="hellvoice-intensity"', html)
         self.assertIn('id="hellvoice-chaos"', html)
         self.assertIn('data-hellfx="chorus72"', html)
+        self.assertIn('id="council-grid"', html)
+        self.assertIn('id="council-feedback"', html)
+        self.assertIn("const rings=", html)
+        self.assertIn("r*8+seat", html)
         for effect in ["witch", "snort", "squeak", "bones", "heckle"]:
             self.assertIn('id="' + effect + '"', html)
         voice = self.get_static("noki-hellvoice.js").text
@@ -72,6 +76,11 @@ class NokiCompanionTests(unittest.TestCase):
         self.assertIn("speechSynthesis", voice)
         self.assertIn("createDynamicsCompressor", voice)
         self.assertIn("phonetics", voice)
+        self.assertIn("function curseAt(", voice)
+        self.assertIn("Math.floor(i/8)", voice)
+        self.assertIn("hellIntros[ring]", voice)
+        self.assertIn("hellEndings[seat]", voice)
+        self.assertIn("playMimic(buffer)", voice)
         self.assertNotIn("getUserMedia", voice)
 
     def test_mimic_and_consented_chat_controls(self):
@@ -81,6 +90,8 @@ class NokiCompanionTests(unittest.TestCase):
         self.assertIn("getUserMedia", html)
         self.assertIn("MediaRecorder", html)
         self.assertIn("decodeAudioData", html)
+        self.assertIn("window.NokiHellvoice.playMimic(buffer)", html)
+        self.assertIn("mimicGeneration", html)
         self.assertIn("noiseSuppression:false", html)
         self.assertIn("recorder.stop();}},4000)", html)
         self.assertIn('fetch("/api/clone-chat/status"', html)

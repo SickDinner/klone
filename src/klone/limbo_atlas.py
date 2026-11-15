@@ -367,6 +367,45 @@ def validate_records(records) -> list[dict]:
     return out
 
 
+IDEA_METHODS = (
+    "Muodosta täsmällinen käsitemääritelmä ja erottele lähteen väite havainnosta.",
+    "Etsi aineiston ulkopuolinen vertailututkimus ja arvioi sen riippumattomuus.",
+    "Tarkista poikkeukset, aineiston vinoumat, puuttuvat mittarit ja haittamahdollisuudet.",
+    "Luo vaihtoehtoinen hypoteesi, joka selittää saman havainnon eri mekanismilla.",
+    "Suunnittele testi, jonka tulos voisi osoittaa ehdotetun selityksen vääräksi.",
+    "Ehdota kahden tieteenalan välistä uutta tutkimuskysymystä, merkiten sen hypoteesiksi.",
+    "Listaa toistettavan kokeen aineisto, menetelmät ja epävarmuusrajat.",
+    "Laadi varovainen johtopäätös ja tärkein avoimeksi jäänyt kysymys.",
+)
+
+
+def _ring_ideation(model: dict, ring_id: int, headline: str) -> list[dict]:
+    """Eight existing specialists per target ring propose separate research angles.
+
+    These are deterministic, source-grounded *draft prompts*, not generated
+    evidence, independent minds, autonomous task execution or peer review.
+    """
+    members = sorted((m for m in model["members"] if m["ring"] == ring_id),
+                     key=lambda member: member["slot"])
+    if len(members) != 8:
+        raise ValueError("Council72 specialist ring must contain eight members")
+    ideas = []
+    for member, method in zip(members, IDEA_METHODS):
+        ideas.append({
+            "member_id": member["id"],
+            "name": member["name"],
+            "specialism": member["task"],
+            "slot": member["slot"],
+            "strategy": method,
+            "research_prompt": ("Aihe: " + headline[:160] + ". Erikoisala: " +
+                                member["task"] + ". " + method),
+            "kind": "deterministic_ideation_draft",
+            "evidence_authenticated": False,
+            "execution_enabled": False,
+        })
+    return ideas
+
+
 def _packet(records: list[dict],ring_id: int, question: str | None) -> dict:
     model=catalog()
     if type(ring_id) is not int or not 2<=ring_id<=8:
@@ -389,6 +428,7 @@ def _packet(records: list[dict],ring_id: int, question: str | None) -> dict:
         "headline":selected[0]["title"],
         "question":user_question,
         "questions":question_examples,
+        "specialist_ideas":_ring_ideation(model,ring_id,selected[0]["title"]),
         "proposed_work":["Etsi alkuperäinen julkaisu ja koko aineisto.",
                          "Arvioi metodologia, epävarmuus ja mahdolliset vastaesimerkit.",
                          "Hae riippumaton julkaisija ja tarkista tulkinnan rajat.",
@@ -439,6 +479,15 @@ def plan(records: object, *, ring_id: int | None = None,
              "steps":[{"observations":observations[i:i+32]}
                       for i in range(0,len(observations),32)]}
     council=run_session(request)
+    # Preserve six existing simulated neuromodulators for each member's
+    # *proposal*, without turning the simulated vote into any authority.
+    opinions={o["member_id"]:o for o in council["latest_experiment"]["modulated"]["opinions"]}
+    for packet in packets:
+        for idea in packet["specialist_ideas"]:
+            opinion=opinions[idea["member_id"]]
+            idea["simulated_modulators"]=dict(opinion["modulators"])
+            idea["simulated_affect"]=dict(opinion["affect"])
+            idea["vote_preview"]=opinion["vote"]
     return {"schema_version":2,"kind":"klone-limbo-atlas-preview",
             "observations":data,"source_groups":sorted({r["publisher_group"] for r in data}),
             "packets":packets,"council_session":council,

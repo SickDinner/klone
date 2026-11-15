@@ -16,3 +16,8 @@
 .atlas-specialist{padding:12px;margin:8px 0;border:1px solid #42686c;background:#0c2229;border-radius:9px}
 .atlas-specialist b{color:#ddf2ef;font-size:.9rem}.atlas-specialist p{font-size:.85rem;line-height:1.45;margin:6px 0}
 .atlas-packet details{margin-top:12px}.atlas-packet summary{cursor:pointer;font-weight:700;color:#9be3d4}
+
+.atlas-memory-changes{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.atlas-memory-card{border:1px solid #466c70;background:#0b2028;border-radius:11px;padding:12px}
+.atlas-memory-card p{font-size:.82rem;color:#bdd6d0}
+.atlas-memory-card a{display:block;margin-top:8px;font-size:.82rem;overflow-wrap:anywhere}

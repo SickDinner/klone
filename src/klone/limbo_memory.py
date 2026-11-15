@@ -7,6 +7,7 @@ exposed as an unauthenticated write endpoint. No network or external posting.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
@@ -65,6 +66,17 @@ def _open(path: Path, *, readonly: bool = False) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA busy_timeout=15000")
     return conn
+
+
+@contextmanager
+def _connection(path: Path, *, readonly: bool = False):
+    """Commit/rollback operations and close SQLite handles on every platform."""
+    conn = _open(path, readonly=readonly)
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def _initialize(conn: sqlite3.Connection) -> None:
@@ -189,7 +201,7 @@ def ingest(db: str | Path, records: list[dict], *,
     observations = _normalize(records)  # fail before DB touches anything
     dest = _memory_path(db, root=root, create=True)
     fingerprint = _hash([r["receipt_sha256"] for r in observations])
-    with _open(dest) as conn:
+    with _connection(dest) as conn:
         # sqlite3.executescript() ends an existing transaction implicitly.
         # Initialize the schema first, then acquire the write lock so that all
         # articles, revisions and run memberships are *one atomic import*.
@@ -225,7 +237,7 @@ def status(db: str | Path, *, root: Path | None = None, limit: int = 50) -> dict
     if type(limit) is not int or not 1 <= limit <= 100:
         raise ValueError("invalid history limit")
     dest = _memory_path(db, root=root)
-    with _open(dest, readonly=True) as conn:
+    with _connection(dest, readonly=True) as conn:
         version=conn.execute("SELECT value FROM atlas_meta WHERE name='schema_version'").fetchone()
         if version is None or version["value"] != str(SCHEMA):
             raise ValueError("unrecognized Atlas research memory")

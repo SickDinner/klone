@@ -443,6 +443,37 @@ def plan(records: object, *, ring_id: int | None = None,
             "epistemic_status":"unverified_publisher_reports"}
 
 
+def balanced_selection(observations: list[dict], *, limit: int = MAX_RECORDS) -> list[dict]:
+    """Round-robin sources *within* each domain, then round-robin the domains.
+
+    A large --all batch must not hide psychology, philosophy or genetics merely
+    because geopolitics news was fetched first. Preserve fixed source provenance.
+    """
+    if type(limit) is not int or not 1 <= limit <= MAX_RECORDS:
+        raise ValueError("invalid output limit")
+    pools = {d.id: {} for d in DOMAINS}
+    for record in observations:
+        source = BY_SOURCE.get(record.get("source_id"))
+        if source is None:
+            raise ValueError("unknown source in balanced selection")
+        pools[source.domain].setdefault(source.id, []).append(record)
+    ordered = {}
+    for domain in DOMAINS:
+        group = pools[domain.id]
+        arranged = []
+        while any(group.values()):
+            for sid in sorted(group):
+                if group[sid]:
+                    arranged.append(group[sid].pop(0))
+        ordered[domain.id] = arranged
+    selected = []
+    while len(selected) < limit and any(ordered.values()):
+        for domain in DOMAINS:
+            if ordered[domain.id] and len(selected) < limit:
+                selected.append(ordered[domain.id].pop(0))
+    return selected
+
+
 def main(argv=None) -> int:
     parser=argparse.ArgumentParser(description="Manually fetch curated multidisciplinary sources; no posting.")
     parser.add_argument("--fetch",action="store_true")
@@ -475,7 +506,7 @@ def main(argv=None) -> int:
             errors.append({"source_id":sid,"status":"error","detail":str(exc)})
     if not observations:
         raise SystemExit("No source observations. "+json.dumps(errors,ensure_ascii=False))
-    report=plan(observations[:MAX_RECORDS])
+    report=plan(balanced_selection(observations))
     report.update({"collection":"manual_public_web",
                    "collected_at_utc":datetime.now(timezone.utc).isoformat(),
                    "requested_sources":selected,"fetch_errors":errors,

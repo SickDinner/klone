@@ -209,6 +209,67 @@
     a.href=url;a.download="klone-atlas-council-review.json";
     a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);
   });
+  function showMemory(data){
+    const root=id("atlas-memory-changes");
+    root.replaceChildren();
+    if(data.kind==="klone-atlas-memory-status"){
+      if(!Array.isArray(data.domains)||!Array.isArray(data.recent_runs))
+        throw new Error("Virheellinen tutkimusarkiston tilatiedosto.");
+      say("atlas-memory-status","Atlas E3 -arkisto: "+data.runs+" tuontia, "+
+        data.articles+" eri julkaisua, "+data.revisions+
+        " havaintoversiota. Ei sisällä yksityisen Memory Coren tietoja.");
+      for(const row of data.domains.slice(0,8)){
+        const card=el("article",undefined,"atlas-memory-card");
+        card.append(el("strong",String(row.domain)));
+        card.append(el("p",String(row.unique_articles)+" eri julkaisuviitettä"));
+        root.append(card);
+      }
+      return;
+    }
+    if(data.kind!=="klone-atlas-memory-delta"||!data.counts||!Array.isArray(data.changes))
+      throw new Error("Tämä ei ole Atlas E3:n tilaraportti tai muutosraportti.");
+    const counts=data.counts;
+    say("atlas-memory-status","Atlas E3, erä #"+data.run_id+
+      ": uusia "+counts.new+" · metadata muuttunut "+counts.metadata_changed+
+      " · tunnettuja "+counts.unchanged+". Tutkimusväitteitä ei ole todennettu.");
+    const visible=data.changes.filter(x=>x.status==="new"||x.status==="metadata_changed").slice(0,100);
+    if(!visible.length){
+      root.append(el("p","Ei uusia tai muuttuneita julkaisuja tässä tuontierässä."));
+    }
+    for(const entry of visible){
+      const card=el("article",undefined,"atlas-memory-card");
+      const type=entry.status==="new"?"UUSI JULKAISU":"METADATA MUUTTUNUT";
+      card.append(el("p",type+" · "+entry.domain+" · versio "+entry.version,"eyebrow"));
+      card.append(el("strong",entry.title));
+      try{
+        const link=new URL(entry.url);
+        if(link.protocol==="https:"&&!link.username&&!link.password){
+          const a=el("a","Lue lähteen sivu");
+          a.href=link.href;a.target="_blank";a.rel="noopener noreferrer";
+          card.append(a);
+        }
+      }catch(_ignored){}
+      root.append(card);
+    }
+    if(data.changes.filter(x=>x.status==="new"||x.status==="metadata_changed").length>100){
+      root.append(el("p","Ensimmäiset 100 muutosta näkyvät. Koko aineisto on tuotavassa JSONissa."));
+    }
+  }
+  id("atlas-memory-import").addEventListener("change",async event=>{
+    const file=event.target.files?.[0];
+    if(!file)return;
+    try{
+      if(file.size>5*1024*1024)throw new Error("Muistiraportti on liian suuri.");
+      const data=JSON.parse(await file.text());
+      showMemory(data);
+    }catch(error){
+      say("atlas-memory-status","Muistitiedoston tuonti epäonnistui: "+error.message);
+    }finally{event.target.value="";}
+  });
+  id("atlas-memory-clear").addEventListener("click",()=>{
+    id("atlas-memory-changes").replaceChildren();
+    say("atlas-memory-status","Muistivertailun näkymä tyhjennetty. SQLite-arkistoa ei muutettu.");
+  });
   async function init(){
     try{
       state.catalog=await api("/api/limbo-atlas/catalog");

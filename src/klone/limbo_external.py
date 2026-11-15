@@ -15,8 +15,9 @@ from pathlib import Path
 import json
 import re
 import ssl
+import time
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener, HTTPSHandler
 import xml.etree.ElementTree as ET
 
@@ -84,6 +85,9 @@ FEEDS = (
 BY_ID = {s.id: s for s in FEEDS}
 BY_COURIER = {s.courier_id: s for s in FEEDS}
 assert len(BY_ID) == len(BY_COURIER) == 8
+
+ARXIV_RECENT_CATEGORIES = {'arxiv-ai': 'cs.AI', 'arxiv-neuro': 'q-bio.NC'}
+ARXIV_QUERY_ENDPOINT = 'https://export.arxiv.org/api/query'
 
 
 def _sha(value: object) -> str:
@@ -270,6 +274,24 @@ def draft_question(*, courier_id: int, source_id: str, question: str) -> dict:
     }
 
 
+def _feed_article_url(url: str, source_id: str) -> str:
+    """The arXiv Atom API can use old HTTP abstract links; canonicalize only its
+    own allowlisted article links to HTTPS, never arbitrary destinations."""
+    source = BY_ID[source_id]
+    if source_id in ARXIV_RECENT_CATEGORIES:
+        try:
+            p = urlsplit(url)
+            if (p.scheme == "http" and p.hostname in ("arxiv.org", "www.arxiv.org")
+                    and p.port in (None, 80) and not p.username and not p.password
+                    and p.path.startswith("/abs/") and not p.fragment):
+                url = "https://arxiv.org" + p.path
+                if p.query:
+                    url += "?" + p.query
+        except ValueError:
+            pass
+    return _public_article_url(url, source)
+
+
 def parse_feed(source_id: str, raw: bytes) -> list[dict]:
     """Parse a bounded RSS/Atom response without resolving arbitrary URLs."""
     if source_id not in BY_ID:
@@ -309,7 +331,7 @@ def parse_feed(source_id: str, raw: bytes) -> list[dict]:
                 "courier_id": BY_ID[source_id].courier_id,
                 "title": _feed_text(title, 240),
                 "summary": _feed_text(summary or title, 360),
-                "url": _public_article_url(url, BY_ID[source_id]),
+                "url": _feed_article_url(url, source_id),
                 "published_at": _clean(published, 80) if published else None,
             }
         except ValueError:
@@ -347,6 +369,39 @@ def fetch_source(source_id: str, *, timeout: float = 8.0) -> list[dict]:
             raw = response.read(MAX_BYTES + 1)
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         raise ValueError("public feed not available: " + source_id) from exc
+    return parse_feed(source_id, raw)
+
+
+def fetch_recent_arxiv(source_id: str, *, timeout: float = 12.0) -> list[dict]:
+    """Operator-invoked arXiv API lookup even on weekends; fixed query and target."""
+    if source_id not in ARXIV_RECENT_CATEGORIES:
+        raise ValueError("recent search is available only for arxiv-ai and arxiv-neuro")
+    if type(timeout) not in (int, float) or not 1 <= timeout <= 15:
+        raise ValueError("timeout out of range")
+    query = urlencode({
+        "search_query": "cat:" + ARXIV_RECENT_CATEGORIES[source_id],
+        "start": 0, "max_results": MAX_FEED_ITEMS,
+        "sortBy": "submittedDate", "sortOrder": "descending",
+    })
+    url = ARXIV_QUERY_ENDPOINT + "?" + query
+    opener = build_opener(ProxyHandler({}), HTTPSHandler(context=ssl.create_default_context()), _NoRedirect())
+    request = Request(url, headers={
+        "User-Agent": USER_AGENT,
+        "Accept": "application/atom+xml, application/xml, text/xml",
+    })
+    try:
+        with opener.open(request, timeout=timeout) as response:
+            if response.status != 200:
+                raise ValueError("arXiv recent query returned non-200")
+            if response.url != url:
+                raise ValueError("arXiv recent query endpoint changed")
+            kind = response.headers.get("Content-Type", "").lower()
+            if kind and not ("xml" in kind or "text/plain" in kind):
+                raise ValueError("arXiv recent query returned non-XML")
+            raw = response.read(MAX_BYTES + 1)
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        raise ValueError("arXiv recent query failed: " + source_id
+                         + " (" + str(exc)[:120] + ")") from exc
     return parse_feed(source_id, raw)
 
 

@@ -74,8 +74,10 @@ class AtlasMemoryE3Tests(unittest.TestCase):
         self.assertEqual(summary["articles"],2)
         self.assertEqual(summary["revisions"],4)
         with sqlite3.connect(self.db) as conn:
-            chain=conn.execute("SELECT version,previous_sha256,record_sha256 "
-                               "FROM atlas_revisions ORDER BY version").fetchall()
+            chain=conn.execute("SELECT r.version,r.previous_sha256,r.record_sha256 "
+                               "FROM atlas_revisions r JOIN atlas_articles a ON r.article_id=a.article_id "
+                               "WHERE a.source_id=? AND a.url=? ORDER BY r.version",
+                               (original["source_id"],original["url"])).fetchall()
         self.assertIsNone(chain[0][1])
         self.assertEqual(chain[1][1],chain[0][2])
         self.assertEqual(chain[2][1],chain[1][2])

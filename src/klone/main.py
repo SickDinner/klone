@@ -121,6 +121,10 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     @app.get("/council72", include_in_schema=False)
     def council_dashboard() -> FileResponse:
         return FileResponse(STATIC_DIR / "council72.html")
+
+    @app.get("/limbo-external", include_in_schema=False)
+    def limbo_external_dashboard() -> FileResponse:
+        return FileResponse(STATIC_DIR / "limbo-external.html")
     return app
 
 

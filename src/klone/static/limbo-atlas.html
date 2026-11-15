@@ -74,12 +74,13 @@
   <div id="atlas-memory-changes" class="atlas-memory-changes"></div>
   <h3>Ota täysi 26 lähteen arkistointi käyttöön</h3>
   <pre class="code">cd ~/klone-arxiv-e1
+STAMP="$(date +%Y%m%d-%H%M%S)"
 
 PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
   -m klone.limbo_atlas --fetch --all \
   --memory-db "$HOME/klone-var/atlas-memory.sqlite3" \
-  --memory-delta-output "$HOME/klone-var/atlas-e3-delta.json" \
-  --output "$HOME/klone-var/atlas-e3-briefing.json"</pre>
+  --memory-delta-output "$HOME/klone-var/atlas-e3-delta-$STAMP.json" \
+  --output "$HOME/klone-var/atlas-e3-briefing-$STAMP.json"</pre>
   <p class="muted">Nämä komennot suoritetaan vain itse käynnistettyinä. Tallennus säilyttää myös ne kelvolliset julkaisut, jotka eivät mahdu 48 havainnon neuvostoraporttiin. Tuo tämän jälkeen E3-muutostiedosto yllä olevalla painikkeella.</p>
 </section>
 

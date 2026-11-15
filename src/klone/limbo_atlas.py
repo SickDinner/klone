@@ -535,8 +535,11 @@ def main(argv=None) -> int:
     parser.add_argument("--source",choices=sorted(BY_SOURCE),action="append")
     parser.add_argument("--all",action="store_true",help="Opt in to all curated sources")
     parser.add_argument("--output",required=True,help="Fresh JSON report path; existing files are not replaced")
+    parser.add_argument("--memory-db",type=Path,help="Opt in to archiving ALL retrieved public entries in standalone E3 SQLite database")
+    parser.add_argument("--memory-delta-output",type=Path,help="Optional new E3 delta report; requires --memory-db")
     args=parser.parse_args(argv)
     if not args.fetch:parser.error("--fetch is required")
+    if args.memory_delta_output and not args.memory_db:parser.error("--memory-delta-output needs --memory-db")
     if args.all and (args.domain or args.source):parser.error("--all cannot combine with filters")
     if not (args.all or args.domain or args.source):parser.error("select --domain, --source or --all")
     if args.all: selected=list(BY_SOURCE)
@@ -560,6 +563,15 @@ def main(argv=None) -> int:
             errors.append({"source_id":sid,"status":"error","detail":str(exc)})
     if not observations:
         raise SystemExit("No source observations. "+json.dumps(errors,ensure_ascii=False))
+    archive_delta=None
+    if args.memory_db is not None:
+        # Explicit user opt-in. Store ALL retrieved entries, including those
+        # omitted from the bounded 48-observation Council72 planning sample.
+        from .limbo_memory import ingest as memory_ingest
+        archive_delta=memory_ingest(args.memory_db, observations)
+        if args.memory_delta_output:
+            rendered=json.dumps(archive_delta,ensure_ascii=False,indent=2,allow_nan=False)+"\n"
+            write_new_report(args.memory_delta_output.expanduser(),rendered,Path.cwd().resolve())
     report=plan(balanced_selection(observations))
     report.update({"collection":"manual_public_web",
                    "collected_at_utc":datetime.now(timezone.utc).isoformat(),
@@ -567,7 +579,7 @@ def main(argv=None) -> int:
                    "dropped_after_cap":max(0,len(observations)-MAX_RECORDS)})
     text=json.dumps(report,ensure_ascii=False,indent=2,allow_nan=False)+"\n"
     write_new_report(Path(args.output).expanduser(),text,Path.cwd().resolve())
-    print(json.dumps({"path":args.output,"observations":len(report["observations"]),
+    print(json.dumps({"path":args.output,"memory":archive_delta["counts"] if archive_delta else None,"observations":len(report["observations"]),
                       "packets":len(report["packets"]),"errors":len(errors),
                       "dropped_after_cap":report["dropped_after_cap"]},ensure_ascii=False))
     return 0

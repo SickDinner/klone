@@ -155,6 +155,21 @@
       const list=el("ul");
       p.proposed_work.forEach(t=>list.append(el("li",t)));
       details.append(list);card.append(details);
+      const specialist=el("details");
+      specialist.append(el("summary","Ringin 8 erikoisagentin tutkimusideat"));
+      for(const idea of p.specialist_ideas||[]){
+        const row=el("section",undefined,"atlas-specialist");
+        row.append(el("b","#"+idea.member_id+" "+idea.name+" · "+idea.specialism));
+        row.append(el("p",idea.research_prompt));
+        const affect=idea.simulated_affect||{};
+        row.append(el("p","Simuloitu tila: uteliaisuus "+
+          Number(affect.curiosity||0).toFixed(2)+", huoli "+
+          Number(affect.concern||0).toFixed(2)+", rauhallisuus "+
+          Number(affect.calm||0).toFixed(2)+
+          " · vain tutkimusluonnos","atlas-stats"));
+        specialist.append(row);
+      }
+      card.append(specialist);
       const badge=el("span","LUONNOS · EI JULKAISTU","atlas-pill");card.append(badge);
       card.append(el("span",p.publisher_groups.length+" julkaisijaryhmää · ei riippumatonta varmennusta","atlas-pill"));
       const links=el("details");

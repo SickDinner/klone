@@ -126,6 +126,24 @@ class LimboExternalTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             draft_question(courier_id=24, source_id="arxiv-ai", question="Hi")
 
+    def test_dashboard_serves_mobile_ui_without_external_scripts(self):
+        page = self.client.get("/limbo-external")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn('lang="fi"', page.text)
+        self.assertIn('id="agents"', page.text)
+        self.assertIn('id="preview"', page.text)
+        self.assertIn('id="draft-form"', page.text)
+        self.assertIn('connect-src \'self\'', page.text)
+        for name in ("limbo-external-view.js", "limbo-external.css"):
+            result = self.client.get("/static/" + name)
+            self.assertEqual(result.status_code, 200)
+        js = self.client.get("/static/limbo-external-view.js").text
+        self.assertIn('"/api/limbo-external/preview"', js)
+        self.assertIn('"/api/limbo-external/question-draft"', js)
+        self.assertIn('textContent', js)
+        self.assertNotIn("innerHTML", js)
+        self.assertNotIn('fetch("https:', js)
+
     def test_api_reads_catalog_without_network_or_memory_permission(self):
         response = self.client.get("/api/limbo-external/agents")
         self.assertEqual(response.status_code, 200)

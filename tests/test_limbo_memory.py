@@ -185,6 +185,7 @@ class AtlasMemoryE3Tests(unittest.TestCase):
             return ingest(self.db,items,root=self.root)
         with patch("klone.limbo_atlas.fetch_source", side_effect=lambda sid:[d for d in docs if d["source_id"]==sid]),\
              patch("klone.limbo_memory.ingest",side_effect=archive) as mem,\
+             patch("klone.limbo_atlas.time.sleep") as ignore_pause,\
              patch("klone.limbo_atlas.write_new_report") as write:
             self.assertEqual(atlas_main(["--fetch","--all","--memory-db",str(self.db),
                                          "--output","/tmp/atlas-e3-test.json"]),0)

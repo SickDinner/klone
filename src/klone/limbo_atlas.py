@@ -156,16 +156,18 @@ def _digest(value) -> str:
                              separators=(",", ":"), allow_nan=False).encode()).hexdigest()
 
 
-def _text(value, cap=360) -> str:
+def _text(value, cap=360, *, truncate=False) -> str:
     if not isinstance(value, str):
         raise ValueError("text must be string")
+    if not truncate and len(value) > cap:
+        raise ValueError("text exceeds field limit")
     cleaned = _feed_text(value, cap)
     if not cleaned or any(ord(c) < 32 for c in cleaned):
         raise ValueError("invalid text")
     return cleaned
 
 
-def _article_url(url: str, source: AtlasSource) -> str:
+def _article_url(url: str, source: AtlasSource, *, imported_arxiv_link=False) -> str:
     if not isinstance(url, str) or not 12 <= len(url) <= 256:
         raise ValueError("article URL invalid or too long")
     try:
@@ -177,7 +179,8 @@ def _article_url(url: str, source: AtlasSource) -> str:
             p.username is not None or p.password is not None) or (
             any(ord(c) < 33 for c in url)):
         raise ValueError("article host not approved")
-    if source.kind == "arxiv" and p.scheme == "http" and port in (None, 80) and p.path.startswith("/abs/"):
+    if (imported_arxiv_link and source.kind == "arxiv" and p.scheme == "http"
+            and port in (None, 80) and p.path.startswith("/abs/")):
         url = "https://arxiv.org" + p.path + ("?" + p.query if p.query else "")
         p = urlsplit(url)
         port = p.port
@@ -216,10 +219,11 @@ def _rss_docs(raw: bytes, source: AtlasSource) -> list[dict]:
             get = lambda k: item.findtext(k, default="")
             url, title, body, published = get("link"), get("title"), (get("description") or get("title")), get("pubDate")
         try:
-            article = _article_url(url, source)
+            article = _article_url(url, source, imported_arxiv_link=True)
             doc = {"source_id":source.id, "courier_id":BY_DOMAIN[source.domain].courier,
-                   "url":article, "title":_text(title,240), "summary":_text(body,360),
-                   "published_at":_text(published,80) if published else None}
+                   "url":article, "title":_text(title,240,truncate=True),
+                   "summary":_text(body,360,truncate=True),
+                   "published_at":_text(published,80,truncate=True) if published else None}
         except ValueError:
             continue
         if article not in seen:
@@ -250,9 +254,10 @@ def _pmc_docs(raw: bytes, source: AtlasSource) -> list[dict]:
         url = "https://europepmc.org/article/" + kind + "/" + ident
         try:
             doc={"source_id":source.id,"courier_id":BY_DOMAIN[source.domain].courier,
-                 "url":_article_url(url, source), "title":_text(row.get("title", ""),240),
-                 "summary":_text(row.get("abstractText") or row.get("title") or "",360),
-                 "published_at":_text(row["firstPublicationDate"],80)
+                 "url":_article_url(url, source),
+                 "title":_text(row.get("title", ""),240,truncate=True),
+                 "summary":_text(row.get("abstractText") or row.get("title") or "",360,truncate=True),
+                 "published_at":_text(row["firstPublicationDate"],80,truncate=True)
                    if row.get("firstPublicationDate") else None}
         except ValueError:
             continue

@@ -9,6 +9,7 @@ from .api import router as api_router
 from .cognition_api import router as cognition_router
 from .council72_api import router as council_router
 from .limbo_external_api import router as limbo_external_router
+from .limbo_atlas_api import router as limbo_atlas_router
 from .audit import AuditService
 from .config import Settings, load_settings, settings
 from .contracts import APP_VERSION, BOOTSTRAP_TASK_ID
@@ -104,6 +105,7 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     app.include_router(cognition_router)
     app.include_router(council_router)
     app.include_router(limbo_external_router)
+    app.include_router(limbo_atlas_router)
     app.include_router(v1_router)
 
     @app.get("/", include_in_schema=False)
@@ -125,6 +127,10 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     @app.get("/limbo-external", include_in_schema=False)
     def limbo_external_dashboard() -> FileResponse:
         return FileResponse(STATIC_DIR / "limbo-external.html")
+
+    @app.get("/limbo-atlas", include_in_schema=False)
+    def limbo_atlas_dashboard() -> FileResponse:
+        return FileResponse(STATIC_DIR / "limbo-atlas.html")
     return app
 
 

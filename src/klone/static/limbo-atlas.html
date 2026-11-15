@@ -61,6 +61,28 @@
   </form>
 </section>
 
+<section class="panel" id="atlas-memory">
+  <h2>Atlas E3 · pysyvä julkinen tutkimusmuisti</h2>
+  <p>Yksittäinen hakukierros voi nähdä samat julkaisut uudelleen. E3:n erillinen Termuxissa sijaitseva SQLite-arkisto tunnistaa <strong>uudet tutkimusviitteet, muuttuneen julkaisumetadatan ja jo tunnetut viitteet</strong>. Se ei muuta KLONEn yksityistä Memory Corea eikä todenna tutkimusväitteitä oikeiksi.</p>
+  <div class="toolbar">
+    <label class="file-button">Tuo E3-muutostiedosto
+      <input id="atlas-memory-import" type="file" accept="application/json,.json">
+    </label>
+    <button type="button" id="atlas-memory-clear" class="secondary">Tyhjennä muistivertailun näkymä</button>
+  </div>
+  <p id="atlas-memory-status" class="status" role="status" aria-live="polite">Muistiarkiston tilaa ei ole vielä tuotu. Tietoja ei haeta tietokannasta selaimen taustalla.</p>
+  <div id="atlas-memory-changes" class="atlas-memory-changes"></div>
+  <h3>Ota täysi 26 lähteen arkistointi käyttöön</h3>
+  <pre class="code">cd ~/klone-arxiv-e1
+
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_atlas --fetch --all \
+  --memory-db "$HOME/klone-var/atlas-memory.sqlite3" \
+  --memory-delta-output "$HOME/klone-var/atlas-e3-delta.json" \
+  --output "$HOME/klone-var/atlas-e3-briefing.json"</pre>
+  <p class="muted">Nämä komennot suoritetaan vain itse käynnistettyinä. Tallennus säilyttää myös ne kelvolliset julkaisut, jotka eivät mahdu 48 havainnon neuvostoraporttiin. Tuo tämän jälkeen E3-muutostiedosto yllä olevalla painikkeella.</p>
+</section>
+
 <section class="panel">
   <h2>4. Valitse vastaanottava rinki ja tutkimuskysymys</h2>
   <p class="muted">Automaattireititys käyttää alan luontevaa neuvostorinkiä. Vaihtoehtoisesti voit ohjata koko havaintojoukon valitsemaasi rinkiin ja pyytää uutta näkökulmaa.</p>

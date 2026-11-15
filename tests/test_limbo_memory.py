@@ -1,5 +1,6 @@
 """Atlas E3 isolated append-only SQLite public research memory contracts."""
 from pathlib import Path
+from contextlib import closing
 import json
 import sqlite3
 import tempfile
@@ -73,7 +74,7 @@ class AtlasMemoryE3Tests(unittest.TestCase):
         self.assertEqual(summary["runs"],3)
         self.assertEqual(summary["articles"],2)
         self.assertEqual(summary["revisions"],4)
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn:
             chain=conn.execute("SELECT r.version,r.previous_sha256,r.record_sha256 "
                                "FROM atlas_revisions r JOIN atlas_articles a ON r.article_id=a.article_id "
                                "WHERE a.source_id=? AND a.url=? ORDER BY r.version",

@@ -100,6 +100,13 @@ def _clean(text: object, limit: int) -> str:
     return value
 
 
+def _feed_text(raw: str, limit: int) -> str:
+    """Normalize editor-supplied RSS HTML fragments without dropping long summaries."""
+    value = SPACE.sub(" ", unescape(str(raw))).strip()
+    value = SPACE.sub(" ", TAGS.sub(" ", value)).strip()
+    return _clean(value[:limit].strip(), limit)
+
+
 def _public_article_url(url: object, feed: PublicFeed) -> str:
     if not isinstance(url, str) or not 10 <= len(url) <= 256:
         raise ValueError("invalid source URL")
@@ -300,8 +307,8 @@ def parse_feed(source_id: str, raw: bytes) -> list[dict]:
             candidate = {
                 "source_id": source_id,
                 "courier_id": BY_ID[source_id].courier_id,
-                "title": _clean(title, 240),
-                "summary": _clean(summary or title, 360),
+                "title": _feed_text(title, 240),
+                "summary": _feed_text(summary or title, 360),
                 "url": _public_article_url(url, BY_ID[source_id]),
                 "published_at": _clean(published, 80) if published else None,
             }

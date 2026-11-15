@@ -94,6 +94,44 @@ Selainosoite: **http://127.0.0.1:8001/limbo-external**.
 Jos olet käynnistänyt koodin aiemmin toisesta työhakemistosta,
 tarkista uudelleenkäynnistys ja git-version SHA ennen testaamista.
 
+## arXivin viikonloppuhaku: --recent
+
+ArXivin virallinen RSS-syöte on **tyhjä lauantaisin, sunnuntaisin ja
+arXivin lomapäivinä**. Se on normaalia eikä tarkoita, että KLONE tai
+verkkoyhteys olisi rikki. Vanha komentorivityökalu ilmoitti tällöin
+"no public feed observations", mikä näytti tekniseltä virheeltä.
+
+Nyt **vain käyttäjän käynnistämä** \`--fetch --recent\` hakee kuusi
+viimeisintä julkaistua artikkelia aihealuetta kohti arXivin virallisesta
+Atom-haku-API:sta \`https://export.arxiv.org/api/query\`.
+
+\`\`\`sh
+cd ~/klone-arxiv-e1 || exit 1
+git fetch origin feat/limbo-external-intelligence-20261115 || exit 1
+git switch --detach FETCH_HEAD || exit 1
+
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m unittest discover -s tests -p 'test_limbo_external.py' || exit 1
+
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_external \
+  --fetch --recent \
+  --source arxiv-ai \
+  --source arxiv-neuro \
+  --output "$HOME/klone-var/arxiv-recent-$(date +%Y%m%d-%H%M%S).json"
+\`\`\`
+
+Kun haet molemmat kategoriat, ohjelma odottaa vähintään 3 sekuntia
+hakujen välissä arXivin API-ohjeen mukaisesti.
+Tämä ei ole jatkuva, ajastettu tai automaattinen haku.
+
+Jos arXiv-API ei vastaa, KLONE ilmoittaa syötteen virheen. Virhetilanteesta
+ei kirjoiteta onnistunutta raporttia, eikä tutkimuksia keksitä.
+JSON-raportin voi tuoda avattuun työpöytään
+\`http://127.0.0.1:8031/limbo-external\`.
+CLI käyttää uusinta Python-koodia ilman palvelimen uudelleenkäynnistystä.
+
+
 ## Yhden julkisen lähteen nouto (vain omalla komennolla)
 
 \`\`\`sh

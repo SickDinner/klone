@@ -158,6 +158,15 @@ class AtlasE2Tests(unittest.TestCase):
         self.assertEqual(len(report["packets"]),4)
         self.assertEqual({p["target_ring"] for p in report["packets"]},{2,3,4,5})
         for packet in report["packets"]:
+            self.assertEqual(len(packet["specialist_ideas"]),8)
+            self.assertEqual(len({i["member_id"] for i in packet["specialist_ideas"]}),8)
+            expected={m["id"] for m in catalog()["members"] if m["ring"]==packet["target_ring"]}
+            self.assertEqual({i["member_id"] for i in packet["specialist_ideas"]},expected)
+            for idea in packet["specialist_ideas"]:
+                self.assertEqual(len(idea["simulated_modulators"]),6)
+                self.assertIn("curiosity",idea["simulated_affect"])
+                self.assertFalse(idea["execution_enabled"])
+                self.assertFalse(idea["evidence_authenticated"])
             self.assertFalse(packet["truth_verified"])
             self.assertFalse(packet["publication_enabled"])
             self.assertFalse(packet["independent_sources_verified"])
@@ -214,6 +223,8 @@ class AtlasE2Tests(unittest.TestCase):
         self.assertIn('"arxiv-ai":"atlas-arxiv-ai"',js.text)
         self.assertIn('"arxiv-neuro":"neuro-arxiv"',js.text)
         self.assertIn('"/api/limbo-atlas/plan"',js.text)
+        self.assertIn("specialist_ideas",js.text)
+        self.assertIn("Simuloitu tila",js.text)
         self.assertIn("textContent",js.text)
         self.assertNotIn("innerHTML",js.text)
         self.assertNotIn('fetch("https:',js.text)

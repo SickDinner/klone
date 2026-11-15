@@ -28,6 +28,19 @@ työluonnoksen ringeille 2–8 (asiantuntija, perustaja, kysymykset,
 lähdeviitteet, vaihtoehtoiset selitykset, falsifiointi).
 Käyttäjä voi vaihtaa vastaanottavan ringin ja muotoilla itse kysymyksen.
 
+Kukin vastaanottava rinki hyödyntää **kaikkia kahdeksaa olemassa
+olevaa erikoisagenttiaan**. E2 muodostaa deterministisesti kahdeksan
+erilaista tutkimusidean luonnosta: käsitemäärittely, riippumaton lähde,
+vinoumien arviointi, vaihtoehtoinen hypoteesi, falsifioitava testi,
+tieteidenvälinen kytkentä, toistettava koe ja epävarmuuden raportointi.
+Jokaisen idean mukana näkyvät jäsenen ID, erikoistehtävä, neuvoston
+simuloidut kuusi neuromodulaattoria ja kognitiiviset tilamuuttujat.
+
+Nämä ovat **tarkistuskelpoisia ideointirunkoja**, eivät vielä LLM:n
+itsenäisesti tekemää kirjallisuuskatsausta, vertaisarvioitua tutkimusta
+tai automaattisesti suoritettavia tehtäviä.
+
+
 ## Julkiset lähteet
 
 E2 sisältää **26 kuratoitua lähdeasetusta**; ne eivät ole 26 toisistaan

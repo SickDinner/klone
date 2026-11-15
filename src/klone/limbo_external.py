@@ -409,23 +409,38 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Explicit, bounded Limbo public-source read; no posting")
     parser.add_argument("--source", choices=sorted(BY_ID), action="append")
     parser.add_argument("--fetch", action="store_true", help="Opt in to one-shot network reads; never automatic")
+    parser.add_argument("--recent", action="store_true", help="Query recent arXiv papers beyond daily RSS")
     parser.add_argument("--output", required=True, help="New local JSON evidence artifact (must not exist)")
     args = parser.parse_args(argv)
     if not args.fetch:
         parser.error("--fetch is required to authorize public-source network reads")
-    source_ids = list(dict.fromkeys(args.source or BY_ID.keys()))
+    source_ids = list(dict.fromkeys(args.source or
+                                    (ARXIV_RECENT_CATEGORIES if args.recent else BY_ID.keys())))
+    if args.recent and any(s not in ARXIV_RECENT_CATEGORIES for s in source_ids):
+        parser.error("--recent accepts only arxiv-ai and arxiv-neuro sources")
     documents, errors = [], []
-    for source_id in source_ids:
+    for index, source_id in enumerate(source_ids):
         try:
-            documents.extend(fetch_source(source_id))
+            if args.recent:
+                # Respect arXiv's recommended three-second interval.
+                if index:
+                    time.sleep(3.1)
+                documents.extend(fetch_recent_arxiv(source_id))
+            else:
+                documents.extend(fetch_source(source_id))
         except ValueError as exc:
             errors.append({"source_id": source_id, "error": str(exc)})
     # Do not manufacture a successful research run when every feed failed/returned empty.
     if not documents:
-        raise SystemExit("No public feed observations; refusing to write an empty success report")
+        cause = "; ".join(x["source_id"] + ": " + x["error"] for x in errors)
+        if args.recent:
+            raise SystemExit("No recent arXiv articles received. " + (cause or "API returned zero entries."))
+        tip = ("Daily arXiv RSS is normally empty on Saturday/Sunday and holidays. "
+               "Try --fetch --recent --source arxiv-ai for existing publications.")
+        raise SystemExit("No public feed observations. " + tip + (" Errors: " + cause if cause else ""))
     report = analyze_documents(documents[:MAX_DOCUMENTS])
     report["fetch_errors"] = errors
-    report["fetch_kind"] = "explicit_manual_cli"
+    report["fetch_kind"] = "explicit_arxiv_recent_api" if args.recent else "explicit_manual_rss_cli"
     report["collected_at_utc"] = datetime.now(timezone.utc).isoformat()
     rendered = json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
     write_new_report(Path(args.output).expanduser(), rendered, Path.cwd().resolve())

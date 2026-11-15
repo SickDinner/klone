@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
+<title>KLONE · Limbo Atlas E2</title>
+<link rel="stylesheet" href="/static/limbo-external.css">
+<link rel="stylesheet" href="/static/limbo-atlas.css">
+<script src="/static/limbo-atlas.js" defer></script>
+</head>
+<body>
+<header>
+  <a href="/">KLONE · Mission Control</a>
+  <a href="/limbo-external">Limbo E1</a>
+  <a href="/council72">72-paikkainen neuvosto</a>
+  <span class="tag">E2 · ATLAS / 8 ALAA</span>
+</header>
+<main>
+<section class="hero">
+  <p class="eyebrow">KLONE / LIMBO / MONIALAINEN TUTKIMUS</p>
+  <h1>Ulkomaailman tietovirrat.<br>Kahdeksan erityisalaa.<br>Seitsemän tutkimusrinkiä.</h1>
+  <p>Genetiikka, psykologia, psykiatria, farmakologia, geopolitiikka, filosofia, talous, teknologia ja luonnontieteet kerätään samaan lähdeketjuun. Kahdeksan nykyistä Limbo-agenttia tarkastelevat julkisia havaintoja ja laativat niistä tutkittavia ehdotuksia neuvoston muille ringeille.</p>
+  <div class="statline"><div><b>8</b><span>oikeaa Limbo-agenttia</span></div><div><b>26</b><span>kuratoitua lähdettä</span></div><div><b>7</b><span>vastaanottavaa rinkiä</span></div><div><b>0</b><span>automaattista julkaisua</span></div></div>
+</section>
+<p id="atlas-status" class="status" role="status" aria-live="polite">Ladataan alojen karttaa...</p>
+
+<section class="panel">
+  <h2>1. Agenttien monialainen vastuunjako</h2>
+  <p class="muted">Valitse agentin ala nähdäksesi sen tutkimustehtävät, neuvostoreitin, julkiset lähteet ja kuusi simuloitua välittäjäainemuuttujaa.</p>
+  <div class="atlas-filter">
+    <label for="domain-filter">Tutkimusala</label>
+    <select id="domain-filter"><option value="">Kaikki kahdeksan alaa</option></select>
+  </div>
+  <div class="agent-grid" id="atlas-agents"></div>
+</section>
+
+<section class="panel">
+  <h2>2. Julkiset uutis- ja tutkimuslähteet</h2>
+  <p class="muted">arXiv, Europe PMC, Stanford Encyclopedia of Philosophy ja julkiset RSS-uutisvirrat. Eri lehtien ja tutkimusarkistojen tietoja ei väitetä toisistaan riippumattomaksi näytöksi ilman tarkastusta.</p>
+  <div class="atlas-sources" id="atlas-sources"></div>
+  <p class="muted">Lähdeosoitteita saa avata erikseen. Niitä ei haeta selaimen taustalla eikä niiden julkaisijoihin lähetetä mitään KLONEn nimissä.</p>
+</section>
+
+<section class="panel" id="atlas-research">
+  <h2>3. Tuo tutkimukset ja rakenna neuvoston työjono</h2>
+  <p>Voit tuoda nykyisen arXiv E1 -raporttisi (12 tutkimusta) tai Atlas E2 -raportin. E1-raportin kaksi arXiv-lähdettä muunnetaan E2:n erikoisaloille; lähdesivu ja teksti säilyvät.</p>
+  <div class="toolbar">
+    <label class="file-button">Tuo tutkimus-JSON <input id="atlas-import" type="file" accept="application/json,.json"></label>
+    <button id="atlas-reset" type="button" class="secondary">Tyhjennä istunto</button>
+  </div>
+  <p id="atlas-import-status" class="status" role="status" aria-live="polite">Ei havaintoja.</p>
+  <div class="atlas-observation-list" id="atlas-observations"></div>
+  <h3>Lisää yksi julkinen lähde käsin</h3>
+  <form id="atlas-manual" class="form-stack">
+    <label>Lähde<select id="atlas-source-select"></select></label>
+    <label>Julkaisun HTTPS-linkki<input id="atlas-url" type="url" required maxlength="256"></label>
+    <label>Julkaisun otsikko<input id="atlas-title" required maxlength="240"></label>
+    <label>Tiivistelmä<textarea id="atlas-summary" rows="3" required maxlength="360"></textarea></label>
+    <button type="submit">Lisää tutkimushavainto</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>4. Valitse vastaanottava rinki ja tutkimuskysymys</h2>
+  <p class="muted">Automaattireititys käyttää alan luontevaa neuvostorinkiä. Vaihtoehtoisesti voit ohjata koko havaintojoukon valitsemaasi rinkiin ja pyytää uutta näkökulmaa.</p>
+  <div class="atlas-controls">
+    <label>Vastaanottaja
+      <select id="atlas-ring">
+        <option value="">Automaattinen monialainen reititys</option>
+        <option value="2">2 · Himo: merkitys, luovuus ja tavoitteet</option>
+        <option value="3">3 · Ylensyönti: muisti, aiemmat kokemukset</option>
+        <option value="4">4 · Ahneus: resurssit ja priorisointi</option>
+        <option value="5">5 · Viha: kognitio, kuormitus ja riskit</option>
+        <option value="6">6 · Harhaoppi: tutkimus ja kilpailevat teoriat</option>
+        <option value="7">7 · Väkivalta: arkkitehtuuri ja rajattu toteutus</option>
+        <option value="8">8 · Vilppi: lähdekritiikki ja auditointi</option>
+      </select>
+    </label>
+    <label>Oma tutkimuskysymys (valinnainen)
+      <input id="atlas-question" maxlength="380" placeholder="Mitä näistä voisi hyödyntää KLONEn muistissa?">
+    </label>
+  </div>
+  <div class="toolbar">
+    <button id="atlas-plan" class="primary" type="button">Luo ja reititä tutkimusluonnokset</button>
+    <button id="atlas-export" type="button" disabled>Lataa koko neuvostoraportti</button>
+  </div>
+  <p id="atlas-plan-status" class="status" aria-live="polite">Suunnitelmaa ei ole laadittu.</p>
+  <div id="atlas-packets" class="atlas-packets"></div>
+</section>
+
+<section class="panel">
+  <h2>5. Hae uusia tutkimuksia Termuxissa</h2>
+  <p>Ulkomaailman aineiston haku käynnistyy vain Termuxin <code>--fetch</code>-valinnalla. Voit hakea kaikki 26 lähdettä tai yhden tutkimusalan kerrallaan.</p>
+  <pre class="code">cd ~/klone-arxiv-e1
+
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_atlas \
+  --fetch --domain genetics \
+  --domain mind_medicine \
+  --output "$HOME/klone-var/atlas-genetiikka-psykiatria.json"</pre>
+  <p class="muted">Haku voi kestää useita minuutteja etenkin kaikilla lähteillä. Yhden lähteen estot tai tyhjät vastaukset säilyvät virheraportissa; niitä ei korvata keksityillä tutkimuksilla.</p>
+</section>
+<footer>KLONE Atlas E2 · raportoidut lähteet ≠ vahvistettu tieto · ei yksityisen muistin lukua · ei automaattista someviestintää</footer>
+</main>
+</body>
+</html>

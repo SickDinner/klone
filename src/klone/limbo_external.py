@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
 from html import unescape
+from pathlib import Path
 import json
 import re
 import ssl
@@ -364,7 +365,8 @@ def main(argv: list[str] | None = None) -> int:
     report["fetch_errors"] = errors
     report["fetch_kind"] = "explicit_manual_cli"
     report["collected_at_utc"] = datetime.now(timezone.utc).isoformat()
-    write_new_report(args.output, report)
+    rendered = json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
+    write_new_report(Path(args.output).expanduser(), rendered, Path.cwd().resolve())
     print(json.dumps({"path": args.output, "sources": source_ids,
                       "documents": len(report["receipts"]), "feed_errors": len(errors),
                       "session_replay_matches": report["session"].get("replay_matches")},

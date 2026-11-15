@@ -81,7 +81,10 @@ mkdir -p "$HOME/klone-var" "$HOME/storage/downloads"
 PYTHONPATH="$PWD/src" "$PY" -m klone.limbo_memory \
   --ingest "$HOME/klone-var/atlas-all-20261116-014113.json" \
   --db "$HOME/klone-var/atlas-memory.sqlite3" \
-  --output "$HOME/storage/downloads/KLONE-E3-ensimmainen-muutos.json"
+  --output "$HOME/klone-var/atlas-e3-first-delta.json"
+
+cp "$HOME/klone-var/atlas-e3-first-delta.json" \
+  "$HOME/storage/downloads/KLONE-E3-ensimmainen-muutos.json"
 \`\`\`
 
 Tämä arkistoi vain alkuperäiseen E2-raporttiin tallentuneet 48 havaintoa.
@@ -117,12 +120,18 @@ uusi jokaisella ajokerralla; SQLite-arkiston polku pysyy samana.
 
 \`\`\`sh
 cd ~/klone-arxiv-e1 || exit 1
+STAMP="$(date +%Y%m%d-%H%M%S)"
 PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
   -m klone.limbo_memory \
   --status \
   --db "$HOME/klone-var/atlas-memory.sqlite3" \
-  --output "$HOME/storage/downloads/KLONE-E3-tila-$(date +%Y%m%d-%H%M%S).json"
+  --output "$HOME/klone-var/atlas-e3-status-$STAMP.json"
+
+cp "$HOME/klone-var/atlas-e3-status-$STAMP.json" \
+  "$HOME/storage/downloads/KLONE-E3-tila-$STAMP.json"
 \`\`\`
+
+Tämä lukee arkistoa ilman muutoksia. Tiedostot luodaan ensin suoraan `~/klone-var`-hakemistoon ja kopioidaan vasta sitten Lataukset-kansioon, koska KLONEn turvallinen vientikirjoitin hylkää Termuxin symbolisen `~/storage/downloads`-linkin.
 
 Tämä lukee arkistoa ilman muutoksia. Tuotu E3-muutos- tai tilaraportti
 voidaan näyttää \`/limbo-atlas\`-työpöydän **Atlas E3** -osiossa.

@@ -2,13 +2,15 @@
 import copy
 import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+from urllib.parse import urlencode
 
 from fastapi.testclient import TestClient
 
 from klone.council72 import catalog
 from klone.limbo_external import (
-    BY_ID, FEEDS, agents, analyze_documents, draft_question, fetch_source, parse_feed,
+    BY_ID, FEEDS, ARXIV_RECENT_CATEGORIES, agents, analyze_documents,
+    draft_question, fetch_source, fetch_recent_arxiv, parse_feed,
     validate_documents, main,
 )
 from klone.main import create_app
@@ -174,6 +176,87 @@ class LimboExternalTests(unittest.TestCase):
             "source_id": "arxiv-ai", "courier_id": 55, "question": "Miten aineisto kerättiin?"})
         self.assertEqual(draft.status_code, 200)
         self.assertFalse(draft.json()["publish_action"])
+
+    def test_weekend_empty_rss_has_clear_next_step(self):
+        feed = b"""<rss version="2.0"><channel><title>cs.AI</title>
+        <skipDays><day>Saturday</day><day>Sunday</day></skipDays>
+        </channel></rss>"""
+        self.assertEqual(parse_feed("arxiv-ai", feed), [])
+        with patch("klone.limbo_external.fetch_source", return_value=[]):
+            with self.assertRaises(SystemExit) as cm:
+                main(["--fetch", "--source", "arxiv-ai",
+                      "--output", "/tmp/missing-weekend-report.json"])
+        self.assertIn("--recent", str(cm.exception))
+        self.assertIn("Saturday/Sunday", str(cm.exception))
+
+    def test_recent_arxiv_api_atom_accepts_only_canonical_article_links(self):
+        atom = b"""<feed xmlns="http://www.w3.org/2005/Atom">
+          <entry><id>http://arxiv.org/abs/2601.12345v1</id>
+          <title>A verified syntax fixture</title>
+          <link href="http://arxiv.org/abs/2601.12345v1" rel="alternate"/>
+          <summary>Original API summaries may be very long</summary>
+          <updated>2026-11-13T09:00:00Z</updated></entry>
+          <entry><title>Off-site</title><link href="http://localhost/private"/>
+          <summary>unsafe</summary></entry>
+          </feed>"""
+        rows = parse_feed("arxiv-ai", atom)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["url"], "https://arxiv.org/abs/2601.12345v1")
+        self.assertEqual(rows[0]["courier_id"], 55)
+        with self.assertRaises(ValueError):
+            validate_documents([{**rows[0], "url": "http://arxiv.org/abs/2601.12345v1"}])
+        self.assertEqual(parse_feed("smithsonian-arts", atom), [])
+
+    def test_recent_api_has_no_user_selected_target_and_bounds_results(self):
+        url = ("https://export.arxiv.org/api/query?" + urlencode({
+            "search_query": "cat:cs.AI", "start": 0, "max_results": 6,
+            "sortBy": "submittedDate", "sortOrder": "descending",
+        }))
+        body = ("""<feed xmlns="http://www.w3.org/2005/Atom">
+          <entry><title>Recent article</title><link rel="alternate"
+          href="https://arxiv.org/abs/2601.12345"/>
+          <summary>Recent summary</summary></entry></feed>""").encode()
+        reply = MagicMock()
+        reply.__enter__.return_value = reply
+        reply.status = 200
+        reply.url = url
+        reply.headers = {"Content-Type": "application/atom+xml"}
+        reply.read.return_value = body
+        opener = MagicMock()
+        opener.open.return_value = reply
+        with patch("klone.limbo_external.build_opener", return_value=opener):
+            rows = fetch_recent_arxiv("arxiv-ai")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["title"], "Recent article")
+        req = opener.open.call_args.args[0]
+        self.assertEqual(req.full_url, url)
+        self.assertEqual(opener.open.call_args.kwargs["timeout"], 12.0)
+        with self.assertRaises(ValueError):
+            fetch_recent_arxiv("bbc-world")
+        with self.assertRaises(ValueError):
+            fetch_recent_arxiv("https://169.254.169.254/latest/meta-data")
+
+    def test_recent_cli_opt_in_and_no_writes_without_data(self):
+        with self.assertRaises(SystemExit):
+            main(["--recent", "--source", "arxiv-ai",
+                  "--output", "/tmp/missing-optin.json"])
+        with patch("klone.limbo_external.fetch_recent_arxiv", return_value=[sample()]) as f, \
+                patch("klone.limbo_external.write_new_report") as writer:
+            self.assertEqual(main(["--fetch", "--recent", "--source", "arxiv-ai",
+                                   "--output", "/tmp/just-mocked.json"]), 0)
+            f.assert_called_once_with("arxiv-ai")
+            writer.assert_called_once()
+            report = json.loads(writer.call_args.args[1])
+            self.assertEqual(report["fetch_kind"], "explicit_arxiv_recent_api")
+            self.assertEqual(len(report["receipts"]), 1)
+            self.assertFalse(report["facts_are_verified"])
+        with patch("klone.limbo_external.fetch_recent_arxiv", side_effect=ValueError("HTTP 503")), \
+                patch("klone.limbo_external.write_new_report") as writer:
+            with self.assertRaises(SystemExit) as cm:
+                main(["--fetch", "--recent", "--source", "arxiv-ai",
+                      "--output", "/tmp/no-mocked.json"])
+            writer.assert_not_called()
+            self.assertIn("HTTP 503", str(cm.exception))
 
     def test_manual_fetch_is_only_from_allowlisted_id_and_no_automatic_fetch(self):
         with self.assertRaises(ValueError):

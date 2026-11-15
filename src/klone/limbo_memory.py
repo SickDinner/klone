@@ -190,8 +190,12 @@ def ingest(db: str | Path, records: list[dict], *,
     dest = _memory_path(db, root=root, create=True)
     fingerprint = _hash([r["receipt_sha256"] for r in observations])
     with _open(dest) as conn:
-        conn.execute("BEGIN IMMEDIATE")
+        # sqlite3.executescript() ends an existing transaction implicitly.
+        # Initialize the schema first, then acquire the write lock so that all
+        # articles, revisions and run memberships are *one atomic import*.
         _initialize(conn)
+        conn.commit()
+        conn.execute("BEGIN IMMEDIATE")
         prior = conn.execute(
             "SELECT run_id FROM atlas_runs WHERE dataset_sha256=?", (fingerprint,)
         ).fetchone()

@@ -216,6 +216,42 @@ class E7E8Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             compare_snapshots(a,analyze(self.core,"employment"))
 
+    def test_discovery_api_is_readonly_on_atlas_and_canary(self):
+        import os
+        from klone.api import get_repository
+        from klone.main import create_app
+        from klone.limbo_main_research_canary import app as canary
+        app=create_app()
+        app.dependency_overrides[get_repository]=lambda:KloneRepository(self.core)
+        with TestClient(app) as client:
+            before=self.core.read_bytes()
+            good=client.get("/api/limbo-atlas/discovery",params={"q":"genetiikka","limit":48})
+            self.assertEqual(good.status_code,200,good.text[:450])
+            self.assertEqual(good.json()["kind"],"klone-atlas-e8-discovery-radar")
+            bad=client.get("/api/limbo-atlas/discovery",params={"q":"genetiikka","limit":97})
+            self.assertEqual(bad.status_code,422)
+            self.assertEqual(self.core.read_bytes(),before)
+        with patch.dict(os.environ,{"KLONE_MAIN_RESEARCH_DB":str(self.core)}):
+            with TestClient(canary) as client:
+                report=client.get("/api/limbo-atlas/discovery",params={"q":"genetiikka"})
+                self.assertEqual(report.status_code,200,report.text[:400])
+                self.assertEqual(report.json()["kind"],"klone-atlas-e8-discovery-radar")
+                self.assertEqual(client.post("/api/limbo-atlas/discovery",json={}).status_code,405)
+                self.assertEqual(self.core_before,self.core.read_bytes())
+
+    def test_atlas_e7_e8_ui_is_safe_and_has_working_controls(self):
+        from klone.main import create_app
+        with TestClient(create_app()) as client:
+            html=client.get("/limbo-atlas")
+            js=client.get("/static/limbo-atlas.js")
+        self.assertEqual(html.status_code,200)
+        self.assertIn('id="atlas-e7-import"',html.text)
+        self.assertIn('id="atlas-e8-form"',html.text)
+        self.assertEqual(js.status_code,200)
+        self.assertIn("klone-e7-hypothesis-list",js.text)
+        self.assertIn('/api/limbo-atlas/discovery?q=',js.text)
+        self.assertNotIn("innerHTML",js.text)
+
     def test_cli_is_explicit_commit_and_no_automatic_writes(self):
         from klone.limbo_hypotheses import main as journal_cli
         with patch("klone.limbo_hypotheses.write_new_report") as writer:

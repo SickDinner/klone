@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from .limbo_atlas import plan, roster
 from .limbo_memory_bridge import recall
 from .limbo_intelligence import analyze
+from .limbo_discovery import radar
 from .api import get_repository
 from .repository import KloneRepository
 
@@ -74,3 +75,16 @@ def atlas_research_intelligence(
         return analyze(repository.db_path,q,limit=limit,target_ring=ring)
     except (ValueError,PermissionError) as error:
         raise HTTPException(status_code=422,detail=str(error)) from error
+
+
+@router.get("/discovery")
+def atlas_discovery_radar(
+    q: str = Query(...,min_length=3,max_length=160),
+    limit: int = Query(default=48,ge=2,le=96),
+    repository: KloneRepository = Depends(get_repository),
+):
+    """Read-only E8 cross-domain discovery and evidence-debt review queue."""
+    try:
+        return radar(repository.db_path,q,limit=limit)
+    except (ValueError,PermissionError) as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc

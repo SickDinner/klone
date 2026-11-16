@@ -197,7 +197,7 @@ class E7E8Tests(unittest.TestCase):
             paper("genomics-arxiv",19224,
                   "Telomerase telomere maintenance in genetic material",
                   "Telomere maintenance assays for genomic stability."),
-            paper("bbc-health",19225,
+            paper("psychiatry-pmc",19225,
                   "Telomere maintenance in cellular ageing",
                   "Cellular ageing measurements test telomere maintenance."),
         ]

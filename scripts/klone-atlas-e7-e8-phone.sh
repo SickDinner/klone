@@ -46,6 +46,13 @@ PYTHONPATH="$ROOT/src" "$PY" -m klone.limbo_discovery \
   --output "$REPORT" || exit 1
 cp "$REPORT" "$HOME/storage/downloads/KLONE-E8-loytotutka.json"
 
+echo "=== E9: luo todellisten lähdeparien tutkimuskortit, VAIN LUKU ==="
+DOSSIERS="$VAR/atlas-e9-dossiers-$STAMP.json"
+PYTHONPATH="$ROOT/src" "$PY" -m klone.limbo_source_dossiers \
+  --klone-db "$TARGET" --question "genetiikka" --all \
+  --output "$DOSSIERS" || exit 1
+cp "$DOSSIERS" "$HOME/storage/downloads/KLONE-E9-lahdeparit.json"
+
 echo "=== E7-hypoteesin esikatselu ilman kirjoittamista ==="
 PYTHONPATH="$ROOT/src" "$PY" -m klone.limbo_hypotheses \
   --journal-db "$VAR/atlas-hypotheses.sqlite3" \
@@ -66,10 +73,14 @@ curl -fsS --max-time 6 \
 curl -fsS --max-time 6 \
   "http://127.0.0.1:8041/api/limbo-atlas/discovery?q=genetiikka&limit=12" \
   > /dev/null || exit 1
+curl -fsS --max-time 8 \
+  "http://127.0.0.1:8041/api/limbo-atlas/dossiers?q=genetiikka" \
+  > /dev/null || exit 1
 
 echo "=== KLONE E7/E8 VALMIS ==="
 echo "Päämuistia tai tutkimusarkistoa ei muutettu."
 echo "E8-raportti: $REPORT"
+echo "E9-lähdekortit: $DOSSIERS"
 echo "E7:n kirjoittamaton esikatselu: $VAR/atlas-e7-preview-$STAMP.json"
 echo "Atlas: http://127.0.0.1:8031/limbo-atlas"
 echo "Päämuisti: http://127.0.0.1:8041/research"

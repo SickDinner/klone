@@ -9,12 +9,81 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from urllib.parse import urlsplit
+
+from .limbo_atlas import BY_SOURCE
 
 from .evidence_io import write_new_report
 from .limbo_discovery import radar
 from .limbo_intelligence import _memories
 
 MAX_DOSSIERS=24
+
+# Identity is publication URL, not event ID, publisher group, or document
+# title. Never merge unrelated news stories simply because titles overlap.
+KNOWN_QUERY_STRIP_HOSTS=frozenset({
+    "bbc.co.uk","bbc.com","arxiv.org","europepmc.org",
+})
+
+
+def _publication_key(doc):
+    """Stable canonical public-source identity; no network or title inference."""
+    u=urlsplit(doc["source_url"])
+    host=(u.hostname or "").casefold().removeprefix("www.")
+    path=u.path.rstrip("/") or "/"
+    if u.scheme!="https" or not host or u.username or u.password:
+        raise ValueError("public research source must be a valid HTTPS URL")
+    # Known feed queries contain campaign tracking; retain unrecognized
+    # queries, avoiding accidental conflation of distinct resources.
+    query=u.query
+    if host in KNOWN_QUERY_STRIP_HOSTS:
+        query="&".join(q for q in query.split("&")
+                       if q and not q.split("=",1)[0].casefold().startswith(
+                           ("utm_","at_")))
+    return (host,path,query)
+
+
+def _source_class(doc):
+    source=BY_SOURCE[doc["source_id"]]
+    if source.kind=="arxiv":
+        return ("research_preprint","preprint_peer_review_not_confirmed")
+    if source.kind=="europepmc":
+        return ("indexed_research","indexing_does_not_verify_method_or_peer_review")
+    return ("news_or_reference_feed","not_primary_research_by_source_type")
+
+
+def _collapse_source_pairs(pairs,docs):
+    """Deduplicate *unordered publication pairs*, preserve all Memory IDs."""
+    kept=[]
+    indexes={}
+    duplicates=[]
+    for pair in pairs:
+        a=docs[pair["first_event_id"]]
+        b=docs[pair["second_event_id"]]
+        aa=_publication_key(a)
+        bb=_publication_key(b)
+        if aa==bb:
+            duplicates.append({
+                "event_ids":[a["event_id"],b["event_id"]],
+                "reason":"same_publication_on_both_sides",
+            })
+            continue
+        key=tuple(sorted((aa,bb)))
+        original=[a["event_id"],b["event_id"]]
+        if key in indexes:
+            prior=kept[indexes[key]]
+            prior["duplicate_memory_event_pairs"].append(original)
+            duplicates.append({
+                "event_ids":original,
+                "canonical_event_ids":[prior["first_event_id"],prior["second_event_id"]],
+                "reason":"same_publication_pair_different_memory_events",
+            })
+            continue
+        indexes[key]=len(kept)
+        kept.append({**pair,"duplicate_memory_event_pairs":[]})
+    return kept,duplicates
+
+
 
 
 def _pair_lookup(report,first,second):
@@ -33,6 +102,9 @@ def _source(doc):
         "revision_id":doc["revision_id"],
         "source_id":doc["source_id"],
         "domain":doc["domain"],
+        "source_kind":BY_SOURCE[doc["source_id"]].kind,
+        "source_class":_source_class(doc)[0],
+        "source_class_caution":_source_class(doc)[1],
         "publisher_group":doc["publisher_group"],
         "title":doc["title"],
         "source_excerpt":doc["abstract"][:450],
@@ -59,6 +131,19 @@ def _make(pair,docs):
         "quality_gate":pair["quality_gate"],
         "radar_review_priority":pair["candidate_priority"],
         "pair_justification":pair["justification"],
+        "duplicate_memory_event_pairs":pair.get("duplicate_memory_event_pairs",[]),
+        "source_comparison_type":(
+            "research_metadata_pair"
+            if all(_source_class(doc)[0]!="news_or_reference_feed"
+                   for doc in (first,second))
+            else "mixed_news_or_reference_pair"
+        ),
+        "source_comparison_caution":(
+            "An RSS news/reference item is not a second independent study."
+            if any(_source_class(doc)[0]=="news_or_reference_feed"
+                   for doc in (first,second))
+            else "Two research-indexed items do not establish independent evidence."
+        ),
         "independence":{"same_publisher_group":same_publisher,
                         "different_publisher_groups":not same_publisher,
                         "independent_studies_confirmed":False,
@@ -102,14 +187,27 @@ def review_pair(core_db,first_event_id,second_event_id,*,question="genetiikka",
 def review_all(core_db,*,question="genetiikka",limit=48):
     report=radar(core_db,question,limit=limit)
     docs={d["event_id"]:d for d in _memories(core_db)}
-    sources=report["cross_discipline_candidates"][:MAX_DOSSIERS]
+    raw=report["cross_discipline_candidates"][:MAX_DOSSIERS]
+    sources,duplicates=_collapse_source_pairs(raw,docs)
+    dossiers=[_make(pair,docs) for pair in sources]
     return {
         "kind":"klone-atlas-e9-review-batch",
-        "schema_version":1,"question":question,
+        "schema_version":2,"question":question,
         "public_memory_count":len(docs),
         "quality_gate":report["diagnostics"]["quality_gate"],
-        "candidate_count":len(sources),
-        "dossiers":[_make(pair,docs) for pair in sources],
+        "raw_memory_pair_count":len(raw),
+        "duplicate_memory_pair_count":len(duplicates),
+        "duplicate_memory_pairs":duplicates,
+        "candidate_count":len(dossiers),
+        "source_type_counts":{
+            "research_metadata_pairs":sum(
+                x["source_comparison_type"]=="research_metadata_pair"
+                for x in dossiers),
+            "mixed_news_or_reference_pairs":sum(
+                x["source_comparison_type"]=="mixed_news_or_reference_pair"
+                for x in dossiers),
+        },
+        "dossiers":dossiers,
         "memory_write":False,"external_network_actions":False,
         "scientific_truth_verified":False,
     }

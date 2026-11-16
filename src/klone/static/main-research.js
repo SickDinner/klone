@@ -41,6 +41,29 @@
        ([k,n])=>k+": "+n).join(" · ")));
      summary.append(node("p","Jokainen julkaisuviite on vahvistamaton lähdehavainto. Tuloksia ei ole todettu oikeiksi."));
      root.append(summary);
+     const hiddenDuplicatePairs=new Set();
+     try{
+       const batch=await api("/api/limbo-atlas/dossiers?q="+encodeURIComponent(q));
+       for(const dupe of batch.duplicate_memory_pairs||[])
+         hiddenDuplicatePairs.add(dupe.event_ids.join(":"));
+       const count=node("article",undefined,"atlas-packet");
+       count.append(node("h3","E9.1 · Eri julkaisut, ei päällekkäisiä muistiviitteitä"));
+       count.append(node("p",batch.raw_memory_pair_count+
+         " muistiparia → "+batch.candidate_count+" eri julkaisuparia ("+
+         batch.duplicate_memory_pair_count+" päällekkäistä muistiparia)."));
+       count.append(node("p","Tutkimusmetatietopareja "+
+         batch.source_type_counts.research_metadata_pairs+
+         " · uutis-/viitelähteen sisältäviä pareja "+
+         batch.source_type_counts.mixed_news_or_reference_pairs));
+       count.append(node("p","Uutisartikkeli ei ole riippumaton tutkimus.","atlas-stats"));
+       root.append(count);
+       write("main-e8-status","E9.1: "+batch.candidate_count+
+         " eri julkaisuparia, "+batch.duplicate_memory_pair_count+
+         " päällekkäistä muistiparia. Ei muistikirjoituksia.");
+     }catch(err){
+       root.append(node("p","E9.1-julkaisujen deduplikointia ei voitu varmistaa: "+err.message,"atlas-stats"));
+     }
+
      for(const x of r.memories){
        const card=node("article",undefined,"atlas-memory-card");
        card.append(node("p","Muisti #"+x.event_id+" · "+x.domain+" · versio "+x.version,"eyebrow"));
@@ -146,6 +169,7 @@
        root.append(weak);
      }
      for(const pair of r.cross_discipline_candidates){
+       if(hiddenDuplicatePairs.has(pair.first_event_id+":"+pair.second_event_id))continue;
        const item=node("article",undefined,"atlas-memory-card");
        item.append(node("p",pair.domains.join(" × "),"eyebrow"));
        item.append(node("strong","Muisti #"+pair.first_event_id+" + #"+pair.second_event_id));

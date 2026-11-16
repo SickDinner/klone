@@ -572,6 +572,44 @@
       header.append(el("p","Tutkintaprioriteetit eivät ole luotettavuus- tai totuusprosentteja.",
           "atlas-stats"));
       root.append(header);
+      const diagnostics=report.diagnostics||{};
+      const scan=el("article",undefined,"atlas-packet");
+      scan.append(el("h3","E8.1 · Haku muiden tieteenalojen lähteistä"));
+      scan.append(el("p","Alkuperäisen haun tutkimusalat: "+
+          (diagnostics.query_selected_domains||[]).join(", ")+
+          " · muita julkisia lähteitä tutkittu: "+
+          (report.outside_domain_documents_examined||0)+
+          " · yhteyksiä muihin aloihin: "+
+          (report.bridge_document_count||0)));
+      if(diagnostics.why_no_pairs){
+        scan.append(el("p","Ei vahvistettavaa yhteysehdokasta: "+
+          diagnostics.why_no_pairs));
+      }
+      for(const suggestion of diagnostics.suggested_next_queries||[]){
+        scan.append(el("p","Ehdotettu seuraava haku: "+suggestion,"atlas-stats"));
+      }
+      root.append(scan);
+      for(const found of report.bridge_documents||[]){
+        const item=el("article",undefined,"atlas-memory-card");
+        item.append(el("p","MUISTA TUTKIMUSALOISTA · "+found.domain,"eyebrow"));
+        item.append(el("strong",found.title));
+        item.append(el("p","Lähdemuisti #"+found.event_id+
+                        " · vahvistamaton lähdehavainto"));
+        const anchor=el("a","Tarkista alkuperäinen julkaisu");
+        anchor.href=found.source_url;anchor.target="_blank";
+        anchor.rel="noopener noreferrer";item.append(anchor);
+        root.append(item);
+      }
+      if(report.weak_single_term_leads?.length){
+        const weak=el("article",undefined,"atlas-packet");
+        weak.append(el("h3","Heikot, yhden termin perusteella löytyneet vihjeet"));
+        weak.append(el("p","Nämä eivät täytä tutkimusyhteyden vähimmäisehtoja."));
+        for(const lead of report.weak_single_term_leads){
+          weak.append(el("p","Muistit #"+lead.first_event_id+" / #"+
+              lead.second_event_id+" · termi: "+lead.shared_terms.join(", ")));
+        }
+        root.append(weak);
+      }
       for(const pair of report.cross_discipline_candidates){
         const card=el("article",undefined,"atlas-memory-card");
         card.append(el("p","Tutkimusyhteys · "+pair.domains.join(" × "),"eyebrow"));

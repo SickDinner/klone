@@ -471,7 +471,7 @@ class E7E8Tests(unittest.TestCase):
                                          json=params).status_code,405)
         with patch.dict(os.environ,{"KLONE_MAIN_RESEARCH_DB":str(self.core)}):
             with TestClient(canary) as client:
-                self.assertEqual(client.get("/health").json()["feature_version"],"E9")
+                self.assertEqual(client.get("/health").json()["feature_version"],"E9.1")
                 self.assertEqual(client.get("/api/limbo-atlas/dossier",
                                             params=params).status_code,200)
                 self.assertEqual(client.get("/api/limbo-atlas/dossiers",

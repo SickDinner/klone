@@ -116,6 +116,40 @@ class E6ResearchTests(unittest.TestCase):
         self.assertEqual(a[0]["version_count_in_core"],2)
         self.assertEqual(r["public_research_memory_count"],5)
 
+    def test_finnish_search_uses_explicit_aliases(self):
+        result=analyze(self.klone,"genetiikka")
+        self.assertGreaterEqual(result["matched_memory_count"],1)
+        self.assertIn("genetics",result["domain_counts"])
+        philosophy=analyze(self.klone,"filosofia")
+        self.assertGreaterEqual(philosophy["matched_memory_count"],1)
+        self.assertFalse(philosophy["authority"]["memory_write"])
+
+    def test_mobile_ui_contains_e6_controls_and_safe_dom(self):
+        from klone.main import create_app
+        with TestClient(create_app()) as client:
+            page=client.get("/limbo-atlas")
+            script=client.get("/static/limbo-atlas.js")
+        self.assertEqual(page.status_code,200)
+        self.assertIn('id="atlas-e6-form"',page.text)
+        self.assertIn('id="atlas-e6-ring"',page.text)
+        self.assertEqual(script.status_code,200)
+        self.assertIn('"/api/limbo-atlas/intelligence?q="',script.text)
+        self.assertIn("council72_preview",script.text)
+        self.assertNotIn("innerHTML",script.text)
+
+    def test_main_bridge_requires_running_research_room_and_owner(self):
+        script=(Path(__file__).resolve().parents[1]/
+                "scripts"/"klone-atlas-main-memory.sh").read_text(encoding="utf-8")
+        self.assertIn("/api/health",script)
+        self.assertIn("/api/rooms",script)
+        self.assertIn("research_room_ready",script)
+        self.assertIn("PAAMUISTI",script)
+        self.assertIn("PRAGMA integrity_check",script)
+        self.assertIn("original.backup(destination",script)
+        self.assertIn("--commit",script)
+        self.assertNotIn("kill -",script)
+        self.assertNotIn("git switch",script)
+
     def test_deny_incorrect_input_and_empty_results(self):
         for q in ("","xy","x"*161):
             with self.subTest(q=q):

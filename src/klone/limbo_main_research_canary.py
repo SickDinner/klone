@@ -14,6 +14,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from .limbo_intelligence import analyze
+from .limbo_discovery import radar
 from .limbo_memory_bridge import recall
 
 
@@ -90,3 +91,14 @@ def atlas_stylesheet():
 @app.get("/static/limbo-external.css", include_in_schema=False)
 def base_stylesheet():
     return FileResponse(STATIC_DIR / "limbo-external.css", media_type="text/css")
+
+
+@app.get("/api/limbo-atlas/discovery")
+def discovery(
+    q: str = Query(...,min_length=3,max_length=160),
+    limit: int = Query(default=48,ge=2,le=96),
+):
+    try:
+        return radar(_db(),q,limit=limit)
+    except (ValueError,PermissionError) as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc

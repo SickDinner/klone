@@ -120,6 +120,13 @@ cd ~/klone-arxiv-e1 || exit 1
 bash scripts/klone-main-research-canary.sh
 \`\`\`
 
+Portin 8041 uudessa suomenkielisessä mobiilityöpöydässä voi
+tehdä päämuistiin tutkimuskysymyksiä myös selaimella:
+`http://127.0.0.1:8041/research`. Näkymä näyttää lähteelliset
+havainnot, mahdolliset tarkistettavat ristiriidat ja Council72:n
+simuloidut tutkimusehdotukset. Sitä ei tarvitse tuoda
+pää-KLONEn vanhan 8000-käyttöliittymän sisään.
+
 Portissa 8041 on vain rajatut luku-API:t:
 - \`http://127.0.0.1:8041/health\`
 - \`http://127.0.0.1:8041/api/limbo-atlas/intelligence?q=genetiikka\`

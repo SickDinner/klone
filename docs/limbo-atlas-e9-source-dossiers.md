@@ -25,6 +25,45 @@ julkisten \`research-room\`-havaintojen joukossa sekä E8.3:n
 laatuseulalla hyväksytty. Mikäli muisti tai suodatus muuttuu,
 vanha pari voidaan hylätä eikä sitä esitetä vahvistettuna.
 
+## E9.1 – saman julkaisun kaksoiskappaleet ja lähdetyypit
+
+Androidin todellinen E9-ajo 17.11.2026 raportoi **7 muistitapahtumaparia**
+mutta AgentSSL-esijulkaisu
+`https://arxiv.org/abs/2611.17323v1` esiintyi kummassakin:
+`90/9` ja `90/58`. Näin **vain 6 eri julkaisuparia**
+on edustettuna esitetyn seitsemän muistitapahtumaparin joukossa.
+
+E9.1 laskee julkaisuparin identiteetin **molempien alkuperäisten
+HTTPS-julkaisuosoitteiden** perusteella, ei muistin tapahtumatunnuksesta
+tai pelkästä otsikosta. Tunnettujen julkaisujen RSS-seurantaparametrit
+(esim. `at_campaign`) poistetaan vertailusta. Erilaisia julkaisuosoitteita
+ei yhdistetä pelkän samankaltaisen otsikon takia. Saman tutkimuksen
+eri julkaisualustoille tallennetut versiot voivat silti jäädä
+tunnistamatta ilman DOI- ja tekijätason lisätietoja.
+
+Raportti säilyttää kaikki alkuperäiset muistiviitteet:
+`raw_memory_pair_count`, `candidate_count`,
+`duplicate_memory_pair_count`, `duplicate_memory_pairs`
+ja kunkin pääkortin `duplicate_memory_event_pairs`.
+Yksikään alkuperäinen muistitapahtuma ei poistu tietokannasta.
+
+Jokainen lähde saa luokittelun `source_class`:
+- `research_preprint`: arXiv-esijulkaisu, vertaisarviointi ei vahvistettu
+- `indexed_research`: Europe PMC:n tutkimusviite, tutkimusmenetelmiä tai
+  vertaisarviointia ei ole varmistettu
+- `news_or_reference_feed`: RSS-uutis-/viitelähde, **ei suoraan toinen
+  riippumaton tutkimus**
+
+Lähdeparin `source_comparison_type` on joko
+`research_metadata_pair` tai `mixed_news_or_reference_pair`.
+Esimerkiksi genetiikan nanopore-virustutkimus / BBC:n
+sinikielitautiuutinen on jälkimmäinen. Sitä ei pidä käsitellä
+kahden tutkimuksen vahvistamana löydöksenä.
+
+Päämuisti 8000, nykyiset 148 tutkimusmuistia ja E7-päiväkirja ovat
+edelleen muuttumattomia. E9.1:n `/health`-versio auttaa päivittämään
+vain localhost:8041-tutkimuslukijan.
+
 ## E9:n toteutus
 
 \`src/klone/limbo_source_dossiers.py\`:

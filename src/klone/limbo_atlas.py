@@ -546,7 +546,7 @@ def main(argv=None) -> int:
     elif args.source: selected=list(dict.fromkeys(args.source))
     else: selected=[s.id for s in SOURCES if s.domain in set(args.domain)]
     if len(selected)>MAX_SOURCES_PER_RUN:raise SystemExit("source count limit exceeded")
-    observations=[];errors=[]; last_arxiv=None
+    observations=[];errors=[];empty_sources=[]; last_arxiv=None
     for sid in selected:
         source=BY_SOURCE[sid]
         if source.kind=="arxiv":
@@ -558,11 +558,11 @@ def main(argv=None) -> int:
         try:
             results=fetch_source(sid)
             observations.extend(results)
-            if not results:errors.append({"source_id":sid,"status":"empty"})
+            if not results:empty_sources.append({"source_id":sid,"status":"empty"})
         except ValueError as exc:
             errors.append({"source_id":sid,"status":"error","detail":str(exc)})
     if not observations:
-        raise SystemExit("No source observations. "+json.dumps(errors,ensure_ascii=False))
+        raise SystemExit("No source observations. "+json.dumps({"errors":errors,"empty_sources":empty_sources},ensure_ascii=False))
     archive_delta=None
     if args.memory_db is not None:
         # Explicit user opt-in. Store ALL retrieved entries, including those
@@ -576,11 +576,13 @@ def main(argv=None) -> int:
     report.update({"collection":"manual_public_web",
                    "collected_at_utc":datetime.now(timezone.utc).isoformat(),
                    "requested_sources":selected,"fetch_errors":errors,
+                   "empty_sources":empty_sources,
                    "dropped_after_cap":max(0,len(observations)-MAX_RECORDS)})
     text=json.dumps(report,ensure_ascii=False,indent=2,allow_nan=False)+"\n"
     write_new_report(Path(args.output).expanduser(),text,Path.cwd().resolve())
     print(json.dumps({"path":args.output,"memory":archive_delta["counts"] if archive_delta else None,"observations":len(report["observations"]),
                       "packets":len(report["packets"]),"errors":len(errors),
+                      "empty_sources":len(empty_sources),
                       "dropped_after_cap":report["dropped_after_cap"]},ensure_ascii=False))
     return 0
 

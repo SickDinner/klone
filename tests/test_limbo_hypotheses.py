@@ -618,6 +618,10 @@ class E7E8Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"owner-supplied"):
             review_manifest(self.core,m)
         m=self._e11_manifest()
+        m["sources"]["A"]["title"]="A forged title"
+        with self.assertRaisesRegex(ValueError,"provenance mismatch"):
+            review_manifest(self.core,m)
+        m=self._e11_manifest()
         m["sources"]["A"]["receipt_sha256"]="0"*64
         with self.assertRaisesRegex(ValueError,"provenance mismatch"):
             review_manifest(self.core,m)
@@ -679,6 +683,9 @@ class E7E8Tests(unittest.TestCase):
         self.assertFalse(prepared["sources"]["A"]["owner_supplied"])
         self.assertEqual(prepared["annotations"],[])
         self.assertTrue(prepared["sources"]["A"]["source_url"].startswith("https://"))
+        self.assertTrue(prepared["sources"]["A"]["title"])
+        self.assertIn(prepared["sources"]["A"]["source_class"],
+                      ("research_preprint","indexed_research","news_or_reference_feed"))
         self.assertEqual(before,self.core.read_bytes())
 
     def test_e10_readonly_council_workbench_endpoints(self):

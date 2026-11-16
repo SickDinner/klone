@@ -14,7 +14,7 @@ from klone.limbo_memory import ingest
 from klone.limbo_memory_bridge import bridge
 from klone.limbo_hypotheses import create,attach,review,detail,list_hypotheses
 from klone.limbo_discovery import radar,compare_snapshots
-from klone.limbo_source_dossiers import review_pair,review_all
+from klone.limbo_source_dossiers import review_pair,review_all,_collapse_source_pairs,_publication_key,_source_class
 from klone.limbo_intelligence import analyze,_memories
 from klone.repository import KloneRepository
 
@@ -389,6 +389,61 @@ class E7E8Tests(unittest.TestCase):
         self.assertFalse(batch["memory_write"])
         self.assertTrue(all(not x["scientific_truth_verified"]
                             for x in batch["dossiers"]))
+        self.assertEqual(self.core_before,self.core.read_bytes())
+
+    def test_e91_deduplicates_real_device_agent_ssl_urls_not_memory_ids(self):
+        # Actual Android issue: pair 90/9 and 90/58 references same
+        # https://arxiv.org/abs/2611.17323v1 AgentSSL publication.
+        docs={
+            90:{"event_id":90,"source_url":"https://arxiv.org/abs/2611.11796v1"},
+            9:{"event_id":9,"source_url":"https://arxiv.org/abs/2611.17323v1"},
+            58:{"event_id":58,"source_url":"https://www.arxiv.org/abs/2611.17323v1"},
+        }
+        pairs=[{"first_event_id":90,"second_event_id":9},
+               {"first_event_id":90,"second_event_id":58}]
+        kept,duplicates=_collapse_source_pairs(pairs,docs)
+        self.assertEqual(len(kept),1)
+        self.assertEqual(kept[0]["duplicate_memory_event_pairs"],[[90,58]])
+        self.assertEqual(duplicates[0]["canonical_event_ids"],[90,9])
+        self.assertEqual(duplicates[0]["reason"],
+                         "same_publication_pair_different_memory_events")
+        self.assertEqual(_publication_key(docs[9]),_publication_key(docs[58]))
+
+    def test_e91_canonical_id_does_not_merge_distinct_publications(self):
+        docs={
+            90:{"event_id":90,"source_url":"https://arxiv.org/abs/2611.11796v1"},
+            9:{"event_id":9,"source_url":"https://arxiv.org/abs/2611.17323v1"},
+            58:{"event_id":58,"source_url":"https://arxiv.org/abs/2611.17324v1"},
+        }
+        kept,duplicates=_collapse_source_pairs([
+            {"first_event_id":90,"second_event_id":9},
+            {"first_event_id":90,"second_event_id":58},
+        ],docs)
+        self.assertEqual(len(kept),2)
+        self.assertEqual(duplicates,[])
+        self.assertNotEqual(_publication_key(docs[9]),_publication_key(docs[58]))
+        with self.assertRaises(ValueError):
+            _publication_key({"source_url":"http://arxiv.org/abs/2611.11796"})
+
+    def test_e91_news_is_not_independent_research_and_canonical_rss_params(self):
+        news={"event_id":77,"source_url":
+            "https://www.bbc.co.uk/news/articles/cmr4gxvrxd9yo?at_medium=RSS&at_campaign=rss"}
+        canonical={"event_id":78,"source_url":
+                   "https://bbc.co.uk/news/articles/cmr4gxvrxd9yo"}
+        self.assertEqual(_publication_key(news),_publication_key(canonical))
+        self.assertEqual(_source_class({"source_id":"bbc-science"})[0],
+                         "news_or_reference_feed")
+        self.assertEqual(_source_class({"source_id":"genomics-arxiv"})[0],
+                         "research_preprint")
+        self.assertEqual(_source_class({"source_id":"ancient-dna-pmc"})[0],
+                         "indexed_research")
+        batch=review_all(self.core,question="genetiikka")
+        self.assertEqual(batch["raw_memory_pair_count"],
+                         batch["candidate_count"]+batch["duplicate_memory_pair_count"])
+        self.assertEqual(batch["source_type_counts"]["research_metadata_pairs"]+
+                         batch["source_type_counts"]["mixed_news_or_reference_pairs"],
+                         batch["candidate_count"])
+        self.assertFalse(batch["memory_write"])
         self.assertEqual(self.core_before,self.core.read_bytes())
 
     def test_e9_get_only_apis_reject_writes_and_fake_papers(self):

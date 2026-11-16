@@ -213,6 +213,34 @@ class AtlasE5BridgeTests(unittest.TestCase):
         self.assertEqual(before,self.target.read_bytes())
         with self.assertRaises(ValueError):recall(self.target," ")
 
+    def test_atlas_e5_http_recall_is_readonly_and_cites_public_articles(self):
+        self.ingest([article(0),article(1)])
+        self.preview(commit=True)
+        from klone.api import get_repository
+        app=create_app()
+        app.dependency_overrides[get_repository]=lambda:self.repo
+        client=TestClient(app)
+        before=len(self.query())
+        result=client.get("/api/limbo-atlas/memory/recall",
+                          params={"q":"genetics","limit":20})
+        self.assertEqual(result.status_code,200,result.text[:400])
+        payload=result.json()
+        self.assertEqual(payload["kind"],"klone-atlas-e5-recall")
+        self.assertEqual(len(payload["results"]),2)
+        self.assertTrue(all(p["source_url"].startswith("https://") for p in payload["results"]))
+        self.assertEqual(len(self.query()),before)
+        bad=client.get("/api/limbo-atlas/memory/recall",params={"q":"g","limit":100})
+        self.assertEqual(bad.status_code,422)
+
+    def test_stored_public_abstracts_are_searchable_in_core(self):
+        doc={**article(0),"title":"No mention of target keyword",
+             "summary":"Specialized electrocephalography research"}
+        self.ingest([doc])
+        self.preview(commit=True)
+        result=recall(self.target,"electrocephalography")
+        self.assertEqual(len(result["results"]),1)
+        self.assertEqual(result["results"][0]["source_id"],"genomics-arxiv")
+
     def test_actual_memory_api_lists_public_research_room_events(self):
         self.ingest([article(0)])
         self.preview(commit=True)

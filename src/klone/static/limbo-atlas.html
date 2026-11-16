@@ -84,6 +84,39 @@ PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
   <p class="muted">Nämä komennot suoritetaan vain itse käynnistettyinä. Tallennus säilyttää myös ne kelvolliset julkaisut, jotka eivät mahdu 48 havainnon neuvostoraporttiin. Tuo tämän jälkeen E3-muutostiedosto yllä olevalla painikkeella.</p>
 </section>
 
+<section class="panel" id="atlas-e4-queue">
+  <h2>Atlas E4 · koko tutkimusarkiston työjono</h2>
+  <p>Kaikki E3-arkiston julkaisuviitteet jaetaan enintään 48 havainnon eriin. Aiemmat 147 viitettä muodostavat neljä erää (48 + 48 + 48 + 3). Jokainen tutkimusala saa vuorollaan paikan neuvoston käsittelyjonossa.</p>
+  <div class="toolbar">
+    <label class="file-button">Tuo E4-työjono
+      <input id="atlas-e4-import" type="file" accept="application/json,.json">
+    </label>
+    <button id="atlas-e4-clear" type="button" class="secondary">Tyhjennä jononäkymä</button>
+  </div>
+  <p id="atlas-e4-status" class="status" role="status" aria-live="polite">E4-työjonoa ei ole vielä tuotu.</p>
+  <div class="atlas-controls">
+    <label for="atlas-e4-batch">Valitse neuvoston tutkimuserä
+      <select id="atlas-e4-batch"><option value="">Tuo ensin työjonotiedosto</option></select>
+    </label>
+  </div>
+  <div class="toolbar">
+    <button type="button" id="atlas-e4-load" disabled>Lataa valittu erä neuvoston ideointiin</button>
+  </div>
+  <div id="atlas-e4-info" class="atlas-memory-changes"></div>
+  <p class="muted">Erän lataaminen ei vielä merkitse tutkimusta tehdyksi. Valitse sen jälkeen alta rinki ja tutkimuskysymys ja paina "Luo ja reititä tutkimusluonnokset". Tarkistamatta olevia väitteitä ei julisteta tosiksi.</p>
+  <h3>Vie koko arkiston jono Termuxista</h3>
+  <pre class="code">cd ~/klone-arxiv-e1
+STAMP="$(date +%Y%m%d-%H%M%S)"
+
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_queue \
+  --db "$HOME/klone-var/atlas-memory.sqlite3" \
+  --output "$HOME/klone-var/atlas-e4-queue-$STAMP.json"
+
+cp "$HOME/klone-var/atlas-e4-queue-$STAMP.json" \
+   "$HOME/storage/downloads/KLONE-E4-tyojono.json"</pre>
+</section>
+
 <section class="panel">
   <h2>4. Valitse vastaanottava rinki ja tutkimuskysymys</h2>
   <p class="muted">Automaattireititys käyttää alan luontevaa neuvostorinkiä. Vaihtoehtoisesti voit ohjata koko havaintojoukon valitsemaasi rinkiin ja pyytää uutta näkökulmaa.</p>

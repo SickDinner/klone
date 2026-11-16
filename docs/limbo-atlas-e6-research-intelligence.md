@@ -92,6 +92,53 @@ PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
   --output "$HOME/klone-var/e6-research-$STAMP.json"
 \`\`\`
 
+## Jos portin 8000 pää-KLONE ei vastaa (Connection refused)
+
+Käyttäjän Android E6 -ajo 16.11.2026 vahvisti:
+- **78/78 E1–E6-testiä** onnistui ja E6 portissa 8031 vastasi;
+- \`genetiikka\` toi 12 muistiosumaa, 1 tutkimusluonnoksen ja
+  18 aihevertailua;
+- yritys käynnistää 8041:n vain luku -lukija pysähtyi, koska
+  **portin 8000 pääpalvelin ei ollut käynnissä**:
+  \`urllib.error.URLError: Connection refused\`.
+- Päämuistiin **ei** kirjoitettu eikä uusia palvelimia käynnistetty.
+
+Älä etsi vikaa E6:n aineistosta tai suorita päämuistin
+\`--commit\`-komentoa. Palauta ensin **alkuperäinen** KLONE 8000
+käyttämättä uutta E6-työpuuta palvelimen korvikkeena:
+
+\`\`\`bash
+cd ~/klone-arxiv-e1 || exit 1
+git fetch origin feat/limbo-external-intelligence-20261115 || exit 1
+git switch --detach FETCH_HEAD || exit 1
+
+bash scripts/klone-main8000-rescue.sh
+\`\`\`
+
+Palautusskripti vaatii jo olemassa olevat
+\`~/klone/src/klone/main.py\` ja
+\`~/klone/data/klone_mission_control.db\`. Se tarkistaa
+alkuperäisen SQLite-muistin eheyden ja ottaa SQLite-online-varmuuskopion
+ennen pääpalvelimen uudelleenkäynnistystä. **Se ei luo uutta
+tyhjää päämuistia eikä koske portteihin 8001 tai 8031.**
+Jos tarkistuksissa ilmenee eri tietokantapolku, pysähdy
+selvittämään oikea sijainti äläkä vaihda polkua summittain.
+
+Kun \`http://127.0.0.1:8000/api/health\` vastaa
+\`status=ok\` ja sen \`database_path\` vastaa alkuperäistä kantaa,
+jatka:
+
+\`\`\`bash
+cd ~/klone-arxiv-e1 || exit 1
+bash scripts/klone-main-research-canary.sh || exit 1
+bash scripts/klone-atlas-main-memory.sh
+\`\`\`
+
+8041 on vain luku -palvelu, jonka tulee osoittaa samaan päämuistiin.
+Viimeinen skripti pyytää edelleen **nimenomaisen PAAMUISTI-hyväksynnän**
+vasta esikatselun ja uuden varmuuskopion jälkeen. Päämuistiin
+ei tehdä mitään automaattisesti.
+
 ## Pää-KLONEn muistin (portti 8000) turvallinen integraatio
 
 ### Suunnitelma A: nykyinen 8000-palvelin tuntee research-roomin

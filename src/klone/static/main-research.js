@@ -159,6 +159,39 @@
            (pair.different_publisher_groups?"kyllä":"ei")));
        item.append(node("p",pair.next_experiment));
        item.append(node("p","Riippumatonta tutkimusnäyttöä ei ole osoitettu.","atlas-stats"));
+       const open=node("button","Avaa E9-lähdeparin tutkimuskortti");
+       open.type="button";
+       open.addEventListener("click",async()=>{
+         open.disabled=true;open.textContent="Luetaan oikeat lähdeviitteet...";
+         try{
+           const dossier=await api("/api/limbo-atlas/dossier?q="+encodeURIComponent(q)+
+             "&first_event_id="+pair.first_event_id+
+             "&second_event_id="+pair.second_event_id);
+           const panel=node("section",undefined,"atlas-packet");
+           panel.append(node("h3","E9 · Kaksi oikeaa julkaisua ja tutkimisen velat"));
+           for(const source of [dossier.source_a,dossier.source_b]){
+             panel.append(node("strong",source.title));
+             panel.append(node("p",source.domain+" · julkaisija "+source.publisher_group+
+               " · muistiviite #"+source.event_id+" · versio "+source.version));
+             panel.append(node("p",source.source_excerpt));
+             const link=node("a","Lue alkuperäinen julkaisu");
+             const u=new URL(source.source_url);
+             if(u.protocol==="https:"&&!u.username&&!u.password){
+               link.href=u.href;link.rel="noopener noreferrer";link.target="_blank";
+               panel.append(link);
+             }
+             panel.append(node("p","Täystekstiä ja tutkimusasetelmaa ei ole vielä tarkistettu.","atlas-stats"));
+           }
+           const protocol=node("ul");
+           Object.values(dossier.research_protocol).forEach(x=>protocol.append(node("li",x)));
+           panel.append(node("h3","Kriittiset tarkistustehtävät"));
+           panel.append(protocol);
+           item.append(panel);
+           open.remove();
+         }catch(err){open.disabled=false;open.textContent="Yritä tutkimuskortin hakua uudelleen";
+           item.append(node("p","E9-haku epäonnistui: "+err.message,"atlas-stats"));}
+       });
+       item.append(open);
        root.append(item);
      }
      const debt=node("article",undefined,"atlas-packet");

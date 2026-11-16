@@ -113,6 +113,38 @@
        ([name,n])=>name+" "+n).join(" · ")));
      summary.append(node("p","Pisteet tarkoittavat tutkimisen tarvetta, eivät todennäköisyyttä tai tieteellistä varmistusta."));
      root.append(summary);
+     const diagnostics=r.diagnostics||{};
+     const scan=node("article",undefined,"atlas-packet");
+     scan.append(node("h3","E8.1 · Tieteidenvälisen haun tarkistus"));
+     scan.append(node("p","Haun alat: "+
+       (diagnostics.query_selected_domains||[]).join(", ")+
+       " · muita julkisia lähteitä tutkittu: "+
+       (r.outside_domain_documents_examined||0)+
+       " · löydettyjä siltalähteitä: "+(r.bridge_document_count||0)));
+     if(diagnostics.why_no_pairs)
+       scan.append(node("p","Miksi tuloksia on nolla: "+diagnostics.why_no_pairs));
+     for(const suggestion of diagnostics.suggested_next_queries||[])
+       scan.append(node("p","Seuraava tarkistettava haku: "+suggestion,"atlas-stats"));
+     root.append(scan);
+     for(const found of r.bridge_documents||[]){
+       const item=node("article",undefined,"atlas-memory-card");
+       item.append(node("p","MUUN ALAN LÄHDE · "+found.domain,"eyebrow"));
+       item.append(node("strong",found.title));
+       item.append(node("p","Muisti #"+found.event_id+" · vahvistamaton"));
+       const a=node("a","Tarkista alkuperäinen julkaisu");
+       a.href=found.source_url;a.target="_blank";a.rel="noopener noreferrer";
+       item.append(a);root.append(item);
+     }
+     if(r.weak_single_term_leads?.length){
+       const weak=node("article",undefined,"atlas-packet");
+       weak.append(node("h3","Heikot tutkintavihjeet"));
+       weak.append(node("p","Yksi yhteinen termi ei riitä väittämään yhteyttä."));
+       for(const hint of r.weak_single_term_leads){
+         weak.append(node("p","Muistit #"+hint.first_event_id+" ja #"+
+             hint.second_event_id+" · "+hint.shared_terms.join(", ")));
+       }
+       root.append(weak);
+     }
      for(const pair of r.cross_discipline_candidates){
        const item=node("article",undefined,"atlas-memory-card");
        item.append(node("p",pair.domains.join(" × "),"eyebrow"));

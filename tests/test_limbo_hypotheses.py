@@ -16,6 +16,9 @@ from klone.limbo_hypotheses import create,attach,review,detail,list_hypotheses
 from klone.limbo_discovery import radar,compare_snapshots
 from klone.limbo_source_dossiers import review_pair,review_all,_collapse_source_pairs,_publication_key,_source_class
 from klone.limbo_intelligence import analyze,_memories
+from klone.limbo_council_workbench import council_review,council_all
+from klone.limbo_doctor import diagnose,_read_health
+from klone.council72 import catalog
 from klone.repository import KloneRepository
 
 
@@ -449,6 +452,140 @@ class E7E8Tests(unittest.TestCase):
                          batch["candidate_count"])
         self.assertFalse(batch["memory_write"])
         self.assertEqual(self.core_before,self.core.read_bytes())
+
+    def test_e10_research_board_assigns_all_real_72_seats_without_votes(self):
+        pair=review_all(self.core,question="genetiikka")["dossiers"][0]
+        a=pair["source_a"]["event_id"]
+        b=pair["source_b"]["event_id"]
+        before=self.core.read_bytes()
+        board=council_review(self.core,a,b)
+        self.assertEqual(board["kind"],"klone-atlas-e10-council72-workbench")
+        self.assertEqual(board["seat_count"],72)
+        self.assertEqual(board["ring_count"],9)
+        self.assertEqual(board["founder_count"],8)
+        self.assertEqual(board["pending_review_count"],72)
+        self.assertEqual(board["performed_review_count"],0)
+        seats=board["assigned_seats"]
+        self.assertEqual(len(seats),72)
+        self.assertEqual(len({x["member_id"] for x in seats}),72)
+        self.assertEqual(len({(x["ring"],x["slot"]) for x in seats}),72)
+        self.assertEqual({x["member_id"] for x in seats},
+                         {m["id"] for m in catalog()["members"]})
+        founders=[x for x in seats if x["founder"]]
+        self.assertEqual(sorted(x["oversees_ring"] for x in founders),list(range(1,9)))
+        self.assertTrue(all(not x["vote_cast"] and not x["completed"]
+                            and not x["permission_granted"] for x in seats))
+        self.assertEqual(sum(x["assigned_seats"] for x in board["rings"]),72)
+        self.assertTrue(all(not x["active_vote_count"] for x in board["rings"]))
+        self.assertTrue(board["research_evidence_debt"])
+        self.assertFalse(any(board["authority"].values()))
+        self.assertTrue(board["source_summary"]["source_a"]["receipt_sha256"])
+        self.assertEqual(board,council_review(self.core,b,a))
+        self.assertEqual(board["report_sha256"],council_review(self.core,a,b)["report_sha256"])
+        self.assertEqual(before,self.core.read_bytes())
+
+    def test_e10_board_denies_forged_uncanonical_or_alias_pairs(self):
+        with self.assertRaises(ValueError):
+            council_review(self.core,1,1)
+        with self.assertRaises(ValueError):
+            council_review(self.core,True,2)
+        with self.assertRaises(ValueError):
+            council_review(self.core,999999,3)
+        allboards=council_all(self.core,question="genetiikka",max_pairs=2)
+        self.assertLessEqual(allboards["board_count"],2)
+        self.assertEqual(allboards["total_pending_seat_assignments"],
+                         allboards["board_count"]*72)
+        self.assertFalse(any(allboards["authority"].values()))
+        with self.assertRaises(ValueError):
+            council_all(self.core,max_pairs=9)
+
+    def test_e10_mixed_news_research_cannot_be_promoted_to_science(self):
+        news=paper("bbc-science",22231,
+                   "Genetic memory markers in genomic science",
+                   "Genetic markers and memory may be correlated.")
+        ingest(self.archive,[news],root=self.root)
+        bridge(self.archive,self.core,commit=True,root=self.root)
+        candidates=review_all(self.core,question="genetiikka")["dossiers"]
+        mixed=[d for d in candidates if
+               d["source_comparison_type"]=="mixed_news_or_reference_pair"]
+        self.assertTrue(mixed)
+        item=mixed[0]
+        board=council_review(self.core,item["source_a"]["event_id"],
+                             item["source_b"]["event_id"])
+        self.assertIn("news_is_not_independent_study",
+                      board["research_evidence_debt"])
+        self.assertFalse(board["authority"]["hypothesis_verified"])
+
+    def test_e10_doctor_validates_three_services_and_actual_db_without_writes(self):
+        from klone import limbo_doctor
+        before=self.core.read_bytes()
+        healths={
+            "main":{"status":"ok","app":"Klone",
+                    "database_path":str(self.core),"app_version":"0.2.0"},
+            "atlas":{"status":"ok","app":"Klone","app_version":"0.2.0"},
+            "research":{"status":"ok","service":"klone-main-research-readonly",
+                        "database_path":str(self.core),"read_only":True,
+                        "feature_version":"E10"},
+        }
+        def mocked(url,*,opener=None):
+            name=next(name for name,target in limbo_doctor.SERVICES
+                      if url==target)
+            return healths[name]
+        with patch("klone.limbo_doctor._read_health",side_effect=mocked):
+            result=diagnose(expected_main_db=self.core,
+                            now="2026-11-17T00:00:00+00:00")
+        self.assertEqual(result["kind"],"klone-e10-phone-doctor")
+        self.assertEqual(result["health"],"ok")
+        self.assertEqual(result["main_database"]["quick_check"],"ok")
+        self.assertEqual(result["main_database"]["active_public_research_events"],5)
+        self.assertEqual(result["services"]["research"]["main_db_matches"],True)
+        self.assertEqual(result["problems"],[])
+        self.assertFalse(any(result["safety"].values()))
+        self.assertEqual(before,self.core.read_bytes())
+
+    def test_e10_doctor_detects_mismatch_dead_sidecar_and_avoids_arbitrary_url(self):
+        from klone import limbo_doctor
+        before=self.core.read_bytes()
+        def mocked(url,*,opener=None):
+            if url.endswith(":8000/api/health"):
+                return {"status":"ok","app":"Klone","database_path":str(self.core)}
+            if url.endswith(":8041/health"):
+                return {"status":"ok","service":"klone-main-research-readonly",
+                        "database_path":str(self.root/"wrong.sqlite"),
+                        "read_only":True,"feature_version":"E10"}
+            raise OSError("connection refused")
+        with patch("klone.limbo_doctor._read_health",side_effect=mocked):
+            result=diagnose(expected_main_db=self.core)
+        self.assertEqual(result["health"],"attention_required")
+        self.assertIn("service_atlas_unavailable_or_invalid",result["problems"])
+        self.assertIn("research_canary_database_mismatch",result["problems"])
+        with self.assertRaises(ValueError):
+            _read_health("https://example.org/do-not-fetch")
+        self.assertEqual(before,self.core.read_bytes())
+
+    def test_e10_readonly_council_workbench_endpoints(self):
+        import os
+        from klone.api import get_repository
+        from klone.main import create_app
+        from klone.limbo_main_research_canary import app as canary
+        pair=review_all(self.core,question="genetiikka")["dossiers"][0]
+        ids={"q":"genetiikka","first_event_id":pair["source_a"]["event_id"],
+             "second_event_id":pair["source_b"]["event_id"]}
+        app=create_app()
+        app.dependency_overrides[get_repository]=lambda:KloneRepository(self.core)
+        before=self.core.read_bytes()
+        with TestClient(app) as client:
+            r=client.get("/api/limbo-atlas/council-workbench",params=ids)
+            self.assertEqual(r.status_code,200,r.text[:500])
+            self.assertEqual(r.json()["seat_count"],72)
+            self.assertEqual(client.post("/api/limbo-atlas/council-workbench",
+                                         json=ids).status_code,405)
+        with patch.dict(os.environ,{"KLONE_MAIN_RESEARCH_DB":str(self.core)}):
+            with TestClient(canary) as client:
+                self.assertEqual(client.get("/health").json()["feature_version"],"E10")
+                self.assertEqual(client.get("/api/limbo-atlas/council-workbench",
+                                            params=ids).status_code,200)
+        self.assertEqual(before,self.core.read_bytes())
 
     def test_e9_get_only_apis_reject_writes_and_fake_papers(self):
         import os

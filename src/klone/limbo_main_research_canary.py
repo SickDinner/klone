@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse
 from .limbo_intelligence import analyze
 from .limbo_discovery import radar
 from .limbo_source_dossiers import review_pair, review_all
+from .limbo_council_workbench import council_review
 from .limbo_memory_bridge import recall
 
 
@@ -47,7 +48,7 @@ def health():
     return {"status":"ok","service":"klone-main-research-readonly",
             "database_path":str(db),
             "room_scope":"research-room","read_only":True,
-            "feature_version":"E9.1","features":["research","discovery","memory_recall","dossiers"]}
+            "feature_version":"E10","features":["research","discovery","memory_recall","dossiers","council_workbench"]}
 
 
 @app.get("/api/limbo-atlas/intelligence")
@@ -124,5 +125,17 @@ def source_dossiers(
 ):
     try:
         return review_all(_db(),question=q)
+    except (ValueError,PermissionError) as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc
+
+
+@app.get("/api/limbo-atlas/council-workbench")
+def e10_council_workbench(
+    q: str = Query(default="genetiikka",min_length=3,max_length=160),
+    first_event_id: int = Query(...,ge=1),
+    second_event_id: int = Query(...,ge=1),
+):
+    try:
+        return council_review(_db(),first_event_id,second_event_id,question=q)
     except (ValueError,PermissionError) as exc:
         raise HTTPException(status_code=422,detail=str(exc)) from exc

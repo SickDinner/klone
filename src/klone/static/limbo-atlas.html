@@ -117,6 +117,36 @@ cp "$HOME/klone-var/atlas-e4-queue-$STAMP.json" \
    "$HOME/storage/downloads/KLONE-E4-tyojono.json"</pre>
 </section>
 
+<section class="panel" id="atlas-e5-core">
+  <h2>Atlas E5 · KLONEn älymuisti</h2>
+  <p>Atlas E3:n julkiset julkaisuviitteet voidaan tuoda erikseen KLONEn varsinaiseen Memory Coreen. Niistä syntyy rajattuja, auditoituja ja alkuperäisjulkaisuun jäljitettäviä muistihavaintoja <code>research-room</code>-huoneeseen. Julkaisun väite ei muutu todistetuksi faktaksi.</p>
+  <div class="atlas-controls">
+    <label>Hae omasta KLONE-älymuistista
+      <input id="atlas-e5-query" maxlength="160" placeholder="esim. genomit, muisti, agentit, farmakologia">
+    </label>
+  </div>
+  <div class="toolbar">
+    <button type="button" id="atlas-e5-search">Hae älymuistin tutkimusviitteitä</button>
+    <button type="button" id="atlas-e5-clear" class="secondary">Tyhjennä hakutulokset</button>
+  </div>
+  <p id="atlas-e5-status" class="status" role="status" aria-live="polite">Tutkimusmuistiin ei ole tehty hakua. E5-tuonti on käynnistettävä erikseen omistajan Termux-komennolla.</p>
+  <div id="atlas-e5-results" class="atlas-memory-changes"></div>
+  <h3>Esikatsele ensin, tuo sitten julkiset viitteet</h3>
+  <pre class="code">cd ~/klone-arxiv-e1
+
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_memory_bridge \
+  --atlas-db "$HOME/klone-var/atlas-memory.sqlite3" \
+  --klone-db "$HOME/klone-var/arxiv-e1.db"
+
+# Kun esikatselu näyttää oikean kohdetietokannan:
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_memory_bridge \
+  --atlas-db "$HOME/klone-var/atlas-memory.sqlite3" \
+  --klone-db "$HOME/klone-var/arxiv-e1.db" --commit</pre>
+  <p class="muted">Tämä lisää vain E3-arkiston julkisia lähdemetatietoja omistajan käskystä. Se ei avaa käyttäjän yksityisiä muisteja, muuta suojattuja huoneita tai nosta epävarmoja väitteitä vahvistetuksi tiedoksi. Älymuistin yksittäisen löydön voi avata Memory Coren omassa kontekstinäkymässä.</p>
+</section>
+
 <section class="panel">
   <h2>4. Valitse vastaanottava rinki ja tutkimuskysymys</h2>
   <p class="muted">Automaattireititys käyttää alan luontevaa neuvostorinkiä. Vaihtoehtoisesti voit ohjata koko havaintojoukon valitsemaasi rinkiin ja pyytää uutta näkökulmaa.</p>
@@ -157,7 +187,7 @@ PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
   --output "$HOME/klone-var/atlas-genetiikka-psykiatria.json"</pre>
   <p class="muted">Haku voi kestää useita minuutteja etenkin kaikilla lähteillä. Yhden lähteen estot tai tyhjät vastaukset säilyvät virheraportissa; niitä ei korvata keksityillä tutkimuksilla.</p>
 </section>
-<footer>KLONE Atlas E2 · raportoidut lähteet ≠ vahvistettu tieto · ei yksityisen muistin lukua · ei automaattista someviestintää</footer>
+<footer>KLONE Atlas E5 · raportoidut lähteet ≠ vahvistettu tieto · ei yksityisen muistin lukua · ei automaattista someviestintää</footer>
 </main>
 </body>
 </html>

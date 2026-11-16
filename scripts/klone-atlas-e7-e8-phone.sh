@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# KLONE Atlas E9.1: safe Termux local tests and deduplicated source dossiers.
+# KLONE Atlas E10: 72-seat read-only council workbench, source dossiers and diagnostics.
 # No automated journal writes, no mutation of Memory Core or port 8000.
 set -euo pipefail
 
@@ -12,9 +12,11 @@ test -x "$PY" || { echo "KLONE Python .venv puuttuu"; exit 1; }
 test -f "$ROOT/src/klone/limbo_hypotheses.py" || { echo "E7-koodi puuttuu"; exit 1; }
 test -f "$ROOT/src/klone/limbo_discovery.py" || { echo "E8-koodi puuttuu"; exit 1; }
 test -f "$ROOT/src/klone/limbo_source_dossiers.py" || { echo "E9.1-koodi puuttuu"; exit 1; }
+test -f "$ROOT/src/klone/limbo_council_workbench.py" || { echo "E10-neuvosto puuttuu"; exit 1; }
+test -f "$ROOT/src/klone/limbo_doctor.py" || { echo "E10-tarkistin puuttuu"; exit 1; }
 mkdir -p "$VAR" "$HOME/storage/downloads"
 
-echo "=== E7/E8/E9.1 tutkimus-, turvallisuus- ja tietokantatestit ==="
+echo "=== E7–E10 tutkimus-, turvallisuus- ja tietokantatestit ==="
 PYTHONPATH="$ROOT/src" "$PY" -m unittest discover \
   -s "$ROOT/tests" -p "test_limbo_hypotheses.py" || exit 1
 
@@ -54,6 +56,13 @@ PYTHONPATH="$ROOT/src" "$PY" -m klone.limbo_source_dossiers \
   --output "$DOSSIERS" || exit 1
 cp "$DOSSIERS" "$HOME/storage/downloads/KLONE-E9-lahdeparit.json"
 
+echo "=== E10: 72-jäsenisen neuvoston tarkistamattomat tutkimustehtävät ==="
+BOARD="$VAR/atlas-e10-council72-$STAMP.json"
+PYTHONPATH="$ROOT/src" "$PY" -m klone.limbo_council_workbench \
+  --klone-db "$TARGET" --question "genetiikka" --all --max-pairs 8 \
+  --output "$BOARD" || exit 1
+cp "$BOARD" "$HOME/storage/downloads/KLONE-E10-neuvosto.json"
+
 echo "=== E7-hypoteesin esikatselu ilman kirjoittamista ==="
 PYTHONPATH="$ROOT/src" "$PY" -m klone.limbo_hypotheses \
   --journal-db "$VAR/atlas-hypotheses.sqlite3" \
@@ -64,7 +73,7 @@ PYTHONPATH="$ROOT/src" "$PY" -m klone.limbo_hypotheses \
   --falsifier "Etukäteen määritelty riippumaton toistokoe ei vahvista samaa tulosta." \
   --output "$VAR/atlas-e7-preview-$STAMP.json" || exit 1
 
-echo "=== Päivitä vain päämuistin VAIN LUKU -lukija 8041 E9.1-versioon ==="
+echo "=== Päivitä vain päämuistin VAIN LUKU -lukija 8041 E10-versioon ==="
 bash scripts/klone-main-research-e8-upgrade.sh || exit 1
 
 echo "=== Varmista E8/E9.1 rajapinnat ==="
@@ -77,11 +86,21 @@ curl -fsS --max-time 6 \
 curl -fsS --max-time 8 \
   "http://127.0.0.1:8041/api/limbo-atlas/dossiers?q=genetiikka" \
   > /dev/null || exit 1
+echo "=== E10: vain luku -tutkimusneuvoston ja puhelimen terveystarkistus ==="
+PYTHONPATH="$ROOT/src" "$PY" -m klone.limbo_doctor \
+  --expected-main-db "$TARGET" \
+  --output "$VAR/klone-doctor-e10-$STAMP.json" || exit 1
+cp "$VAR/klone-doctor-e10-$STAMP.json" "$HOME/storage/downloads/KLONE-E10-doctor.json"
+curl -fsS --max-time 12 \
+  "http://127.0.0.1:8041/api/limbo-atlas/council-workbench?q=genetiikka&first_event_id=26&second_event_id=24" \
+  > /dev/null || exit 1
 
-echo "=== KLONE E7/E8/E9.1 VALMIS ==="
+echo "=== KLONE E7–E10 VALMIS ==="
 echo "Päämuistia tai tutkimusarkistoa ei muutettu."
 echo "E8-raportti: $REPORT"
 echo "E9-lähdekortit: $DOSSIERS"
+echo "E10-neuvostotehtävät: $BOARD"
+echo "E10-terveystarkistus: $VAR/klone-doctor-e10-$STAMP.json"
 echo "E7:n kirjoittamaton esikatselu: $VAR/atlas-e7-preview-$STAMP.json"
 echo "Atlas: http://127.0.0.1:8031/limbo-atlas"
 echo "Päämuisti: http://127.0.0.1:8041/research"

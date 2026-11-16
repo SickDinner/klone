@@ -210,6 +210,34 @@
            Object.values(dossier.research_protocol).forEach(x=>protocol.append(node("li",x)));
            panel.append(node("h3","Kriittiset tarkistustehtävät"));
            panel.append(protocol);
+           const councilButton=node("button","Avaa E10 · kaikki 72 neuvoston tehtävää");
+           councilButton.type="button";
+           councilButton.addEventListener("click",async()=>{
+             councilButton.disabled=true;councilButton.textContent="Laaditaan neuvoston tutkimussuunnitelma...";
+             try{
+               const board=await api("/api/limbo-atlas/council-workbench?q="+
+                 encodeURIComponent(q)+"&first_event_id="+pair.first_event_id+
+                 "&second_event_id="+pair.second_event_id);
+               const block=node("section",undefined,"atlas-packet");
+               block.append(node("h3","E10 · 9 rinkiä × 8 tehtävää = 72"));
+               block.append(node("p","Vain tehtävänjako: 0 suoritettua arviota, 0 ääntä, ei päätösvaltaa."));
+               block.append(node("p","Evidenssivelka: "+board.research_evidence_debt.join(", ")));
+               for(const ring of board.rings){
+                 const details=node("details");
+                 details.append(node("summary","Rinki "+ring.ring+" · "+ring.name));
+                 const list=node("ul");
+                 for(const seat of board.assigned_seats.filter(x=>x.ring===ring.ring)){
+                   list.append(node("li",seat.member_name+" (#"+seat.member_id+
+                     "): "+seat.review_task+" — kesken; ei tarkistettua näyttöä."));
+                 }
+                 details.append(list);block.append(details);
+               }
+               panel.append(block);councilButton.remove();
+             }catch(err){councilButton.disabled=false;
+               councilButton.textContent="Yritä E10-tehtäväjakoa uudelleen";
+               panel.append(node("p","E10: "+err.message,"atlas-stats"));}
+           });
+           panel.append(councilButton);
            item.append(panel);
            open.remove();
          }catch(err){open.disabled=false;open.textContent="Yritä tutkimuskortin hakua uudelleen";

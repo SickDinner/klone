@@ -47,6 +47,78 @@ def _query_terms(query):
     return terms
 
 
+def _expand_across_domains(all_docs, seeds):
+    """Look beyond query-matched domains without inventing evidence links.
+
+    A potential bridge needs >=2 corpus-distinctive shared terms, including
+    one from a publication title. Single-term matches are only weak leads.
+    All candidates retain actual Memory Core event IDs and source URLs.
+    """
+    if not seeds:
+        return [], [], 0, {}
+    seed_domains={d["domain"] for d in seeds}
+    outside=[d for d in all_docs if d["domain"] not in seed_domains]
+    if not outside:
+        return [], [], 0, {}
+    frequencies=Counter()
+    for doc in all_docs:
+        frequencies.update(_tokens(doc["title"]+" "+doc["abstract"][:400]))
+    cap=max(3,len(all_docs)//3)
+    def distinctive(doc):
+        return {t for t in _tokens(doc["title"]+" "+doc["abstract"][:400])
+                if frequencies[t]<=cap and len(t)>=4}
+    seed_terms={d["event_id"]:distinctive(d) for d in seeds}
+    outside_terms={d["event_id"]:distinctive(d) for d in outside}
+    pairs=[]
+    weak=[]
+    for seed in seeds:
+        for other in outside:
+            common=sorted(seed_terms[seed["event_id"]] &
+                          outside_terms[other["event_id"]])
+            in_title=sorted(set(common)&
+                            (_tokens(seed["title"])|_tokens(other["title"])))
+            if not common or not in_title:
+                continue
+            pair={
+                "first_event_id":seed["event_id"],
+                "second_event_id":other["event_id"],
+                "first_source_url":seed["source_url"],
+                "second_source_url":other["source_url"],
+                "domains":sorted([seed["domain"],other["domain"]]),
+                "shared_terms":common[:8],
+                "shared_term_count":len(common),
+                "candidate_origin":"other_domain_public_memory",
+                "different_publisher_groups":
+                    seed["publisher_group"]!=other["publisher_group"],
+                "independent_studies_confirmed":False,
+                "cross_domain_hypothesis_verified":False,
+                "next_experiment":"Tarkista molemmat alkuperäiset julkaisut ja "
+                                  "määritä yhteinen testattava muuttuja sekä "
+                                  "itsenäinen kumoava havainto.",
+            }
+            if len(common)>=2:
+                pair["candidate_priority"]=min(8,len(common))*3+(
+                    2 if pair["different_publisher_groups"] else 0)
+                pairs.append(pair)
+            else:
+                pair["candidate_priority"]=0
+                pair["status"]="weak_single_term_lead_not_confirmed"
+                weak.append(pair)
+    pairs.sort(key=lambda p:(-p["candidate_priority"],
+                 p["first_event_id"],p["second_event_id"]))
+    weak.sort(key=lambda p:(p["first_event_id"],p["second_event_id"]))
+    bridges={}
+    for pair in pairs[:MAX_PAIRS]:
+        second=next(d for d in outside if d["event_id"]==pair["second_event_id"])
+        bridges[second["event_id"]]={
+            "event_id":second["event_id"],"domain":second["domain"],
+            "source_url":second["source_url"],"title":second["title"],
+            "source_id":second["source_id"],
+            "epistemic_status":"unverified_publisher_claim",
+        }
+    return pairs[:MAX_PAIRS],weak[:8],len(outside),bridges
+
+
 def radar(core_db,query,*,limit=48):
     if type(limit) is not int or not 2<=limit<=MAX_MATCH:
         raise ValueError("limit must be 2..96")
@@ -93,6 +165,16 @@ def radar(core_db,query,*,limit=48):
             })
     pairs.sort(key=lambda d:(-d["candidate_priority"],
              d["first_event_id"],d["second_event_id"]))
+    matched_domains=sorted({d["domain"] for d in chosen})
+    bridge_mode=len(matched_domains)==1
+    bridged_pairs=[]
+    weak_leads=[]
+    outside_examined=0
+    bridge_sources={}
+    if bridge_mode:
+        bridged_pairs,weak_leads,outside_examined,bridge_sources=(
+            _expand_across_domains(docs,chosen))
+        pairs=(pairs+bridged_pairs)[:MAX_PAIRS]
     proposals=[]
     domains=Counter(x["domain"] for x in chosen)
     for domain in DOMAINS:
@@ -123,6 +205,32 @@ def radar(core_db,query,*,limit=48):
         "snapshot_sha256":_hash([(d["event_id"],d["receipt_sha256"]) for d in chosen]),
         "discipline_coverage":dict(sorted(domains.items())),
         "cross_discipline_candidates":pairs[:MAX_PAIRS],
+        "bridge_mode":"cross_domain_expansion" if bridge_mode else "query_domains",
+        "bridge_documents":sorted(bridge_sources.values(),key=lambda d:d["event_id"]),
+        "bridge_document_count":len(bridge_sources),
+        "outside_domain_documents_examined":outside_examined,
+        "weak_single_term_leads":weak_leads,
+        "diagnostics":{
+            "matched_domain_count":len(matched_domains),
+            "query_selected_domains":matched_domains,
+            "minimum_distinctive_terms_for_expansion":2,
+            "cross_domain_pairs_found":len(pairs),
+            "why_no_pairs":(
+                "No query-matched publications were available."
+                if not chosen else
+                "All selected publications belong to one domain and the corpus has no other domains."
+                if bridge_mode and outside_examined==0 else
+                "Other-domain publications were examined, but no pair met the two-distinctive-term title-overlap criterion."
+                if bridge_mode and not pairs else
+                "No query-selected pair met the two-term topic-overlap criterion."
+                if not pairs else None
+            ),
+            "suggested_next_queries":(
+                [query+" neuroscience",query+" ethics",query+" economics"]
+                if bridge_mode and not pairs else []
+            ),
+            "no_links_does_not_mean_no_scientific_relation":True,
+        },
         "attention_queue":proposals,
         "adversarial_research_lenses":[{"id":name,"question":prompt} for name,prompt in LENSES],
         "authority":{"writes_memory":False,"reads_private_data":False,

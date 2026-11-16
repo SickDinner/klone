@@ -525,6 +525,7 @@
         history.append(el("summary","Avaa koko versio- ja lähdehistoria"));
         for(const step of entry.events.slice(0,100)){
           const item=el("p","Versio "+step.revision+" · "+step.event_type+
+                   " · "+String(step.payload?.recorded_at||"aika tuntematon")+
                    " · tarkiste "+String(step.event_hash).slice(0,16),"atlas-stats");
           history.append(item);
           if(step.event_type==="source_link"){

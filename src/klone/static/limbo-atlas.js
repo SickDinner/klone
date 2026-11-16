@@ -379,6 +379,96 @@
     id("atlas-e5-results").replaceChildren();
     say("atlas-e5-status","Hakutulokset tyhjennetty. Memory Coren tietoja ei muutettu.");
   });
+  let latestE6=null;
+  id("atlas-e6-form").addEventListener("submit",async event=>{
+    event.preventDefault();
+    const q=id("atlas-e6-question").value.trim();
+    const ring=id("atlas-e6-ring").value;
+    const limit=id("atlas-e6-limit").value;
+    if(q.length<3){say("atlas-e6-status","Anna vähintään kolme merkkiä.");return;}
+    const results=id("atlas-e6-results");
+    results.replaceChildren();
+    latestE6=null;id("atlas-e6-export").disabled=true;
+    id("atlas-e6-analyze").disabled=true;
+    say("atlas-e6-status","Luetaan KLONEn julkista tutkimusmuistia, muodostetaan kysymykset...");
+    try{
+      const url="/api/limbo-atlas/intelligence?q="+encodeURIComponent(q)+
+        "&limit="+encodeURIComponent(limit)+(ring?"&ring="+encodeURIComponent(ring):"");
+      const report=await api(url);
+      latestE6=report;
+      const lead=el("article",undefined,"atlas-packet");
+      lead.append(el("h3","Muistivertailu · "+report.matched_memory_count+
+                         " / "+report.public_research_memory_count+" viitettä"));
+      lead.append(el("p",Object.entries(report.domain_counts||{}).map(
+        ([name,num])=>name+": "+num).join(" · ")));
+      lead.append(el("p","Lähderyhmiä "+report.source_groups.length+
+        " · tutkimuskysymyksiä "+report.research_drafts.length+
+        " · mahdollisia verrattavia pareja "+report.comparisons.length));
+      lead.append(el("p","Tietolähteen väitettä tai ristiriitaa ei ole varmennettu.","atlas-stats"));
+      results.append(lead);
+      for(const item of report.memories){
+        const card=el("article",undefined,"atlas-memory-card");
+        card.append(el("p","MUISTI #"+item.event_id+" · "+item.domain+
+                    " · relevanssi "+item.relevance_score,"eyebrow"));
+        card.append(el("strong",item.title));
+        card.append(el("p","Versio "+item.version+" · lähteen tunniste "+item.source_id+
+                    " · Limbo-agentti #"+item.courier_id));
+        const a=el("a","Alkuperäinen julkaisu");
+        a.href=item.source_url;a.target="_blank";a.rel="noopener noreferrer";
+        card.append(a);results.append(card);
+      }
+      if(report.comparisons.length){
+        const section=el("article",undefined,"atlas-packet");
+        section.append(el("h3","Lähteiden vertailu ja mahdolliset ristiriidat"));
+        for(const comparison of report.comparisons){
+          const d=el("details");
+          d.append(el("summary",comparison.kind==="potential_claim_tension"?
+            "Mahdollinen sanallinen jännite – tarkista" : "Yhteinen aihe – vertaa menetelmiä"));
+          d.append(el("p","Muistit #"+comparison.first_event_id+" ja #"+
+            comparison.second_event_id+" · yhteisiä termejä: "+
+            comparison.shared_terms.join(", ")));
+          d.append(el("p",comparison.explanation));
+          d.append(el("p","Eri julkaisijaryhmät: "+
+            (comparison.different_publishers?"kyllä":"ei")+
+            ". Väitteiden ristiriitaa ei ole varmennettu.","atlas-stats"));
+          section.append(d);
+        }
+        results.append(section);
+      }
+      if(report.research_drafts.length){
+        const section=el("article",undefined,"atlas-packet");
+        section.append(el("h3","Neuvoston jatkotutkimusluonnokset"));
+        for(const draft of report.research_drafts){
+          const d=el("details");
+          d.append(el("summary",draft.domain+" · Limbo-agentti #"+draft.agent_id+
+                 " → rinki "+draft.specialist_ring));
+          d.append(el("p","Tutkimuskysymys: "+draft.research_prompt));
+          const ul=el("ul");
+          draft.proposed_questions.forEach(v=>ul.append(el("li",v)));
+          d.append(ul);
+          d.append(el("p","Erikoisagenttien tunnukset: "+
+            draft.specialist_member_ids.join(", ")+
+            " · vasta alustava työluonnos","atlas-stats"));
+          section.append(d);
+        }
+        results.append(section);
+      }
+      say("atlas-e6-status","E6-analyysi valmistui: "+report.matched_memory_count+
+          " julkista muistiviitettä ja "+report.research_drafts.length+
+          " tutkimusluonnosta. Ei muistikirjoituksia eikä uusia verkkohakuja.");
+      id("atlas-e6-export").disabled=false;
+    }catch(error){
+      say("atlas-e6-status","Tutkimusanalyysi epäonnistui: "+error.message);
+    }finally{id("atlas-e6-analyze").disabled=false;}
+  });
+  id("atlas-e6-export").addEventListener("click",()=>{
+    if(!latestE6)return;
+    const blob=new Blob([JSON.stringify(latestE6,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download="KLONE-E6-tutkimusanalyysi.json";a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+  });
   async function init(){
     try{
       state.catalog=await api("/api/limbo-atlas/catalog");

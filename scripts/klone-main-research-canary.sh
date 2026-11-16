@@ -27,6 +27,7 @@ PY
 
 echo "Pää-KLONEn tietokanta: $TARGET"
 echo "=== VAIN LUKU -KATSELU PORTISSA 8041 ==="
+set +e
 KLONE_MAIN_RESEARCH_DB="$TARGET" "$PY" - <<'PY'
 import json,os,socket,sys
 from urllib.request import build_opener,ProxyHandler
@@ -48,6 +49,7 @@ if busy:
     sys.exit(12)
 PY
 result=$?
+set -e
 if [ "$result" -eq 12 ]; then exit 0; fi
 if [ "$result" -ne 0 ]; then exit "$result"; fi
 

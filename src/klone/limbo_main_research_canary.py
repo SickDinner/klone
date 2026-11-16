@@ -11,6 +11,7 @@ from pathlib import Path
 import stat
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
 
 from .limbo_intelligence import analyze
 from .limbo_memory_bridge import recall
@@ -67,3 +68,25 @@ def memory_recall(
         return recall(_db(),q,limit=limit)
     except (ValueError,PermissionError) as error:
         raise HTTPException(status_code=422,detail=str(error)) from error
+
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+@app.get("/research", include_in_schema=False)
+def research_dashboard():
+    return FileResponse(STATIC_DIR / "main-research.html")
+
+
+@app.get("/static/main-research.js", include_in_schema=False)
+def research_script():
+    return FileResponse(STATIC_DIR / "main-research.js", media_type="text/javascript")
+
+
+@app.get("/static/limbo-atlas.css", include_in_schema=False)
+def atlas_stylesheet():
+    return FileResponse(STATIC_DIR / "limbo-atlas.css", media_type="text/css")
+
+
+@app.get("/static/limbo-external.css", include_in_schema=False)
+def base_stylesheet():
+    return FileResponse(STATIC_DIR / "limbo-external.css", media_type="text/css")

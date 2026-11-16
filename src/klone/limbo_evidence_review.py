@@ -27,6 +27,9 @@ def _source_info(source):
         "event_id":source["event_id"],
         "source_url":source["source_url"],
         "receipt_sha256":source["receipt_sha256"],
+        "title":source["title"],
+        "source_class":source["source_class"],
+        "version":source["version"],
         "text":"",
         "owner_supplied":False,
         "usage_rights_note":"",
@@ -56,7 +59,8 @@ def prepare(core_db,first_event_id,second_event_id,*,question="genetiikka"):
 def _source_check(incoming,expected,letter):
     if type(incoming) is not dict:
         raise ValueError(f"source {letter} must be a JSON object")
-    for key in ("event_id","source_url","receipt_sha256"):
+    for key in ("event_id","source_url","receipt_sha256",
+                "title","source_class","version"):
         if incoming.get(key)!=expected[key] or type(incoming.get(key))!=type(expected[key]):
             raise ValueError(f"source {letter} provenance mismatch: {key}")
     if incoming.get("owner_supplied") is not True:
@@ -109,7 +113,9 @@ def _annotation(raw,texts,source_ids):
 
 
 def review_manifest(core_db,manifest):
-    if type(manifest) is not dict or manifest.get("schema_version")!=1:
+    if (type(manifest) is not dict or
+            type(manifest.get("schema_version")) is not int or
+            manifest.get("schema_version")!=1):
         raise ValueError("E11 schema v1 object required")
     if manifest.get("kind")!="klone-e11-owner-evidence-template":
         raise ValueError("invalid E11 manifest kind")

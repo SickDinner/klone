@@ -5,10 +5,13 @@ External network fetch is deliberately unavailable from HTTP API endpoints.
 from __future__ import annotations
 
 from typing import Annotated
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from .limbo_atlas import plan, roster
+from .limbo_memory_bridge import recall
+from .api import get_repository
+from .repository import KloneRepository
 
 
 router = APIRouter(prefix="/api/limbo-atlas", tags=["experimental limbo research atlas"])
@@ -43,3 +46,16 @@ def atlas_plan(request: AtlasPlanRequest):
                     ring_id=request.target_ring, question=request.research_question)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/memory/recall")
+def atlas_memory_recall(
+    q: str = Query(..., min_length=2, max_length=160),
+    limit: int = Query(default=12, ge=1, le=30),
+    repository: KloneRepository = Depends(get_repository),
+):
+    """Read owner-accessible public research-room events; no side effects."""
+    try:
+        return recall(repository.db_path, q, limit=limit)
+    except (ValueError, PermissionError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error

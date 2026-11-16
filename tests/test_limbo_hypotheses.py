@@ -249,7 +249,7 @@ class E7E8Tests(unittest.TestCase):
             self.assertNotIn("theory",pair["shared_terms"])
             self.assertTrue(pair["shared_title_concepts"])
             self.assertEqual(pair["quality_gate"],
-                "e8.2-contextual-scientific-terms-v1")
+                "e8.3-normalized-scientific-terms-v2")
         self.assertTrue(r["diagnostics"]["generic_topic_words_ignored"])
         self.assertTrue(r["diagnostics"]["shared_title_term_required_in_both_sources"])
         self.assertEqual(self.core.read_bytes(),original)
@@ -261,6 +261,48 @@ class E7E8Tests(unittest.TestCase):
             {"detection"})
         self.assertEqual(_concepts("telomere maintenance"),
                          {"telomere","maintenance"})
+
+    def test_e83_real_device_false_positive_tokens_are_not_evidence(self):
+        from klone.limbo_discovery import _concepts,BRIDGE_QUALITY_VERSION
+        self.assertEqual(BRIDGE_QUALITY_VERSION,
+                         "e8.3-normalized-scientific-terms-v2")
+        self.assertEqual(_concepts("network networks"),{"network"})
+        self.assertEqual(_concepts("graph graphs network networks"),
+                         {"graph","network"})
+        self.assertEqual(_concepts("detecting detection difficult"),{"detection"})
+        self.assertEqual(_concepts("exploring under domains"),set())
+        self.assertEqual(_concepts("agents agent"),{"agent"})
+        self.assertEqual(_concepts("gene expression"),{"gene","expression"})
+        self.assertNotIn("exploring",_concepts(
+            "exploring sequencing under network networks"))
+
+    def test_e83_real_device_weak_network_plural_link_is_rejected(self):
+        samples=[
+            paper("genomics-arxiv",19228,
+                  "Graph networks in telomerase biology",
+                  "We observe network networks under multiple conditions."),
+            paper("psychiatry-pmc",19229,
+                  "Network networks in behavioral medicine",
+                  "Our results explore networks and network effects."),
+            paper("stanford-philosophy",19230,
+                  "Graph network structures in philosophy",
+                  "Graph structure and network nodes across systems."),
+        ]
+        ingest(self.archive,samples,root=self.root)
+        bridge(self.archive,self.core,commit=True,root=self.root)
+        before=self.core.read_bytes()
+        result=radar(self.core,"telomerase",limit=48)
+        self.assertEqual(result["bridge_mode"],"cross_domain_expansion")
+        ids={d["title"]:d["event_id"] for d in _memories(self.core)}
+        self.assertNotIn(ids["Network networks in behavioral medicine"],
+                         [p["second_event_id"] for p in result["cross_discipline_candidates"]])
+        justified=[p for p in result["cross_discipline_candidates"]
+                   if p["second_event_id"]==ids["Graph network structures in philosophy"]]
+        self.assertEqual(len(justified),1)
+        self.assertEqual(justified[0]["shared_terms"],["graph","network"])
+        self.assertIn("manual verification",justified[0]["justification"])
+        self.assertFalse(justified[0]["cross_domain_hypothesis_verified"])
+        self.assertEqual(before,self.core.read_bytes())
 
     def test_zero_links_explains_missing_domain_and_suggests_followup(self):
         report=radar(self.core,"financial",limit=24)

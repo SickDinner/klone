@@ -252,6 +252,30 @@ class E7E8Tests(unittest.TestCase):
         self.assertIn('/api/limbo-atlas/discovery?q=',js.text)
         self.assertNotIn("innerHTML",js.text)
 
+    def test_android_upgrade_scripts_parse_and_preserve_main_service(self):
+        import shutil,subprocess
+        shell=shutil.which("bash")
+        if shell is None:
+            self.skipTest("bash unavailable")
+        scripts=Path(__file__).resolve().parents[1]/"scripts"
+        for filename in ("klone-atlas-e7-e8-phone.sh",
+                         "klone-main-research-e8-upgrade.sh",
+                         "klone-main-research-canary.sh"):
+            with self.subTest(script=filename):
+                proc=subprocess.run([shell,"-n",str(scripts/filename)],
+                    capture_output=True,text=True,timeout=10)
+                self.assertEqual(proc.returncode,0,proc.stderr)
+        upgrade=(scripts/"klone-main-research-e8-upgrade.sh").read_text(encoding="utf-8")
+        self.assertIn("127.0.0.1:8000/api/health",upgrade)
+        self.assertIn("klone-main-research-readonly",upgrade)
+        self.assertIn("klone.limbo_main_research_canary:app",upgrade)
+        self.assertIn("candidates)!=1",upgrade)
+        self.assertNotIn("kill -9",upgrade)
+        launcher=(scripts/"klone-atlas-e7-e8-phone.sh").read_text(encoding="utf-8")
+        self.assertIn("--propose",launcher)
+        self.assertNotIn(" --commit",launcher)
+        self.assertIn("--klone-db",launcher)
+
     def test_cli_is_explicit_commit_and_no_automatic_writes(self):
         from klone.limbo_hypotheses import main as journal_cli
         with patch("klone.limbo_hypotheses.write_new_report") as writer:

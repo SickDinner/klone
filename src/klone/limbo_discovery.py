@@ -32,6 +32,55 @@ LENSES=(
 )
 
 
+# E8.2: deliberately conservative bridge lexicon. Tokens here are too
+# generic to count as a scientific bridge, even when they are scarce
+# within the current 148-document snapshot. Kept separate from _tokens:
+# source retrieval must remain unaffected by bridge quality screening.
+BRIDGE_NOISE=frozenset("""
+however therefore thus moreover nevertheless whereas although despite
+potential potentially possible possibly likely unlikely remain remains
+remaining still yet many few several various different similarly
+change changes changing changed historical history past present future
+contribution contributions perspective perspectives context contexts
+theory theories framework frameworks concept concepts conceptual
+approach approaches work works working role roles important significance
+significant significantly similar similarities difficult difficulties
+results findings find found might may must could should would can
+overview introduction discussion conclusion conclusions commentary
+recent recently novel new increasing increase decreases decreased
+understanding understand exploration explored explore advances advancement
+emerging challenges challenge opportunity opportunities insight insights
+review reviews reviewed general broad specific specifically across
+within without between among both some any all often always never
+provides provide provided providing suggests suggest suggested
+explaining explanation explained explain implications implications
+research researchers research-based papers publications article articles
+report reports evidence knowledge information background description
+however particular global local international regional field fields
+cases case examples example further towards toward relevant relevance
+""".split())
+
+# A tiny transparent morphology table prevents an inflection family from
+# counting twice ("detecting" + "detection" is one concept, not two).
+BRIDGE_CONCEPT_FORMS={
+    "detecting":"detection","detected":"detection","detects":"detection",
+    "difficulties":"difficulty","difficult":"difficulty",
+    "changes":"change","changed":"change","changing":"change",
+    "potentially":"potential","perspectives":"perspective",
+    "contributions":"contribution",
+    "genes":"gene","genomes":"genome","markers":"marker",
+    "populations":"population","patients":"patient",
+}
+BRIDGE_QUALITY_VERSION="e8.2-contextual-scientific-terms-v1"
+
+
+def _concepts(text):
+    """Set of non-generic concepts, with only explicit normalization."""
+    return {BRIDGE_CONCEPT_FORMS.get(t,t) for t in _tokens(text)
+            if len(t)>=4 and t not in BRIDGE_NOISE
+            and BRIDGE_CONCEPT_FORMS.get(t,t) not in BRIDGE_NOISE}
+
+
 def _hash(obj)->str:
     return sha256(json.dumps(obj,ensure_ascii=False,sort_keys=True,
            separators=(",",":"),allow_nan=False).encode()).hexdigest()
@@ -62,22 +111,25 @@ def _expand_across_domains(all_docs, seeds):
         return [], [], 0, {}
     frequencies=Counter()
     for doc in all_docs:
-        frequencies.update(_tokens(doc["title"]+" "+doc["abstract"][:400]))
+        frequencies.update(_concepts(doc["title"]+" "+doc["abstract"][:400]))
     cap=max(3,len(all_docs)//3)
     def distinctive(doc):
-        return {t for t in _tokens(doc["title"]+" "+doc["abstract"][:400])
-                if frequencies[t]<=cap and len(t)>=4}
+        return {t for t in _concepts(doc["title"]+" "+doc["abstract"][:400])
+                if frequencies[t]<=cap}
     seed_terms={d["event_id"]:distinctive(d) for d in seeds}
     outside_terms={d["event_id"]:distinctive(d) for d in outside}
+    outside_by_id={d["event_id"]:d for d in outside}
     pairs=[]
     weak=[]
     for seed in seeds:
         for other in outside:
             common=sorted(seed_terms[seed["event_id"]] &
                           outside_terms[other["event_id"]])
-            in_title=sorted(set(common)&
-                            (_tokens(seed["title"])|_tokens(other["title"])))
-            if not common or not in_title:
+            # A bridge must be anchored in BOTH actual publication titles:
+            # title+abstract overlaps alone are often boilerplate.
+            in_both_titles=sorted(
+                set(common)&_concepts(seed["title"])&_concepts(other["title"]))
+            if not common or not in_both_titles:
                 continue
             pair={
                 "first_event_id":seed["event_id"],
@@ -87,6 +139,8 @@ def _expand_across_domains(all_docs, seeds):
                 "domains":sorted([seed["domain"],other["domain"]]),
                 "shared_terms":common[:8],
                 "shared_term_count":len(common),
+                "shared_title_concepts":in_both_titles[:8],
+                "quality_gate":BRIDGE_QUALITY_VERSION,
                 "candidate_origin":"other_domain_public_memory",
                 "different_publisher_groups":
                     seed["publisher_group"]!=other["publisher_group"],
@@ -109,7 +163,7 @@ def _expand_across_domains(all_docs, seeds):
     weak.sort(key=lambda p:(p["first_event_id"],p["second_event_id"]))
     bridges={}
     for pair in pairs[:MAX_PAIRS]:
-        second=next(d for d in outside if d["event_id"]==pair["second_event_id"])
+        second=outside_by_id[pair["second_event_id"]]
         bridges[second["event_id"]]={
             "event_id":second["event_id"],"domain":second["domain"],
             "source_url":second["source_url"],"title":second["title"],
@@ -143,11 +197,13 @@ def radar(core_db,query,*,limit=48):
             if pool[d.id] and len(chosen)<limit:chosen.append(pool[d.id].pop(0))
     pairs=[]
     for i,a in enumerate(chosen):
-        ta=_tokens(a["title"]+" "+a["abstract"][:400])
+        ta=_concepts(a["title"]+" "+a["abstract"][:400])
         for b in chosen[i+1:]:
             if a["domain"]==b["domain"]:continue
-            overlap=sorted(ta&_tokens(b["title"]+" "+b["abstract"][:400]))
-            if len(overlap)<2:continue
+            overlap=sorted(ta&_concepts(b["title"]+" "+b["abstract"][:400]))
+            title_concepts=sorted(set(overlap)&
+                _concepts(a["title"])&_concepts(b["title"]))
+            if len(overlap)<2 or not title_concepts:continue
             same_publisher=a["publisher_group"]==b["publisher_group"]
             # Investigation priority, NEVER an evidence reliability score.
             score=min(8,len(overlap))*3+int(not same_publisher)*2+int(
@@ -156,6 +212,8 @@ def radar(core_db,query,*,limit=48):
                 "first_event_id":a["event_id"],"second_event_id":b["event_id"],
                 "domains":sorted([a["domain"],b["domain"]]),
                 "shared_terms":overlap[:8],
+                "shared_title_concepts":title_concepts[:8],
+                "quality_gate":BRIDGE_QUALITY_VERSION,
                 "candidate_priority":score,
                 "different_publisher_groups":not same_publisher,
                 "independent_studies_confirmed":False,
@@ -214,15 +272,19 @@ def radar(core_db,query,*,limit=48):
             "matched_domain_count":len(matched_domains),
             "query_selected_domains":matched_domains,
             "minimum_distinctive_terms_for_expansion":2,
+            "quality_gate":BRIDGE_QUALITY_VERSION,
+            "shared_title_term_required_in_both_sources":True,
+            "generic_topic_words_ignored":True,
+            "generic_words_excluded":sorted(BRIDGE_NOISE),
             "cross_domain_pairs_found":len(pairs),
             "why_no_pairs":(
                 "No query-matched publications were available."
                 if not chosen else
                 "All selected publications belong to one domain and the corpus has no other domains."
                 if bridge_mode and outside_examined==0 else
-                "Other-domain publications were examined, but no pair met the two-distinctive-term title-overlap criterion."
+                "Other-domain publications were examined, but no pair passed two non-generic concepts with a concept shared in both titles."
                 if bridge_mode and not pairs else
-                "No query-selected pair met the two-term topic-overlap criterion."
+                "No query-selected pair passed two non-generic concepts with a concept shared in both titles."
                 if not pairs else None
             ),
             "suggested_next_queries":(

@@ -147,6 +147,44 @@ PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
   <p class="muted">Tämä lisää vain E3-arkiston julkisia lähdemetatietoja omistajan käskystä. Se ei avaa käyttäjän yksityisiä muisteja, muuta suojattuja huoneita tai nosta epävarmoja väitteitä vahvistetuksi tiedoksi. Älymuistin yksittäisen löydön voi avata Memory Coren omassa kontekstinäkymässä.</p>
 </section>
 
+<section class="panel" id="atlas-e6-intelligence">
+  <h2>Atlas E6 · Neuvoston tutkimusäly</h2>
+  <p>Tutkimusäly hakee KLONEn oikean Memory Coren <code>research-room</code>-huoneesta, vertailee aiemmin tallennettuja lähteitä ja muodostaa jokaiselle tieteenalalle uusia testattavia tutkimuskysymyksiä. Se tarkistaa myös mahdolliset vastakkaiset sanamuodot, mutta <strong>ei väitä ristiriitoja todistetuiksi</strong>.</p>
+  <form id="atlas-e6-form" class="form-stack">
+    <label>Tutkittava kysymys tai aihe
+      <input id="atlas-e6-question" required minlength="3" maxlength="160" placeholder="esim. ancestry, memory, artificial intelligence, employment">
+    </label>
+    <div class="atlas-controls">
+      <label>Neuvoston näkökulma
+        <select id="atlas-e6-ring">
+          <option value="">Automaattinen erikoisrinki</option>
+          <option value="2">2 · Merkitys ja luovuus</option>
+          <option value="3">3 · Muisti ja kokemukset</option>
+          <option value="4">4 · Talous ja resurssit</option>
+          <option value="5">5 · Kognitio ja riskit</option>
+          <option value="6">6 · Hypoteesit ja tutkimus</option>
+          <option value="7">7 · Arkkitehtuuri ja testit</option>
+          <option value="8">8 · Evidenssi ja auditointi</option>
+        </select>
+      </label>
+      <label>Käsiteltävien lähteiden enimmäismäärä
+        <select id="atlas-e6-limit">
+          <option value="12">12 viitettä</option>
+          <option value="24" selected>24 viitettä</option>
+          <option value="48">48 viitettä</option>
+        </select>
+      </label>
+    </div>
+    <div class="toolbar">
+      <button id="atlas-e6-analyze" type="submit">Tutki muistista ja luonnostele hypoteesit</button>
+      <button id="atlas-e6-export" type="button" disabled>Lataa tutkimusanalyysi JSON</button>
+    </div>
+  </form>
+  <p id="atlas-e6-status" class="status" role="status" aria-live="polite">Odotetaan tutkimuskysymystä. Ei automaattista verkon lukua tai muistikirjoitusta.</p>
+  <div id="atlas-e6-results" class="atlas-packets"></div>
+  <p class="muted">Tämä versio tekee toistettavaa avainsana- ja lähdevertailua. Ristiriitasignaalit ovat tutkimuskysymyksiä, eivät tekoälyn toteamia tosiasioita. Alkuperäiset tutkimukset, menetelmät ja mahdollinen vertaisarviointi pitää edelleen tarkastaa.</p>
+</section>
+
 <section class="panel">
   <h2>4. Valitse vastaanottava rinki ja tutkimuskysymys</h2>
   <p class="muted">Automaattireititys käyttää alan luontevaa neuvostorinkiä. Vaihtoehtoisesti voit ohjata koko havaintojoukon valitsemaasi rinkiin ja pyytää uutta näkökulmaa.</p>
@@ -187,7 +225,7 @@ PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
   --output "$HOME/klone-var/atlas-genetiikka-psykiatria.json"</pre>
   <p class="muted">Haku voi kestää useita minuutteja etenkin kaikilla lähteillä. Yhden lähteen estot tai tyhjät vastaukset säilyvät virheraportissa; niitä ei korvata keksityillä tutkimuksilla.</p>
 </section>
-<footer>KLONE Atlas E5 · raportoidut lähteet ≠ vahvistettu tieto · ei yksityisen muistin lukua · ei automaattista someviestintää</footer>
+<footer>KLONE Atlas E6 · raportoidut lähteet ≠ vahvistettu tieto · ei yksityisen muistin lukua · ei automaattista someviestintää</footer>
 </main>
 </body>
 </html>

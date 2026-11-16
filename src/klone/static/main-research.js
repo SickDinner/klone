@@ -149,7 +149,10 @@
        const item=node("article",undefined,"atlas-memory-card");
        item.append(node("p",pair.domains.join(" × "),"eyebrow"));
        item.append(node("strong","Muisti #"+pair.first_event_id+" + #"+pair.second_event_id));
-       item.append(node("p","Yhteisiä termejä: "+pair.shared_terms.join(", ")));
+       item.append(node("p","Yhteisiä käsitteitä: "+pair.shared_terms.join(", ")));
+       item.append(node("p","Molempien otsikoiden vahvistama sanastoyhteys: "+
+          (pair.shared_title_concepts||[]).join(", "),"atlas-stats"));
+       item.append(node("p","E8.2 poistaa yleisluonteisia sanoja ja saman käsitteen taivutusmuodot. Kyse on vasta tutkimusehdokkaasta.","atlas-stats"));
        item.append(node("p","Prioriteetti "+pair.candidate_priority+
            " · erilliset kustantajaryhmät: "+
            (pair.different_publisher_groups?"kyllä":"ei")));

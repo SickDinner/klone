@@ -12,14 +12,14 @@ URL="http://127.0.0.1:8031"
 cd "$ROOT"
 test -x "$PY" || { echo "VIRHE: KLONE Python puuttuu: $PY" >&2; exit 1; }
 test -f "$ROOT/src/klone/limbo_memory.py" || {
-  echo "VIRHE: E3-koodi puuttuu. Päivitä työpuu GitHubista ensin." >&2
+  echo "VIRHE: Atlas-lähdekoodi puuttuu. Päivitä työpuu GitHubista ensin." >&2
   exit 1
 }
 
-echo "=== KLONE ATLAS E3 ==="
+echo "=== KLONE ATLAS E5 / E1-E5 YHTEENSOPIVUUSTESTIT ==="
 git rev-parse --short HEAD
-echo "=== Testaa E1, E2 ja E3 ==="
-for filename in test_limbo_external.py test_limbo_atlas.py test_limbo_memory.py; do
+echo "=== Testaa E1, E2, E3, E4 ja E5 ==="
+for filename in test_limbo_external.py test_limbo_atlas.py test_limbo_memory.py test_limbo_queue.py test_limbo_memory_bridge.py; do
   PYTHONPATH="$ROOT/src" PYTHONDONTWRITEBYTECODE=1 \
     "$PY" -m unittest discover -s "$ROOT/tests" -p "$filename" || exit 1
 done
@@ -75,7 +75,7 @@ for _ in range(30):
 raise SystemExit("Portti 8031 on edelleen varattu; vierasta palvelua ei pysäytetä.")
 PY
 
-echo "=== Käynnistetään Atlas E3 ==="
+echo "=== Käynnistetään Atlas E5 ==="
 (
   cd "$ROOT" || exit 1
   KLONE_DB_PATH="$VAR/arxiv-e1.db" \

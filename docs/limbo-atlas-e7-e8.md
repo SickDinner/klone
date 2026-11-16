@@ -206,6 +206,41 @@ on tunnistettu, ja uuden version tulee olla `E8.2`.
 Porttiin 8000 tai olemassa oleviin 148 julkiseen lähdetietueeseen
 ei kirjoiteta.
 
+## E8.3 – tieteellisten siltakäsitteiden tarkempi normalisointi
+
+Puhelimen E8.2-ajo 16.11.2026 vahvisti, että alkuperäisestä 24
+poikkitieteellisestä sanastoyhteydestä jäi 12. Tuloste paljasti silti
+uusia harhaanjohtavia osumia: `network` ja `networks` oli
+laskettu kahdeksi käsitteeksi, samoin `exploring` ja `under`
+pääsivät läpi raportointisanaston seulan.
+
+E8.3:
+- normalisoi läpinäkyvästi yleiset taivutusmuodot kuten
+  `networks → network`, `graphs → graph`, `agents → agent`;
+- poistaa vertailupisteistä yleissanat `exploring`, `under`,
+  `domains` ja muita epätarkkoja ilmauksia;
+- vaatii edelleen vähintään **kaksi erillistä käsitettä**, joista
+  vähintään yksi esiintyy **molempien julkaisujen otsikoissa**;
+- lisää `justification`-perustelun ja
+  `quality_gate=e8.3-normalized-scientific-terms-v2`-tunnisteen
+  jokaiseen varsinaiseen linkkiehdokkaaseen;
+- pitää heikot yhden termin vihjeet selvästi erillään;
+- ei muuta alkuperäisten lähdejulkaisujen metatietoja,
+  148 tutkimusmuistia, Council72:n hyväksyntärajoja tai
+  omistajan hypoteesipäiväkirjaa.
+
+Tämäkään suodatin ei pysty todistamaan yhteisen menetelmän,
+kausaalisuuden tai riippumattoman toistotutkimuksen olemassaoloa.
+Ehdokasmäärän pieneneminen on laatuseulan *toimintamuutos*, ei
+todiste siitä, että juuri oikeat hypoteesit olisi löydetty.
+
+Käyttöönotto tehdään aiemmalla omistajan ajamalla
+`bash scripts/klone-atlas-e7-e8-phone.sh`-komennolla.
+Se testaa ensin muutokset, käynnistää 8031:n uudelleen ja
+korvaa **vain** eristetyn 8041-lukijan, jos siinä on aiempi
+E8.2-versio. Portin 8000 pääpalvelinta tai sen tietokantaa
+ei muuteta.
+
 ## Yksi käyttöönottokomento puhelimessa
 
 \`\`\`sh

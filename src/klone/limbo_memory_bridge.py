@@ -242,18 +242,21 @@ def recall(klone_db: str | Path, query: str, *, limit: int = 12) -> dict:
     with closing(sqlite3.connect(path.as_uri()+"?mode=ro",uri=True,timeout=15)) as conn:
         _schema(conn)
         rows = conn.execute(
-            "SELECT id,title,metadata_json FROM memory_events "
+            "SELECT id,title,evidence_text,metadata_json FROM memory_events "
             "WHERE room_id=? AND event_type=? AND status='active' "
             "ORDER BY id DESC LIMIT ?", (ROOM,EVENT_TYPE,MAX_SEARCH+1)).fetchall()
     if len(rows)>MAX_SEARCH:
         raise ValueError("research-room too large for local search")
     ranked=[]
-    for event_id,title,metadata in rows:
+    for event_id,title,evidence_text,metadata in rows:
         data=json.loads(metadata) if metadata else {}
         if data.get("epistemic_status")!="unverified_publisher_claim":
             continue
-        haystack=(str(title)+" "+str(data.get("domain",""))+" "+str(data.get("source_id",""))).lower()
-        score=sum(3 if term in haystack else 0 for term in terms)
+        heading=str(title).lower()
+        abstract=str(evidence_text).lower()
+        tags=(str(data.get("domain",""))+" "+str(data.get("source_id",""))).lower()
+        score=sum(5 if term in heading else (3 if term in tags else
+                  (1 if term in abstract else 0)) for term in terms)
         if score>0:
             ranked.append({
                 "event_id":int(event_id),

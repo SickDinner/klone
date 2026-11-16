@@ -166,6 +166,46 @@ Kaikki 148 aiemmin tuodun lähdehavainnon metatiedot pysyvät
 muuttumattomina; E8.1 on read-only ja erillisen omistajan
 käynnistämän Termux-päivityksen takana.
 
+## E8.2 – näennäisten löytöjen laadunhallinta
+
+Käyttäjän Android E8.1 -ajo laajensi `genetiikka`-haun 24
+suorasta osumasta **124 muiden alojen artikkelin tarkistukseen**
+ja 24 alustavaan vertailuehdokkaaseen. Näissä oli kuitenkin
+ilmeisiä **vääriä positiivisia**: yhteiset sanat
+`however`, `potential`, `remain`, `change`,
+`contributions`, `perspectives`, `theory` ja `work`
+eivät riitä todistamaan mitään yhteisestä tutkimuskohteesta.
+
+E8.2:n laadunvarmistus on nimenomaan hakuehdokkaiden suodatin:
+
+1. Edellä mainitut yleisluonteiset ilmaukset ja muu vastaava
+   raportointisanasto poistetaan vertailun termijoukosta.
+   Tämä **ei muuta** alkuperäisten tutkimushakujen avainsanoja.
+2. Eri taivutusmuodot normalisoidaan **läpinäkyvän pienen sanaston**
+   avulla: esimerkiksi `detecting` + `detection` ovat
+   vain *yksi* käsite, eivät kaksi riippumatonta perustelua.
+3. Vertailussa vaaditaan vähintään kaksi yhteistä erottelevampaa
+   käsitettä ja vähintään yksi käsite, joka näkyy **molempien
+   alkuperäisten julkaisujen otsikoissa**.
+4. `shared_title_concepts` ja `quality_gate` raportoidaan.
+   Työpöydät näyttävät ehdokkaan perustelut suomeksi.
+5. Jos ehdokkaita jää nolla, siitä ei päätellä tieteellisen
+   yhteyden puuttumista. Lähteitä on voitu valita liian vähän
+   tai yhteys voi vaatia synonyymi-, koko tekstin tai datatason
+   tarkastelua.
+
+Tämä on edelleen rajattu **sanastopohjainen tutkimisjärjestys**,
+ei neuroverkon semanttinen haku eikä tieteellisen kausaalisuuden
+varmistin. On parempi saada nolla luotettavasti perusteltua
+ehdokasta kuin 24 tekaistua poikkitieteellistä löydöstä.
+
+Käyttöönotto on sama erikseen omistajan ajama
+`bash scripts/klone-atlas-e7-e8-phone.sh`. Portin 8041
+lukija päivitetään vain, jos vanha `feature_version=E8.1`
+on tunnistettu, ja uuden version tulee olla `E8.2`.
+Porttiin 8000 tai olemassa oleviin 148 julkiseen lähdetietueeseen
+ei kirjoiteta.
+
 ## Yksi käyttöönottokomento puhelimessa
 
 \`\`\`sh

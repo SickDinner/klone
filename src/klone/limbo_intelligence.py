@@ -17,7 +17,7 @@ import sqlite3
 
 from .evidence_io import checked_path, write_new_report
 from .guards import access_guard
-from .limbo_atlas import BY_SOURCE, BY_DOMAIN, DOMAINS, _article_url
+from .limbo_atlas import BY_SOURCE, BY_DOMAIN, DOMAINS, _article_url, plan
 from .limbo_memory_bridge import ROOM, EVENT_TYPE, _schema
 from .council72 import catalog
 
@@ -102,11 +102,17 @@ def _memories(db: str | Path) -> list[dict]:
             or BY_DOMAIN[source.domain].courier != data.get("courier_id")):
             raise ValueError("source/courier mismatch in research memory")
         url=_article_url(data.get("source_url"),source)
+        label=str(title).replace("Julkinen lähdehavainto (vahvistamaton): ","",1)
+        raw=str(evidence)
+        if "Lähteen kuvaus: " not in raw or "\nAlkuperäinen julkaisu: " not in raw:
+            raise ValueError("Memory Core research event has no source excerpt")
+        abstract=raw.split("Lähteen kuvaus: ",1)[1].split("\nAlkuperäinen julkaisu: ",1)[0]
         doc={
             "event_id":event_id,"article_id":data["article_id"],
             "revision_id":data["revision_id"],"version":data["version"],
-            "title":str(title).replace("Julkinen lähdehavainto (vahvistamaton): ","",1),
-            "abstract":str(evidence)[:1200],
+            "title":label,
+            "abstract":abstract,
+            "published_at":data.get("published_at"),
             "domain":source.domain,
             "source_id":source_id,"publisher_group":source.publisher,
             "courier_id":data["courier_id"],"source_url":url,
@@ -201,6 +207,26 @@ def analyze(db: str | Path, question: str, *, limit: int=24,
             "proposed_questions":suggestions,
             "state":"not_executed_research_proposal",
         })
+    council_preview=None
+    if selected:
+        from .limbo_atlas import validate_records
+        source_records=[]
+        for entry in selected:
+            source_records.append({
+                "source_id":entry["source_id"],
+                "courier_id":entry["courier_id"],
+                "url":entry["source_url"],
+                "title":entry["title"],
+                "summary":entry["abstract"],
+                "published_at":entry["published_at"],
+            })
+        # Re-run the exact existing 72-seat governance machinery on this
+        # source-scoped, explicitly unverified memory selection. No execution.
+        validated=validate_records(source_records)
+        for record,entry in zip(validated,selected):
+            if record["receipt_sha256"]!=entry["receipt_sha256"]:
+                raise ValueError("Memory Core observation differs from stored E3 receipt")
+        council_preview=plan(source_records,ring_id=target_ring,question=question)
     digest=sha256(json.dumps(
         [question,target_ring,[(d["event_id"],d["receipt_sha256"]) for d in selected]],
         ensure_ascii=False,sort_keys=True).encode()).hexdigest()
@@ -220,6 +246,7 @@ def analyze(db: str | Path, question: str, *, limit: int=24,
                              "epistemic_status","relevance_score")
         } for d in selected],
         "comparisons":links,"research_drafts":questions,
+        "council72_preview":council_preview,
         "limits":[
             "Only public research-room memory events are read.",
             "Matching and contradiction flags are lexical hypotheses, not verified scientific conclusions.",

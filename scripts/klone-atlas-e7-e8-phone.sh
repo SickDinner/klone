@@ -91,9 +91,28 @@ PYTHONPATH="$ROOT/src" "$PY" -m klone.limbo_doctor \
   --expected-main-db "$TARGET" \
   --output "$VAR/klone-doctor-e10-$STAMP.json" || exit 1
 cp "$VAR/klone-doctor-e10-$STAMP.json" "$HOME/storage/downloads/KLONE-E10-doctor.json"
-curl -fsS --max-time 12 \
-  "http://127.0.0.1:8041/api/limbo-atlas/council-workbench?q=genetiikka&first_event_id=26&second_event_id=24" \
-  > /dev/null || exit 1
+# Select an actual present pair; never rely on hardcoded Memory Core event IDs.
+E9_REPORT="$DOSSIERS" "$PY" - <<'PY'
+import json
+import os
+from pathlib import Path
+from urllib.request import build_opener, ProxyHandler
+from urllib.parse import urlencode
+report=json.loads(Path(os.environ["E9_REPORT"]).read_text())
+pairs=report["dossiers"]
+if pairs:
+    a=pairs[0]["source_a"]["event_id"]
+    b=pairs[0]["source_b"]["event_id"]
+    params=urlencode({"q":"genetiikka","first_event_id":a,"second_event_id":b})
+    url="http://127.0.0.1:8041/api/limbo-atlas/council-workbench?"+params
+    with build_opener(ProxyHandler({})).open(url,timeout=12) as r:
+        board=json.load(r)
+    if board["seat_count"]!=72 or any(board["authority"].values()):
+        raise SystemExit("E10-neuvoston turvallisuusraja ei täyttynyt")
+    print("E10-neuvostotarkistus: 72 odottavaa tehtävää, ei valtuuksia")
+else:
+    print("Ei nykyisiä laatuseulattuja julkaisupariehdokkaita; ei keksitä paria")
+PY
 
 echo "=== KLONE E7–E10 VALMIS ==="
 echo "Päämuistia tai tutkimusarkistoa ei muutettu."

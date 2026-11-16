@@ -132,6 +132,40 @@ PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
   --output "$HOME/klone-var/e8-radar-$STAMP.json"
 \`\`\`
 
+## E8.1 – miksi genetiikkahaku antoi nolla tieteidenvälistä yhteyttä?
+
+Androidin E8-ajo 16.11.2026 näytti:
+- `genetiikka` sai 24 suoraa hakutulosviitettä, kaikki alalta `genetics`;
+- lähdeparien tiukka tieteidenvälinen vertailu palautti **0 yhteyttä**;
+- `attention_priority=7` kuvaa puuttuvan tutkimustyön prioriteettia,
+  **ei tieteenalan laatua eikä väitteen todennäköisyyttä**.
+
+Nollatulos ei osoita, ettei tutkimusaloilla olisi yhteyksiä.
+Aiempi tutka etsi pareja vain niistä julkaisuista, jotka jo
+osuivat kyselyn termeihin. Kun kaikki olivat yhtä tieteenalaa,
+vertailuehdokkaita ei voinut syntyä.
+
+E8.1:ssa yhden tieteenalan hauissa tutkitaan **myös muiden alojen
+julkisia Memory Core -havaintoja**. Yhteys vaatii vähintään kaksi
+harvinaisempaa yhteistä termiä, joista yhden on oltava julkaisun
+otsikossa. Tämä on **tutkimusidean minimiehto, ei tieteellinen
+varmennus**. Raporttiin lisättiin:
+
+- `bridge_mode`: `cross_domain_expansion` tai `query_domains`
+- `outside_domain_documents_examined`: todella tarkastettujen
+  muiden alojen muistiartikkeleiden määrä
+- `bridge_documents`: linkit aidosti olemassa oleviin
+  muun tieteenalan julkaisumuisteihin
+- `weak_single_term_leads`: yhden yhteisen termin heikot vihjeet,
+  joita **ei lasketa varsinaisiksi yhteyksiksi**
+- `diagnostics.why_no_pairs` ja
+  `diagnostics.suggested_next_queries`: todellinen selitys ja
+  rajatut jatkohakuehdotukset, jos yhteyksiä ei löydy.
+
+Kaikki 148 aiemmin tuodun lähdehavainnon metatiedot pysyvät
+muuttumattomina; E8.1 on read-only ja erillisen omistajan
+käynnistämän Termux-päivityksen takana.
+
 ## Yksi käyttöönottokomento puhelimessa
 
 \`\`\`sh

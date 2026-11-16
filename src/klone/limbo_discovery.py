@@ -62,6 +62,15 @@ cases case examples example further towards toward relevant relevance
 
 # A tiny transparent morphology table prevents an inflection family from
 # counting twice ("detecting" + "detection" is one concept, not two).
+# E8.3: generic verbs/prepositions and corpus-wide research descriptors found
+# in real Android E8.2 false-positive outputs. These are never evidence of a
+# cross-disciplinary scientific mechanism.
+BRIDGE_NOISE=BRIDGE_NOISE|frozenset("""
+under over exploring explores explore explored exploratory
+domains domain broadness patterns pattern described describes describing
+involving involves involved related relations relation similar similarity
+""".split())
+
 BRIDGE_CONCEPT_FORMS={
     "detecting":"detection","detected":"detection","detects":"detection",
     "difficulties":"difficulty","difficult":"difficulty",
@@ -70,8 +79,13 @@ BRIDGE_CONCEPT_FORMS={
     "contributions":"contribution",
     "genes":"gene","genomes":"genome","markers":"marker",
     "populations":"population","patients":"patient",
+    "networks":"network","networked":"network",
+    "graphs":"graph","graphical":"graph",
+    "sequencings":"sequencing",
+    "agents":"agent",
+    "dynamics":"dynamics",
 }
-BRIDGE_QUALITY_VERSION="e8.2-contextual-scientific-terms-v1"
+BRIDGE_QUALITY_VERSION="e8.3-normalized-scientific-terms-v2"
 
 
 def _concepts(text):
@@ -140,6 +154,9 @@ def _expand_across_domains(all_docs, seeds):
                 "shared_terms":common[:8],
                 "shared_term_count":len(common),
                 "shared_title_concepts":in_both_titles[:8],
+                "justification":"Two or more distinct normalized non-generic terms, "
+                    "including a concept in both cited publication titles; "
+                    "manual verification required.",
                 "quality_gate":BRIDGE_QUALITY_VERSION,
                 "candidate_origin":"other_domain_public_memory",
                 "different_publisher_groups":
@@ -213,6 +230,9 @@ def radar(core_db,query,*,limit=48):
                 "domains":sorted([a["domain"],b["domain"]]),
                 "shared_terms":overlap[:8],
                 "shared_title_concepts":title_concepts[:8],
+                "justification":"At least two normalized non-generic concepts "
+                    "with a common concept in both source titles; "
+                    "not proof of a scientific relationship.",
                 "quality_gate":BRIDGE_QUALITY_VERSION,
                 "candidate_priority":score,
                 "different_publisher_groups":not same_publisher,

@@ -16,10 +16,10 @@ test -f "$ROOT/src/klone/limbo_memory.py" || {
   exit 1
 }
 
-echo "=== KLONE ATLAS E6 / E1-E6 YHTEENSOPIVUUSTESTIT ==="
+echo "=== KLONE ATLAS E8 / E1-E8 YHTEENSOPIVUUSTESTIT ==="
 git rev-parse --short HEAD
-echo "=== Testaa E1, E2, E3, E4, E5 ja E6 ==="
-for filename in test_limbo_external.py test_limbo_atlas.py test_limbo_memory.py test_limbo_queue.py test_limbo_memory_bridge.py test_limbo_intelligence.py; do
+echo "=== Testaa E1, E2, E3, E4, E5, E6, E7 ja E8 ==="
+for filename in test_limbo_external.py test_limbo_atlas.py test_limbo_memory.py test_limbo_queue.py test_limbo_memory_bridge.py test_limbo_intelligence.py test_limbo_hypotheses.py; do
   PYTHONPATH="$ROOT/src" PYTHONDONTWRITEBYTECODE=1 \
     "$PY" -m unittest discover -s "$ROOT/tests" -p "$filename" || exit 1
 done
@@ -75,7 +75,7 @@ for _ in range(30):
 raise SystemExit("Portti 8031 on edelleen varattu; vierasta palvelua ei pysäytetä.")
 PY
 
-echo "=== Käynnistetään Atlas E6 ==="
+echo "=== Käynnistetään Atlas E8 ==="
 (
   cd "$ROOT" || exit 1
   KLONE_DB_PATH="$VAR/arxiv-e1.db" \

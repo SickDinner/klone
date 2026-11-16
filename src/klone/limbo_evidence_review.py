@@ -7,6 +7,7 @@ the owner explicitly supplied for an actual canonical E9.1 public source.
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -194,18 +195,69 @@ def review_manifest(core_db,manifest):
     return report
 
 
+
+def fill_template(core_db,template,source_a_bytes,source_b_bytes,
+                  *,rights_note_a,rights_note_b):
+    """Intentional local-text intake; validation uses original canonical sources.
+
+    This does not assume that a user's pasted excerpt is an authentic paper.
+    Never stores any supplied text in the original KLONE Memory Core.
+    """
+    if type(template) is not dict or template.get("kind")!="klone-e11-owner-evidence-template":
+        raise ValueError("an actual E11 source manifest template is required")
+    if type(source_a_bytes) is not bytes or type(source_b_bytes) is not bytes:
+        raise ValueError("text files must be supplied as bytes")
+    result=deepcopy(template)
+    for role,raw,note in (("A",source_a_bytes,rights_note_a),
+                          ("B",source_b_bytes,rights_note_b)):
+        if type(note) is not str or not 5<=len(note)<=240:
+            raise ValueError("owner must provide rights notes for both texts")
+        if len(raw)>MAX_TEXT_CHARS*4:
+            raise ValueError("owner-supplied source text is oversized")
+        try:
+            txt=raw.decode("utf-8")
+        except UnicodeError as error:
+            raise ValueError("source text is not UTF-8") from error
+        source=result.get("sources",{}).get(role)
+        if type(source) is not dict:
+            raise ValueError("E11 source slot missing")
+        source["text"]=txt
+        source["usage_rights_note"]=note
+        source["owner_supplied"]=True
+    # E11 validates canonical pair, all source identity fields, current
+    # receipt hashes, rights flags and limits before any manifest is saved.
+    review_manifest(core_db,result)
+    return result
+
 def main(argv=None):
     p=argparse.ArgumentParser(description="KLONE E11 offline quoted evidence ledger")
     p.add_argument("--klone-db",type=Path,required=True)
     choice=p.add_mutually_exclusive_group(required=True)
     choice.add_argument("--prepare",type=int,nargs=2,metavar=("FIRST","SECOND"))
     choice.add_argument("--review",type=Path,metavar="OWNER_MANIFEST")
+    choice.add_argument("--fill",type=Path,metavar="TEMPLATE")
+    p.add_argument("--source-a-file",type=Path)
+    p.add_argument("--source-b-file",type=Path)
+    p.add_argument("--rights-note-a")
+    p.add_argument("--rights-note-b")
+    p.add_argument("--owner-confirms-supplied-text",action="store_true")
     p.add_argument("--question",default="genetiikka")
     p.add_argument("--output",type=Path,required=True)
     args=p.parse_args(argv)
     try:
         if args.prepare:
             data=prepare(args.klone_db,*args.prepare,question=args.question)
+        elif args.fill:
+            if (not args.owner_confirms_supplied_text or
+                args.source_a_file is None or args.source_b_file is None):
+                raise ValueError("fill requires two local files and explicit owner confirmation")
+            data=fill_template(
+                args.klone_db,
+                json_object(read_bounded(args.fill,MAX_MANIFEST_BYTES)),
+                read_bounded(args.source_a_file,MAX_TEXT_CHARS*4),
+                read_bounded(args.source_b_file,MAX_TEXT_CHARS*4),
+                rights_note_a=args.rights_note_a,
+                rights_note_b=args.rights_note_b)
         else:
             data=review_manifest(args.klone_db,
                                  json_object(read_bounded(args.review,MAX_MANIFEST_BYTES)))

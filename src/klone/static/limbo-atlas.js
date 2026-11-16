@@ -618,7 +618,8 @@
         card.append(el("p","Yhteisiä käsitteitä: "+pair.shared_terms.join(", ")));
         card.append(el("p","Molempien otsikoiden yhteiset käsitteet: "+
                     (pair.shared_title_concepts||[]).join(", "),"atlas-stats"));
-        card.append(el("p","Karsittu E8.2:n yleissanastoseulalla. Tieteellinen yhteys on yhä varmistamatta.","atlas-stats"));
+        card.append(el("p","Laatuseula E8.3 · yleistason sanat ja toistuvat taivutusmuodot karsittu.","atlas-stats"));
+        card.append(el("p","Perustelu: "+(pair.justification||"Tutkittava sanastoyhtäläisyys"),"atlas-stats"));
         card.append(el("p","Tutkimisen prioriteetti "+pair.candidate_priority+
           " · erilliset julkaisijaryhmät: "+
           (pair.different_publisher_groups?"kyllä":"ei")));

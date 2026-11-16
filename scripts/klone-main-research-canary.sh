@@ -83,5 +83,9 @@ if data.get("database_path")!=sys.argv[1] or data.get("read_only") is not True:
     raise SystemExit("Read-only canary ei osoita oikeaan päämuistiin")
 print("Päämuisti on liitetty E6:n VAIN LUKU -tutkimusnäkymään.")
 PY
+echo "Päämuistin E6-tutkimustyöpöytä: $URL/research"
 echo "E6-päämuistihaku: $URL/api/limbo-atlas/intelligence?q=genetiikka"
 echo "Vain luku. Ei muutoksia päämuistiin eikä pääpalvelimeen 8000."
+if command -v termux-open-url >/dev/null 2>&1; then
+  termux-open-url "$URL/research" || true
+fi

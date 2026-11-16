@@ -1,6 +1,6 @@
 "use strict";
 (function(){
-  const state={catalog:null,records:[],report:null,busy:false};
+  const state={catalog:null,records:[],report:null,busy:false,queue:null};
   const id=name=>document.getElementById(name);
   const el=(tag,text,cls)=>{
     const node=document.createElement(tag);
@@ -269,6 +269,75 @@
   id("atlas-memory-clear").addEventListener("click",()=>{
     id("atlas-memory-changes").replaceChildren();
     say("atlas-memory-status","Muistivertailun näkymä tyhjennetty. SQLite-arkistoa ei muutettu.");
+  });
+  function displayQueue(q) {
+    if (!q || q.kind!=="klone-atlas-e4-queue" || !Array.isArray(q.batches)
+        || !Number.isInteger(q.article_count) || q.article_count<1
+        || q.batches.length<1 || q.batches.length>3000)
+      throw new Error("E4-jonotiedosto ei ole kelvollinen.");
+    let sum=0;
+    const seen=new Set();
+    for (let i=0;i<q.batches.length;i++){
+      const b=q.batches[i];
+      if(b.number!==i+1||!Array.isArray(b.observations)||
+         !Array.isArray(b.article_ids)||b.article_ids.length!==b.observations.length||
+         b.size!==b.observations.length||b.size<1||b.size>48)
+        throw new Error("E4-erä on virheellinen.");
+      for(const n of b.article_ids){
+        if(!Number.isInteger(n)||seen.has(n))throw new Error("E4 sisältää toistuvan julkaisu-ID:n.");
+        seen.add(n);
+      }
+      for(const item of b.observations)cleaned(item);
+      sum+=b.size;
+    }
+    if(sum!==q.article_count || q.batch_count!==q.batches.length)
+      throw new Error("Jono ei kata kaikkia julkaisuviitteitä.");
+    state.queue=q;
+    const select=id("atlas-e4-batch"),root=id("atlas-e4-info");
+    select.replaceChildren();root.replaceChildren();
+    for(const b of q.batches){
+      const option=el("option","Erä "+b.number+" / "+q.batch_count+" · "+b.size+" viitettä");
+      option.value=String(b.number);
+      select.append(option);
+    }
+    id("atlas-e4-load").disabled=false;
+    say("atlas-e4-status","E4: "+q.article_count+" arkistoitua julkaisuviitettä, "+
+      q.batch_count+" tutkimuserää. Tilanne: tutkimusjonon luonnos, ei vielä arvioitua näyttöä.");
+    for(const b of q.batches){
+      const card=el("article",undefined,"atlas-memory-card");
+      card.append(el("strong","Erä "+b.number+" · "+b.size+" viitettä"));
+      card.append(el("p",Object.entries(b.domains||{}).map(([d,n])=>d+" "+n).join(" · ")));
+      root.append(card);
+    }
+  }
+  id("atlas-e4-import").addEventListener("change",async event=>{
+    const file=event.target.files?.[0];
+    if(!file)return;
+    try{
+      if(file.size>8*1024*1024)throw new Error("E4-jono on liian suuri (8 MiB).");
+      const q=JSON.parse(await file.text());
+      displayQueue(q);
+    }catch(error){say("atlas-e4-status","E4-tuonti epäonnistui: "+error.message);}
+    finally{event.target.value="";}
+  });
+  id("atlas-e4-clear").addEventListener("click",()=>{
+    state.queue=null;id("atlas-e4-batch").replaceChildren();
+    id("atlas-e4-load").disabled=true;id("atlas-e4-info").replaceChildren();
+    say("atlas-e4-status","E4-jono poistettu vain selainvälilehdestä.");
+  });
+  id("atlas-e4-load").addEventListener("click",()=>{
+    if(!state.queue)return;
+    const batch=state.queue.batches.find(b=>b.number===Number(id("atlas-e4-batch").value));
+    if(!batch)return;
+    try{
+      loadRecords(batch.observations,false);
+      say("atlas-plan-status","Erä "+batch.number+" / "+state.queue.batch_count+
+          " ladattu. Valitse nyt vastaanottava rinki tai automaattireititys "+
+          "ja muodosta tutkimusluonnokset.");
+      id("atlas-research").scrollIntoView({behavior:"smooth",block:"start"});
+    }catch(error){
+      say("atlas-e4-status","Erän lataaminen epäonnistui: "+error.message);
+    }
   });
   async function init(){
     try{

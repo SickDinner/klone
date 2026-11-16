@@ -98,8 +98,6 @@ class AtlasE4QueueTests(unittest.TestCase):
 
     def test_plan_one_batch_via_existing_council72_and_no_authority(self):
         data=self.fixture(50)
-        with patch("klone.limbo_queue.plan", wraps=None) as research_plan:
-            pass
         result=plan_batch(data,2,question="Miten vahvistamme havainnot?")
         self.assertEqual(result["kind"],"klone-atlas-e4-council-draft")
         self.assertEqual(result["batch_number"],2)
@@ -162,6 +160,21 @@ class AtlasE4QueueTests(unittest.TestCase):
         q=self.fixture(3)
         with self.assertRaises(ValueError):
             plan_batch(q,2)
+
+    def test_cli_can_export_one_council_research_draft(self):
+        q=self.fixture(3)
+        with patch("klone.limbo_queue._memory_path", side_effect=lambda p,root=None:self.db),\
+             patch("klone.limbo_queue.write_new_report") as writer:
+            self.assertEqual(main(["--db",str(self.db),"--batch","1",
+                                   "--ring","6","--question","Millä koeasetelmalla tätä testataan?",
+                                   "--output",str(self.root/"e4-council.json")]),0)
+            report=json.loads(writer.call_args.args[1])
+            self.assertEqual(report["kind"],"klone-atlas-e4-council-draft")
+            self.assertEqual(report["size"],3)
+            self.assertEqual(len(report["council"]["packets"]),1)
+            self.assertEqual(report["council"]["packets"][0]["target_ring"],6)
+            self.assertFalse(report["authority"]["automatic_approval"])
+        self.assertEqual(status(self.db,root=self.root)["runs"],1)
 
     def test_empty_finance_source_is_distinguished_from_network_error(self):
         from klone.limbo_atlas import BY_SOURCE

@@ -54,10 +54,25 @@ print("yes" if json.load(open(sys.argv[1],encoding="utf-8"))["research_room_read
 PY
 )"
 if [ "$READY" != "yes" ]; then
-  echo "TURVARAJA: portin 8000 vanha KLONE ei tunne research-roomia."
-  echo "Älä päivitä päämuistia vielä. E6 toimii jo 8031:ssä."
-  echo "Päivitä 8000:n ohjelmistoversio hyväksytystä E5/E6-merkinnästä ensin."
-  exit 2
+  echo "Pääpalvelin 8000 ei tunne vielä research-roomia."
+  echo "Varmistetaan sen rinnalla käynnissä oleva eristetty, VAIN LUKU -E6-palvelu."
+  "$PY" - "$TARGET" <<'PY'
+import json,sys
+from urllib.request import build_opener,ProxyHandler
+o=build_opener(ProxyHandler({}))
+try:
+    with o.open("http://127.0.0.1:8041/health",timeout=4) as r:
+        data=json.load(r)
+except Exception as exc:
+    raise SystemExit("TURVARAJA: Portti 8041 ei vastaa: "+str(exc)+
+                     ". Käynnistä ensin bash scripts/klone-main-research-canary.sh")
+if (data.get("service")!="klone-main-research-readonly"
+    or data.get("read_only") is not True
+    or data.get("database_path")!=sys.argv[1]
+    or data.get("room_scope")!="research-room"):
+    raise SystemExit("TURVARAJA: Väärä päämuistin E6-lukija. EI KIRJOITETA.")
+print("Oikea 8000:n päämuisti on 8041:n read-only tutkimuslukijan kohteena.")
+PY
 fi
 
 echo "=== TURVALLINEN SQLITE-ONLINE-VARMUUSKOPIO ==="
@@ -96,16 +111,32 @@ from urllib.request import build_opener,ProxyHandler
 o=build_opener(ProxyHandler({}))
 with o.open("http://127.0.0.1:8000/api/health",timeout=5) as r:h=json.load(r)
 with o.open("http://127.0.0.1:8000/api/rooms",timeout=5) as r:rooms=json.load(r)
-if h.get("database_path")!=sys.argv[1] or not any(
-  x.get("id")=="research-room" and x.get("classification")=="public" for x in rooms
-):
-  raise SystemExit("Pääpalvelin muuttui. Kirjoitus estetty.")
+if h.get("database_path")!=sys.argv[1]:
+    raise SystemExit("Pääpalvelimen tietokantapolku muuttui. Kirjoitus estetty.")
+room_ready=any(x.get("id")=="research-room" and x.get("classification")=="public" for x in rooms)
+if not room_ready:
+    try:
+        with o.open("http://127.0.0.1:8041/health",timeout=5) as r:canary=json.load(r)
+    except Exception as exc:
+        raise SystemExit("Päämuistin vain luku -tutkimuslukija ei vastaa: "+str(exc))
+    if (canary.get("service")!="klone-main-research-readonly"
+        or canary.get("database_path")!=sys.argv[1]
+        or canary.get("read_only") is not True
+        or canary.get("room_scope")!="research-room"):
+        raise SystemExit("TURVARAJA: Päämuisti ei ole turvallisesti luettavissa. EI KIRJOITETA.")
 PY
 echo "=== HYVÄKSYTTY TUTKIMUSMETATIETOJEN TUONTI ==="
 OUTPUT="$HOME/klone-var/main-e6-import-$(date +%Y%m%d-%H%M%S).json"
 PYTHONPATH="$ROOT/src" "$PY" -m klone.limbo_memory_bridge \
   --atlas-db "$ATLAS_DB" --klone-db "$TARGET" --commit --output "$OUTPUT"
-curl --fail --silent --show-error --max-time 5 \
-  "$HEALTH_URL/api/memory/events?room_id=research-room&limit=1" >/dev/null
+if [ "$READY" = "yes" ]; then
+  curl --fail --silent --show-error --max-time 5 \
+    "$HEALTH_URL/api/memory/events?room_id=research-room&limit=1" >/dev/null
+else
+  curl --fail --silent --show-error --max-time 5 \
+    "http://127.0.0.1:8041/api/limbo-atlas/memory/recall?q=genetiikka&limit=1" >/dev/null
+  echo "Pääpalvelimen 8000 vanha käyttöliittymä ei vielä näytä tutkimushuonetta."
+  echo "Uusi tutkimusmuisti on luettavissa portin 8041 kautta."
+fi
 echo "Päämuistin tuonti valmis: $OUTPUT"
 echo "Varmuuskopio: $BACKUP"

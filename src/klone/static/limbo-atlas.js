@@ -529,9 +529,14 @@
           history.append(item);
           if(step.event_type==="source_link"){
             const src=step.payload.source;
-            const a=el("a","Lähde #"+src.event_id+" · "+step.payload.stance);
-            a.href=src.source_url;a.target="_blank";a.rel="noopener noreferrer";
-            history.append(a);
+            try{
+              const url=new URL(String(src.source_url));
+              if(url.protocol==="https:"&&!url.username&&!url.password){
+                const a=el("a","Lähde #"+src.event_id+" · "+step.payload.stance);
+                a.href=url.href;a.target="_blank";a.rel="noopener noreferrer";
+                history.append(a);
+              }
+            }catch(_ignored){history.append(el("p","Virheellinen lähdeosoite ohitettu."));}
           }
         }
         card.append(history);root.append(card);

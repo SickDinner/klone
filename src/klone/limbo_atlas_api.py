@@ -12,6 +12,7 @@ from .limbo_atlas import plan, roster
 from .limbo_memory_bridge import recall
 from .limbo_intelligence import analyze
 from .limbo_discovery import radar
+from .limbo_source_dossiers import review_pair, review_all
 from .api import get_repository
 from .repository import KloneRepository
 
@@ -86,5 +87,31 @@ def atlas_discovery_radar(
     """Read-only E8 cross-domain discovery and evidence-debt review queue."""
     try:
         return radar(repository.db_path,q,limit=limit)
+    except (ValueError,PermissionError) as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc
+
+
+@router.get("/dossier")
+def atlas_source_pair_dossier(
+    q: str = Query(default="genetiikka",min_length=3,max_length=160),
+    first_event_id: int = Query(...,ge=1),
+    second_event_id: int = Query(...,ge=1),
+    repository: KloneRepository = Depends(get_repository),
+):
+    """GET-only methods review checklist for two current public cited events."""
+    try:
+        return review_pair(repository.db_path,first_event_id,second_event_id,question=q)
+    except (ValueError,PermissionError) as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc
+
+
+@router.get("/dossiers")
+def atlas_all_source_pair_dossiers(
+    q: str = Query(default="genetiikka",min_length=3,max_length=160),
+    repository: KloneRepository = Depends(get_repository),
+):
+    """Read-only E9 dossiers for up to 24 source-backed E8.3 candidate pairs."""
+    try:
+        return review_all(repository.db_path,question=q)
     except (ValueError,PermissionError) as exc:
         raise HTTPException(status_code=422,detail=str(exc)) from exc

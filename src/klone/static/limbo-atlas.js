@@ -490,6 +490,127 @@
     a.href=url;a.download="KLONE-E6-tutkimusanalyysi.json";a.click();
     setTimeout(()=>URL.revokeObjectURL(url),3000);
   });
+  let latestE8=null;
+  id("atlas-e7-import").addEventListener("change",async event=>{
+    const file=event.target.files?.[0];
+    if(!file)return;
+    const root=id("atlas-e7-results");
+    root.replaceChildren();
+    try{
+      if(file.size>5*1024*1024)throw Error("Yli 5 MiB:n päiväkirjaraportti.");
+      const report=JSON.parse(await file.text());
+      if(!report||report.kind!=="klone-e7-hypothesis-list"||
+         !Array.isArray(report.hypotheses)||report.hypotheses.length>100)
+        throw Error("Tuntematon E7-päiväkirjamuoto.");
+      for(const entry of report.hypotheses){
+        if(entry.kind!=="klone-e7-hypothesis-history"||
+           !entry.hypothesis||!Array.isArray(entry.events))
+          throw Error("Virheellinen hypoteesihistoria.");
+        const card=el("article",undefined,"atlas-memory-card");
+        card.append(el("p","#"+entry.hypothesis.hypothesis_id+" · "+
+                       entry.hypothesis.domain+" · versio "+entry.revision,"eyebrow"));
+        card.append(el("strong",entry.hypothesis.title));
+        card.append(el("p","Kysymys: "+entry.hypothesis.question));
+        card.append(el("p","Kumoava testi: "+entry.hypothesis.falsifier));
+        card.append(el("p","Arvioinnin tila: "+entry.state+" · lähteitä: "+
+                       entry.linked_sources+" · julkaisijaryhmiä: "+
+                       entry.publisher_groups.length));
+        if(entry.stale_source_event_ids?.length)
+          card.append(el("p","Vanhentuneet lähdemuistien tunnukset: "+
+                         entry.stale_source_event_ids.join(", "),"atlas-stats"));
+        card.append(el("p","Evidenssivelka: vastanäytön haku "+
+             (entry.evidence_debt?.find_counterevidence?"kesken":"ehdokas kirjattu")+
+             " · riippumatonta toistoa ei ole varmistettu.","atlas-stats"));
+        const history=el("details");
+        history.append(el("summary","Avaa koko versio- ja lähdehistoria"));
+        for(const step of entry.events.slice(0,100)){
+          const item=el("p","Versio "+step.revision+" · "+step.event_type+
+                   " · tarkiste "+String(step.event_hash).slice(0,16),"atlas-stats");
+          history.append(item);
+          if(step.event_type==="source_link"){
+            const src=step.payload.source;
+            const a=el("a","Lähde #"+src.event_id+" · "+step.payload.stance);
+            a.href=src.source_url;a.target="_blank";a.rel="noopener noreferrer";
+            history.append(a);
+          }
+        }
+        card.append(history);root.append(card);
+      }
+      say("atlas-e7-status",report.hypotheses.length+
+          " hypoteesia tuotu paikalliseen näkymään. Päiväkirjan tiedot säilyvät muuttumattomina.");
+    }catch(err){say("atlas-e7-status","Päiväkirjan tuonti epäonnistui: "+err.message);}
+    finally{event.target.value="";}
+  });
+  id("atlas-e7-clear").addEventListener("click",()=>{
+    id("atlas-e7-results").replaceChildren();
+    say("atlas-e7-status","Näyttö tyhjennetty. Tallennettua päiväkirjaa ei muutettu.");
+  });
+  id("atlas-e8-form").addEventListener("submit",async event=>{
+    event.preventDefault();
+    const question=id("atlas-e8-question").value.trim();
+    if(question.length<3){say("atlas-e8-status","Syötä vähintään kolme merkkiä.");return;}
+    id("atlas-e8-run").disabled=true;id("atlas-e8-export").disabled=true;
+    id("atlas-e8-results").replaceChildren();latestE8=null;
+    say("atlas-e8-status","Lasketaan julkisen muistin tieteidenvälisiä yhteyksiä...");
+    try{
+      const report=await api("/api/limbo-atlas/discovery?q="+encodeURIComponent(question)+
+                             "&limit=48");
+      latestE8=report;
+      const root=id("atlas-e8-results");
+      const header=el("article",undefined,"atlas-packet");
+      header.append(el("h3","Löytötutka: "+report.selected+" valittua / "+
+                        report.available_public_memories+" muistiviitettä"));
+      header.append(el("p","Poikkitieteellisiä tutkittavia pareja "+
+          report.cross_discipline_candidates.length+" · aiheita "+
+          Object.keys(report.discipline_coverage).length));
+      header.append(el("p","Tutkintaprioriteetit eivät ole luotettavuus- tai totuusprosentteja.",
+          "atlas-stats"));
+      root.append(header);
+      for(const pair of report.cross_discipline_candidates){
+        const card=el("article",undefined,"atlas-memory-card");
+        card.append(el("p","Tutkimusyhteys · "+pair.domains.join(" × "),"eyebrow"));
+        card.append(el("strong","Muistit #"+pair.first_event_id+" ja #"+
+                       pair.second_event_id));
+        card.append(el("p","Yhteisiä termejä: "+pair.shared_terms.join(", ")));
+        card.append(el("p","Tutkimisen prioriteetti "+pair.candidate_priority+
+          " · erilliset julkaisijaryhmät: "+
+          (pair.different_publisher_groups?"kyllä":"ei")));
+        card.append(el("p",pair.next_experiment));
+        card.append(el("p","Ei todennettua syy-yhteyttä tai riippumatonta vahvistusta.","atlas-stats"));
+        root.append(card);
+      }
+      const debt=el("article",undefined,"atlas-packet");
+      debt.append(el("h3","Evidenssivelka ja seuraavaksi tutkittavat alat"));
+      for(const entry of report.attention_queue){
+        const d=el("details");
+        d.append(el("summary",entry.domain+" · rinki "+entry.preferred_ring+
+          " · tutkimisen prioriteetti "+entry.attention_priority));
+        const ul=el("ul");
+        entry.epistemic_debt.forEach(item=>ul.append(el("li",item)));
+        d.append(ul);debt.append(d);
+      }
+      root.append(debt);
+      const critics=el("article",undefined,"atlas-packet");
+      critics.append(el("h3","Kahdeksan kriittistä tutkimuslinssiä"));
+      for(const lens of report.adversarial_research_lenses){
+        const d=el("details");
+        d.append(el("summary",lens.id));
+        d.append(el("p",lens.question));critics.append(d);
+      }
+      root.append(critics);
+      say("atlas-e8-status","Löytötutka valmis: "+report.cross_discipline_candidates.length+
+         " tutkittavaa yhteyttä; ei muistikirjoituksia eikä ulkoisia hakuja.");
+      id("atlas-e8-export").disabled=false;
+    }catch(err){say("atlas-e8-status","Tutkan suoritus epäonnistui: "+err.message);}
+    finally{id("atlas-e8-run").disabled=false;}
+  });
+  id("atlas-e8-export").addEventListener("click",()=>{
+    if(!latestE8)return;
+    const blob=new Blob([JSON.stringify(latestE8,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download="KLONE-E8-loytotutka.json";a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+  });
   async function init(){
     try{
       state.catalog=await api("/api/limbo-atlas/catalog");

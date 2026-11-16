@@ -93,5 +93,66 @@
    a.href=url;a.download="KLONE-paamuisti-E6-tutkimus.json";a.click();
    setTimeout(()=>URL.revokeObjectURL(url),3000);
  });
+ let latestE8=null;
+ id("main-e8-form").addEventListener("submit",async event=>{
+   event.preventDefault();
+   const q=id("main-e8-query").value.trim();
+   if(q.length<3){write("main-e8-status","Anna vähintään kolme merkkiä.");return;}
+   id("main-e8-run").disabled=true;id("main-e8-export").disabled=true;
+   id("main-e8-results").replaceChildren();latestE8=null;
+   write("main-e8-status","Vertaillaan päämuistin julkisia tutkimusviitteitä...");
+   try{
+     const r=await api("/api/limbo-atlas/discovery?q="+encodeURIComponent(q)+"&limit=48");
+     latestE8=r;
+     write("main-e8-status",r.selected+" tutkimusviitettä · "+
+       r.cross_discipline_candidates.length+" tieteidenvälistä tutkittavaa yhteyttä. Ei muistikirjoituksia.");
+     const root=id("main-e8-results");
+     const summary=node("article",undefined,"atlas-packet");
+     summary.append(node("h3","Löytötutkan yhteenveto"));
+     summary.append(node("p",Object.entries(r.discipline_coverage||{}).map(
+       ([name,n])=>name+" "+n).join(" · ")));
+     summary.append(node("p","Pisteet tarkoittavat tutkimisen tarvetta, eivät todennäköisyyttä tai tieteellistä varmistusta."));
+     root.append(summary);
+     for(const pair of r.cross_discipline_candidates){
+       const item=node("article",undefined,"atlas-memory-card");
+       item.append(node("p",pair.domains.join(" × "),"eyebrow"));
+       item.append(node("strong","Muisti #"+pair.first_event_id+" + #"+pair.second_event_id));
+       item.append(node("p","Yhteisiä termejä: "+pair.shared_terms.join(", ")));
+       item.append(node("p","Prioriteetti "+pair.candidate_priority+
+           " · erilliset kustantajaryhmät: "+
+           (pair.different_publisher_groups?"kyllä":"ei")));
+       item.append(node("p",pair.next_experiment));
+       item.append(node("p","Riippumatonta tutkimusnäyttöä ei ole osoitettu.","atlas-stats"));
+       root.append(item);
+     }
+     const debt=node("article",undefined,"atlas-packet");
+     debt.append(node("h3","Evidenssivelka · jatkotutkimusjono"));
+     for(const task of r.attention_queue){
+       const d=node("details");
+       d.append(node("summary",task.domain+" → rinki "+task.preferred_ring+
+         " · tutkimisen prioriteetti "+task.attention_priority));
+       const ul=node("ul");
+       task.epistemic_debt.forEach(x=>ul.append(node("li",x)));
+       d.append(ul);debt.append(d);
+     }
+     root.append(debt);
+     const critiques=node("article",undefined,"atlas-packet");
+     critiques.append(node("h3","Kahdeksan kriittistä näkökulmaa"));
+     for(const lens of r.adversarial_research_lenses){
+       const d=node("details");d.append(node("summary",lens.id));
+       d.append(node("p",lens.question));critiques.append(d);
+     }
+     root.append(critiques);
+     id("main-e8-export").disabled=false;
+   }catch(err){write("main-e8-status","Löytötutkan virhe: "+err.message);}
+   finally{id("main-e8-run").disabled=false;}
+ });
+ id("main-e8-export").addEventListener("click",()=>{
+   if(!latestE8)return;
+   const blob=new Blob([JSON.stringify(latestE8,null,2)],{type:"application/json"});
+   const url=URL.createObjectURL(blob),a=document.createElement("a");
+   a.href=url;a.download="KLONE-paamuisti-E8-loytotutka.json";a.click();
+   setTimeout(()=>URL.revokeObjectURL(url),3000);
+ });
  void init();
 })();

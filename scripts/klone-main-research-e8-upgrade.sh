@@ -9,6 +9,7 @@ cd "$ROOT"
 test -x "$PY" || { echo "Python .venv puuttuu"; exit 1; }
 
 echo "=== Tarkista alkuperäisen päämuistin todellinen polku ==="
+set +e
 KLONE_ROOT="$ROOT" "$PY" - <<'PY'
 import json
 import os
@@ -84,6 +85,7 @@ for _ in range(40):
 raise SystemExit("8041 ei vapautunut: uutta prosessia ei käynnistetä.")
 PY
 result=$?
+set -e
 if [ "$result" -eq 12 ]; then
   termux-open-url http://127.0.0.1:8041/research || true
   exit 0

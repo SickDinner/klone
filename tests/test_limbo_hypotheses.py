@@ -104,6 +104,10 @@ class E7E8Tests(unittest.TestCase):
         self.assertEqual(history["stale_source_event_ids"],[])
         self.assertEqual(history["events"][0]["event_type"],"proposed")
         self.assertTrue(all(e["event_hash"] for e in history["events"]))
+        from datetime import datetime
+        for row in history["events"]:
+            stamp=datetime.fromisoformat(row["payload"]["recorded_at"])
+            self.assertIsNotNone(stamp.tzinfo)
         self.assertFalse(history["scientifically_verified"])
         self.assertEqual(self.core_before,self.core.read_bytes())
 

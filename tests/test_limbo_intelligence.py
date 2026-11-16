@@ -71,6 +71,11 @@ class E6ResearchTests(unittest.TestCase):
         self.assertFalse(report["authority"]["memory_write"])
         self.assertFalse(report["authority"]["private_memory_access"])
         self.assertFalse(report["authority"]["automatic_approval"])
+        self.assertIsNotNone(report["council72_preview"])
+        self.assertEqual(report["council72_preview"]["epistemic_status"],
+                         "unverified_publisher_reports")
+        self.assertTrue(report["council72_preview"]["packets"])
+        self.assertFalse(report["council72_preview"]["authority"]["automatic_approval"])
 
     def test_possible_tension_is_not_claimed_verified_contradiction(self):
         r=analyze(self.klone,"ancestry")
@@ -93,6 +98,10 @@ class E6ResearchTests(unittest.TestCase):
         self.assertTrue(all(len(x["specialist_member_ids"])==8 for x in r["research_drafts"]))
         self.assertTrue(all(x["state"]=="not_executed_research_proposal"
                             for x in r["research_drafts"]))
+        self.assertTrue(all(len(p["specialist_ideas"])==8
+                            for p in r["council72_preview"]["packets"]))
+        self.assertTrue(all(not p["truth_verified"]
+                            for p in r["council72_preview"]["packets"]))
         self.assertFalse(r["authority"]["external_posting"])
 
     def test_latest_version_and_history_count_kept(self):
@@ -118,6 +127,7 @@ class E6ResearchTests(unittest.TestCase):
         empty=analyze(self.klone,"unfindablewordxyz")
         self.assertEqual(empty["matched_memory_count"],0)
         self.assertEqual(empty["research_drafts"],[])
+        self.assertIsNone(empty["council72_preview"])
 
     def test_only_public_research_room_is_read(self):
         with self.repository.connection() as conn:

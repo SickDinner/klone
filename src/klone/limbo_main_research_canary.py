@@ -46,7 +46,7 @@ def health():
     return {"status":"ok","service":"klone-main-research-readonly",
             "database_path":str(db),
             "room_scope":"research-room","read_only":True,
-            "feature_version":"E8.2","features":["research","discovery","memory_recall"]}
+            "feature_version":"E8.3","features":["research","discovery","memory_recall"]}
 
 
 @app.get("/api/limbo-atlas/intelligence")

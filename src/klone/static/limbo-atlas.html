@@ -86,7 +86,7 @@ PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
 
 <section class="panel" id="atlas-e4-queue">
   <h2>Atlas E4 · koko tutkimusarkiston työjono</h2>
-  <p>Kaikki E3-arkiston julkaisuviitteet jaetaan enintään 48 havainnon eriin. Aiemmat 147 viitettä muodostavat neljä erää (48 + 48 + 48 + 3). Jokainen tutkimusala saa vuorollaan paikan neuvoston käsittelyjonossa.</p>
+  <p>Kaikki E3-arkiston julkaisuviitteet jaetaan enintään 48 havainnon eriin. Erien määrä lasketaan aina senhetkisestä tietokannasta; 148 viitettä muodostaa neljä erää (48 + 48 + 48 + 4). Jokainen tutkimusala saa vuorollaan paikan neuvoston käsittelyjonossa.</p>
   <div class="toolbar">
     <label class="file-button">Tuo E4-työjono
       <input id="atlas-e4-import" type="file" accept="application/json,.json">
@@ -185,6 +185,45 @@ PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
   <p class="muted">Tämä versio tekee toistettavaa avainsana- ja lähdevertailua. Ristiriitasignaalit ovat tutkimuskysymyksiä, eivät tekoälyn toteamia tosiasioita. Alkuperäiset tutkimukset, menetelmät ja mahdollinen vertaisarviointi pitää edelleen tarkastaa.</p>
 </section>
 
+<section class="panel" id="atlas-e7-journal">
+  <h2>Atlas E7 · Hypoteesien aikakirja</h2>
+  <p>Uusi omistajan hyväksymä tutkimuspäiväkirja pitää erillään hypoteesin, sen kumoavan ennusteen, muistilähteiden puolto- ja vastaehdokkaat sekä ihmisen arviointimerkinnät. Jokainen merkintä saa uuden tarkistetun version ja tarkisteketjun. Julkaisun tiivistelmä ei yksin todista hypoteesia oikeaksi.</p>
+  <div class="toolbar">
+    <label class="file-button">Tuo E7-päiväkirjan JSON
+      <input id="atlas-e7-import" type="file" accept="application/json,.json">
+    </label>
+    <button type="button" id="atlas-e7-clear" class="secondary">Tyhjennä näkymä</button>
+  </div>
+  <p id="atlas-e7-status" class="status" role="status" aria-live="polite">Tuo E7:n vain luku -vientitiedosto. Selain ei voi muuttaa muistipäiväkirjaa.</p>
+  <div id="atlas-e7-results" class="atlas-memory-changes"></div>
+  <h3>Esikatsele falsifioitava hypoteesi Termuxissa</h3>
+  <pre class="code">cd ~/klone-arxiv-e1
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_hypotheses \
+  --klone-db "$HOME/klone-var/arxiv-e1.db" \
+  --propose --domain genetics \
+  --title "Geneettisten menetelmien vertailu" \
+  --question "Miten eri aineistojen mallit voidaan testata?" \
+  --falsifier "Riippumaton aineisto ei toista havaittua vaikutusta."</pre>
+  <p class="muted">Esikatselu ei kirjoita mitään. Vasta käyttäjän nimenomaisesti lisäämä <code>--commit</code> luo tapahtuman paikalliseen E7-päiväkirjaan, ei pää-KLONEn Memory Coreen.</p>
+</section>
+
+<section class="panel" id="atlas-e8-discovery">
+  <h2>Atlas E8 · Tieteidenvälinen löytötutka</h2>
+  <p>E8 etsii yllättäviä, toisiinsa liittyviä aiheita eri tieteenaloilta ja arvioi, missä lähdekritiikin <strong>evidenssivelka</strong> on suurin. Kahdeksan kriittistä tutkimuslinssiä etsii nollamalleja, sekoittavia tekijöitä, mittausvirheitä ja mahdollisia kumoavia testejä. Pisteet ovat tutkimuksen priorisointia, eivät totuuden todennäköisyyksiä.</p>
+  <form id="atlas-e8-form" class="form-stack">
+    <label>Tutka-aihe
+      <input id="atlas-e8-question" required minlength="3" maxlength="160" placeholder="genetiikka, muisti, työmarkkinat, filosofia">
+    </label>
+    <div class="toolbar">
+      <button type="submit" id="atlas-e8-run">Etsi tieteidenvälisiä tutkimusideoita</button>
+      <button type="button" id="atlas-e8-export" disabled>Lataa tutkimustutkan raportti</button>
+    </div>
+  </form>
+  <p id="atlas-e8-status" class="status" role="status" aria-live="polite">Ei tutkimusajoa. Lähteitä luetaan vain omasta julkisesta research-room-muistista.</p>
+  <div id="atlas-e8-results" class="atlas-packets"></div>
+</section>
+
 <section class="panel">
   <h2>4. Valitse vastaanottava rinki ja tutkimuskysymys</h2>
   <p class="muted">Automaattireititys käyttää alan luontevaa neuvostorinkiä. Vaihtoehtoisesti voit ohjata koko havaintojoukon valitsemaasi rinkiin ja pyytää uutta näkökulmaa.</p>
@@ -225,7 +264,7 @@ PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
   --output "$HOME/klone-var/atlas-genetiikka-psykiatria.json"</pre>
   <p class="muted">Haku voi kestää useita minuutteja etenkin kaikilla lähteillä. Yhden lähteen estot tai tyhjät vastaukset säilyvät virheraportissa; niitä ei korvata keksityillä tutkimuksilla.</p>
 </section>
-<footer>KLONE Atlas E6 · raportoidut lähteet ≠ vahvistettu tieto · ei yksityisen muistin lukua · ei automaattista someviestintää</footer>
+<footer>KLONE Atlas E8 · raportoidut lähteet ≠ vahvistettu tieto · ei yksityisen muistin lukua · ei automaattista someviestintää</footer>
 </main>
 </body>
 </html>

@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse
 
 from .limbo_intelligence import analyze
 from .limbo_discovery import radar
+from .limbo_source_dossiers import review_pair, review_all
 from .limbo_memory_bridge import recall
 
 
@@ -46,7 +47,7 @@ def health():
     return {"status":"ok","service":"klone-main-research-readonly",
             "database_path":str(db),
             "room_scope":"research-room","read_only":True,
-            "feature_version":"E8.3","features":["research","discovery","memory_recall"]}
+            "feature_version":"E9","features":["research","discovery","memory_recall","dossiers"]}
 
 
 @app.get("/api/limbo-atlas/intelligence")
@@ -101,5 +102,27 @@ def discovery(
 ):
     try:
         return radar(_db(),q,limit=limit)
+    except (ValueError,PermissionError) as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc
+
+
+@app.get("/api/limbo-atlas/dossier")
+def source_dossier(
+    q: str = Query(default="genetiikka",min_length=3,max_length=160),
+    first_event_id: int = Query(...,ge=1),
+    second_event_id: int = Query(...,ge=1),
+):
+    try:
+        return review_pair(_db(),first_event_id,second_event_id,question=q)
+    except (ValueError,PermissionError) as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc
+
+
+@app.get("/api/limbo-atlas/dossiers")
+def source_dossiers(
+    q: str = Query(default="genetiikka",min_length=3,max_length=160),
+):
+    try:
+        return review_all(_db(),question=q)
     except (ValueError,PermissionError) as exc:
         raise HTTPException(status_code=422,detail=str(exc)) from exc

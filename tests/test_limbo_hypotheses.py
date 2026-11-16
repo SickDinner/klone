@@ -608,7 +608,7 @@ class E7E8Tests(unittest.TestCase):
                                          json=params).status_code,405)
         with patch.dict(os.environ,{"KLONE_MAIN_RESEARCH_DB":str(self.core)}):
             with TestClient(canary) as client:
-                self.assertEqual(client.get("/health").json()["feature_version"],"E9.1")
+                self.assertEqual(client.get("/health").json()["feature_version"],"E10")
                 self.assertEqual(client.get("/api/limbo-atlas/dossier",
                                             params=params).status_code,200)
                 self.assertEqual(client.get("/api/limbo-atlas/dossiers",
@@ -654,6 +654,8 @@ class E7E8Tests(unittest.TestCase):
         self.assertIn("hiddenDuplicatePairs",js.text)
         self.assertIn("E9.1",js.text)
         self.assertIn("Avaa E9-lähdeparin tutkimuskortti",js.text)
+        self.assertIn("Avaa E10 · kaikki 72 neuvoston tehtävää",js.text)
+        self.assertIn("/api/limbo-atlas/council-workbench?q=",js.text)
         self.assertIn('/api/limbo-atlas/discovery?q=',js.text)
         self.assertNotIn("innerHTML",js.text)
 
@@ -681,6 +683,9 @@ class E7E8Tests(unittest.TestCase):
         self.assertNotIn(" --commit",launcher)
         self.assertIn("--klone-db",launcher)
         self.assertIn("klone.limbo_source_dossiers",launcher)
+        self.assertIn("klone.limbo_council_workbench",launcher)
+        self.assertIn("klone.limbo_doctor",launcher)
+        self.assertNotIn("first_event_id=26",launcher)
         self.assertIn("/api/limbo-atlas/dossiers?q=",launcher)
 
     def test_cli_is_explicit_commit_and_no_automatic_writes(self):

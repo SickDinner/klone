@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from datetime import datetime, timezone
 from contextlib import contextmanager
 from hashlib import sha256
 import json
@@ -180,7 +181,8 @@ def create(journal_db,core_db,*,title,domain,question,falsifier,
     if count==0:raise ValueError("no public research memories to ground hypothesis work")
     payload={"kind":"unverified_research_hypothesis","title":title,"domain":domain,
              "question":question,"falsifier":falsifier,
-             "truth_verified":False,"author":"owner","memory_snapshot_count":count}
+             "truth_verified":False,"author":"owner","memory_snapshot_count":count,
+             "recorded_at":datetime.now(timezone.utc).isoformat()}
     if not commit:
         return {"kind":"klone-e7-proposal","mode":"preview",
                 "hypothesis":payload,"memory_write":False}
@@ -231,7 +233,8 @@ def attach(journal_db,core_db,*,hypothesis_id,source_event_id,stance,
                                     "receipt_sha256","domain")}
     payload={"stance":stance,"source":ref,"note":note,
              "source_claim_verified":False,"independent_evidence_verified":False,
-             "owner_reviewed_source":False}
+             "owner_reviewed_source":False,
+             "recorded_at":datetime.now(timezone.utc).isoformat()}
     dest=_memory_path(journal_db,root=root)
     with _db(dest,readonly=True) as conn:
         _readonly_schema(conn)
@@ -277,7 +280,8 @@ def review(journal_db,*,hypothesis_id,state,notes,expected_revision,
     if type(expected_revision) is not int or len(chain)!=expected_revision:
         raise ValueError("stale hypothesis revision")
     payload={"state":state,"reviewer":"owner","notes":notes,
-             "source_claims_verified":False,"scientific_conclusion":None}
+             "source_claims_verified":False,"scientific_conclusion":None,
+             "recorded_at":datetime.now(timezone.utc).isoformat()}
     if not commit:
         return {"kind":"klone-e7-review","mode":"preview",
                 "hypothesis_id":hypothesis_id,"next_revision":expected_revision+1,

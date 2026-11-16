@@ -440,6 +440,10 @@ class E7E8Tests(unittest.TestCase):
         batch=review_all(self.core,question="genetiikka")
         self.assertEqual(batch["raw_memory_pair_count"],
                          batch["candidate_count"]+batch["duplicate_memory_pair_count"])
+        self.assertEqual(batch["schema_version"],2)
+        self.assertTrue(all("source_comparison_type" in d for d in batch["dossiers"]))
+        self.assertTrue(all(d["source_a"]["source_class"] and
+                            d["source_b"]["source_class"] for d in batch["dossiers"]))
         self.assertEqual(batch["source_type_counts"]["research_metadata_pairs"]+
                          batch["source_type_counts"]["mixed_news_or_reference_pairs"],
                          batch["candidate_count"])
@@ -510,6 +514,8 @@ class E7E8Tests(unittest.TestCase):
         self.assertEqual(js.status_code,200)
         self.assertIn("klone-e7-hypothesis-list",js.text)
         self.assertIn("/api/limbo-atlas/dossier?q=",js.text)
+        self.assertIn("hiddenDuplicatePairs",js.text)
+        self.assertIn("E9.1",js.text)
         self.assertIn("Avaa E9-lähdeparin tutkimuskortti",js.text)
         self.assertIn('/api/limbo-atlas/discovery?q=',js.text)
         self.assertNotIn("innerHTML",js.text)

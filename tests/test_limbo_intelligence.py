@@ -137,6 +137,35 @@ class E6ResearchTests(unittest.TestCase):
         self.assertIn("council72_preview",script.text)
         self.assertNotIn("innerHTML",script.text)
 
+    def test_main_readonly_canary_has_no_mutating_routes(self):
+        import os
+        from klone.limbo_main_research_canary import app as canary
+        with patch.dict(os.environ,{"KLONE_MAIN_RESEARCH_DB":str(self.klone)}):
+            client=TestClient(canary)
+            health=client.get("/health")
+            self.assertEqual(health.status_code,200)
+            self.assertTrue(health.json()["read_only"])
+            self.assertEqual(health.json()["room_scope"],"research-room")
+            before=self.klone.read_bytes()
+            response=client.get("/api/limbo-atlas/intelligence",params={"q":"genetiikka"})
+            self.assertEqual(response.status_code,200,response.text[:400])
+            self.assertGreaterEqual(response.json()["matched_memory_count"],1)
+            other=client.get("/api/limbo-atlas/memory/recall",params={"q":"genetics"})
+            self.assertEqual(other.status_code,200,other.text[:300])
+            self.assertEqual(client.post("/api/limbo-atlas/intelligence",json={}).status_code,405)
+            self.assertEqual(client.post("/api/memory/events",json={}).status_code,404)
+            self.assertEqual(before,self.klone.read_bytes())
+
+    def test_sidecar_launcher_never_restarts_main_service(self):
+        script=(Path(__file__).resolve().parents[1]/
+            "scripts"/"klone-main-research-canary.sh").read_text(encoding="utf-8")
+        self.assertIn("127.0.0.1:8000/api/health",script)
+        self.assertIn("--port 8041",script)
+        self.assertIn("klone.limbo_main_research_canary:app",script)
+        self.assertNotIn("kill -",script)
+        self.assertNotIn("git switch",script)
+        self.assertNotIn("--commit",script)
+
     def test_main_bridge_requires_running_research_room_and_owner(self):
         script=(Path(__file__).resolve().parents[1]/
                 "scripts"/"klone-atlas-main-memory.sh").read_text(encoding="utf-8")

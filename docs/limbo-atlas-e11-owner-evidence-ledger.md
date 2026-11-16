@@ -91,6 +91,39 @@ Näin aiempi neutraali 72-paikkainen neuvosto voidaan myöhemmin
 ohjata tutkimaan *molemmat* suunnat, mutta kukaan ei saa
 automaattisesti hyväksyä väitettä.
 
+### Helpompi tapa Termuxissa: kaksi tavallista .txt-tiedostoa
+
+Sinun ei tarvitse liittää pitkiä tekstejä suoraan JSON-editorissa.
+Tallenna itse käytettävissäsi oleva julkaisuteksti A tiedostoon
+\`~/klone-var/e11/oma-lahde-A.txt\` ja teksti B tiedostoon
+\`~/klone-var/e11/oma-lahde-B.txt\`. Pidä nämä tiedostot
+Termuxin yksityisessä tallennustilassa.
+
+Valitse oikea pohjatiedosto, jonka E11:n \`--prepare\` loi,
+ja kirjoita esimerkiksi:
+
+\`\`\`bash
+cd ~/klone-arxiv-e1
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_evidence_review \
+  --klone-db "$HOME/klone/data/klone_mission_control.db" \
+  --fill "$HOME/klone-var/e11/OMA-POHJA.json" \
+  --source-a-file "$HOME/klone-var/e11/oma-lahde-A.txt" \
+  --source-b-file "$HOME/klone-var/e11/oma-lahde-B.txt" \
+  --rights-note-a "Oma hyväksytty julkaisukatkelma A" \
+  --rights-note-b "Oma hyväksytty julkaisukatkelma B" \
+  --owner-confirms-supplied-text \
+  --output "$HOME/klone-var/e11/OMA-TAyTETTY-MANIFESTI.json"
+\`\`\`
+
+Korvaa \`OMA-POHJA.json\` oikealla tiedostonimellä. Tämä vaihe
+vaatii eksplisiittisen \`--owner-confirms-supplied-text\`-lipun,
+tarkistaa tekstin UTF-8-koodauksen, tekstimäärien ylärajat ja
+alkuperäisen Memory Coren lähdetunnisteet. Se ei vielä tee
+tutkimuspäätelmiä. Tämän jälkeen sinun tarvitsee lisätä vain
+haluamasi yksiselitteiset lainaukset \`annotations\`-kohtaan
+ja ajaa alla oleva \`--review\`.
+
 ### Tarkista täytetty manifesti offline-tilassa
 
 \`\`\`bash

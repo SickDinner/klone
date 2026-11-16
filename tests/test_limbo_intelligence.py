@@ -154,6 +154,15 @@ class E6ResearchTests(unittest.TestCase):
             self.assertEqual(other.status_code,200,other.text[:300])
             self.assertEqual(client.post("/api/limbo-atlas/intelligence",json={}).status_code,405)
             self.assertEqual(client.post("/api/memory/events",json={}).status_code,404)
+            page=client.get("/research")
+            self.assertEqual(page.status_code,200)
+            self.assertIn('lang="fi"',page.text)
+            self.assertIn('id="main-form"',page.text)
+            javascript=client.get("/static/main-research.js")
+            self.assertEqual(javascript.status_code,200)
+            self.assertIn("council72_preview",javascript.text)
+            self.assertIn("textContent",javascript.text)
+            self.assertNotIn("innerHTML",javascript.text)
             self.assertEqual(before,self.klone.read_bytes())
 
     def test_termux_upgrade_scripts_parse_as_bash(self):

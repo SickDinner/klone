@@ -45,7 +45,8 @@ def health():
         raise HTTPException(status_code=503,detail=str(error)) from error
     return {"status":"ok","service":"klone-main-research-readonly",
             "database_path":str(db),
-            "room_scope":"research-room","read_only":True}
+            "room_scope":"research-room","read_only":True,
+            "feature_version":"E8","features":["research","discovery","memory_recall"]}
 
 
 @app.get("/api/limbo-atlas/intelligence")

@@ -615,7 +615,10 @@
         card.append(el("p","Tutkimusyhteys · "+pair.domains.join(" × "),"eyebrow"));
         card.append(el("strong","Muistit #"+pair.first_event_id+" ja #"+
                        pair.second_event_id));
-        card.append(el("p","Yhteisiä termejä: "+pair.shared_terms.join(", ")));
+        card.append(el("p","Yhteisiä käsitteitä: "+pair.shared_terms.join(", ")));
+        card.append(el("p","Molempien otsikoiden yhteiset käsitteet: "+
+                    (pair.shared_title_concepts||[]).join(", "),"atlas-stats"));
+        card.append(el("p","Karsittu E8.2:n yleissanastoseulalla. Tieteellinen yhteys on yhä varmistamatta.","atlas-stats"));
         card.append(el("p","Tutkimisen prioriteetti "+pair.candidate_priority+
           " · erilliset julkaisijaryhmät: "+
           (pair.different_publisher_groups?"kyllä":"ei")));

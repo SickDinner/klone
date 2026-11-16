@@ -31,6 +31,27 @@ through using were what when where which while with within without would jonka j
 sekä myös ovat siitä tämä nämä tutkimus tutkimusjulkaisu article effects effect study
 analysis approach method models model system results paper proposed new public claim""".split())
 
+# Finnish queries are expanded to transparent English source-index terms.
+# This is a controlled search synonym table, not a translation model.
+FI_ALIASES = {
+    "genetiikka": ("genetics","genetic","genome","genomics","dna","ancestry"),
+    "genomi": ("genome","genomics","genetics"),
+    "muinaisdna": ("ancient","dna","paleogenomics"),
+    "evoluutio": ("evolution","evolutionary","population"),
+    "psykologia": ("psychology","psychological","cognition"),
+    "psykiatria": ("psychiatry","psychiatric","mental"),
+    "farmakologia": ("pharmacology","drug","medicine","safety"),
+    "neurotiede": ("neuroscience","neural","neuro","brain"),
+    "filosofia": ("philosophy","ethics","ethical"),
+    "geopolitiikka": ("world","international","geopolitics"),
+    "talous": ("economics","economic","economy","finance","business"),
+    "työllisyys": ("employment","labour","labor","jobs","workforce"),
+    "tekoäly": ("artificial","intelligence","machine","learning","ai","llm"),
+    "muisti": ("memory","remember","context","retrieval"),
+    "ilmasto": ("climate","environment","earth"),
+    "energia": ("energy","power","electricity"),
+}
+
 STRONG_NEG = ("no evidence", "not associated", "does not", "did not", "not significant",
               "no significant", "fails to", "lack of", "doesn't", "without evidence")
 STRONG_POS = ("is associated", "significant increase", "significant decrease", "improves",
@@ -45,6 +66,9 @@ def _tokens(s: str) -> set[str]:
 
 def _selection(rows,query:str,limit:int) -> list[dict]:
     terms=_tokens(query)
+    for term in tuple(terms):
+        if term in FI_ALIASES:
+            terms.update(FI_ALIASES[term])
     if not terms:raise ValueError("research question requires meaningful search terms")
     ranked=[]
     for doc in rows:

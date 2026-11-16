@@ -152,7 +152,8 @@
        item.append(node("p","Yhteisiä käsitteitä: "+pair.shared_terms.join(", ")));
        item.append(node("p","Molempien otsikoiden vahvistama sanastoyhteys: "+
           (pair.shared_title_concepts||[]).join(", "),"atlas-stats"));
-       item.append(node("p","E8.2 poistaa yleisluonteisia sanoja ja saman käsitteen taivutusmuodot. Kyse on vasta tutkimusehdokkaasta.","atlas-stats"));
+       item.append(node("p","Laatuseula E8.3 · käsitteiden muodot normalisoitu, ei varmistettua tieteellistä yhteyttä.","atlas-stats"));
+       item.append(node("p","Perustelu: "+(pair.justification||"Tutkittava sanastoyhtäläisyys"),"atlas-stats"));
        item.append(node("p","Prioriteetti "+pair.candidate_priority+
            " · erilliset kustantajaryhmät: "+
            (pair.different_publisher_groups?"kyllä":"ei")));

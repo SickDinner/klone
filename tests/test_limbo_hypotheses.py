@@ -18,6 +18,7 @@ from klone.limbo_source_dossiers import review_pair,review_all,_collapse_source_
 from klone.limbo_intelligence import analyze,_memories
 from klone.limbo_council_workbench import council_review,council_all
 from klone.limbo_doctor import diagnose,_read_health
+from klone.limbo_evidence_review import prepare,review_manifest,main as evidence_main
 from klone.council72 import catalog
 from klone.repository import KloneRepository
 
@@ -561,6 +562,123 @@ class E7E8Tests(unittest.TestCase):
         self.assertIn("research_canary_database_mismatch",result["problems"])
         with self.assertRaises(ValueError):
             _read_health("https://example.org/do-not-fetch")
+        self.assertEqual(before,self.core.read_bytes())
+
+    def _e11_manifest(self):
+        dossier=review_all(self.core,question="genetiikka")["dossiers"][0]
+        first,second=dossier["source_a"]["event_id"],dossier["source_b"]["event_id"]
+        manifest=prepare(self.core,first,second)
+        manifest["sources"]["A"].update(
+            text="Methods: We measured gene markers in a cohort. Results: Associations were reported.",
+            owner_supplied=True,usage_rights_note="Owner-supplied excerpt for private review")
+        manifest["sources"]["B"].update(
+            text="Methods: We measured clinical markers. Results: No association was observed in patients.",
+            owner_supplied=True,usage_rights_note="Owner-supplied excerpt for private review")
+        return manifest
+
+    def test_e11_owner_quotes_are_exact_cited_candidates_not_verified_facts(self):
+        manifest=self._e11_manifest()
+        manifest["annotations"]=[
+            {"source":"A","claim_key":"gene-marker-link",
+             "quote":"Associations were reported.",
+             "stance":"support_candidate","note":"User suggests a positive candidate."},
+            {"source":"B","claim_key":"gene-marker-link",
+             "quote":"No association was observed in patients.",
+             "stance":"counter_candidate","note":"User suggests a negative candidate."}]
+        before=self.core.read_bytes()
+        r=review_manifest(self.core,manifest)
+        self.assertEqual(r["kind"],"klone-e11-offline-evidence-ledger")
+        self.assertEqual(r["annotation_count"],2)
+        self.assertEqual(len(r["opposing_annotation_candidates"]),1)
+        self.assertEqual(r["opposing_annotation_candidates"][0]["status"],
+                         "opposing_owner_annotations_not_verified_contradiction")
+        self.assertEqual(r["quote_anchors"][0]["quote"],
+                         "Associations were reported.")
+        self.assertEqual(r["quote_anchors"][0]["char_start"],
+                         manifest["sources"]["A"]["text"].index(
+                             "Associations were reported."))
+        self.assertFalse(r["quote_anchors"][0]["independently_verified"])
+        self.assertFalse(r["council_state"]["approval"])
+        self.assertTrue(all(not x for x in r["authority"].values()))
+        self.assertEqual(r,review_manifest(self.core,manifest))
+        self.assertEqual(before,self.core.read_bytes())
+        self.assertNotIn("Methods: We measured",
+                         json.dumps(r,ensure_ascii=False))
+
+    def test_e11_rejects_fake_quotes_stale_sources_and_unapproved_content(self):
+        m=self._e11_manifest()
+        annotation={"source":"A","claim_key":"a-claim",
+                    "quote":"The study proves absolutely everything.",
+                    "stance":"support_candidate","note":"Owner note"}
+        m["annotations"]=[annotation]
+        with self.assertRaisesRegex(ValueError,"exactly once"):
+            review_manifest(self.core,m)
+        m["annotations"]=[]
+        m["sources"]["A"]["owner_supplied"]=False
+        with self.assertRaisesRegex(ValueError,"owner-supplied"):
+            review_manifest(self.core,m)
+        m=self._e11_manifest()
+        m["sources"]["A"]["receipt_sha256"]="0"*64
+        with self.assertRaisesRegex(ValueError,"provenance mismatch"):
+            review_manifest(self.core,m)
+        m=self._e11_manifest()
+        m["source_snapshot_sha256"]="f"*64
+        with self.assertRaisesRegex(ValueError,"stale"):
+            review_manifest(self.core,m)
+        m=self._e11_manifest()
+        m["sources"]["A"]["event_id"]=99999
+        with self.assertRaises(ValueError):
+            review_manifest(self.core,m)
+
+    def test_e11_rejects_duplicate_quote_offsets_and_bogus_stance(self):
+        m=self._e11_manifest()
+        m["sources"]["A"]["text"] += " Associations were reported."
+        m["annotations"]=[{"source":"A","claim_key":"a-claim",
+                           "quote":"Associations were reported.",
+                           "stance":"context","note":"User note"}]
+        with self.assertRaisesRegex(ValueError,"exactly once"):
+            review_manifest(self.core,m)
+        m=self._e11_manifest()
+        m["annotations"]=[{"source":"A","claim_key":"a-claim",
+                           "quote":"Associations were reported.",
+                           "stance":"scientifically_proven","note":"User note"}]
+        with self.assertRaisesRegex(ValueError,"stance"):
+            review_manifest(self.core,m)
+        m=self._e11_manifest()
+        m["annotations"]=[{"source":"A","claim_key":"a-claim",
+                           "quote":"Associations were reported.",
+                           "stance":"context","note":"User note"}]*2
+        with self.assertRaisesRegex(ValueError,"duplicate annotation"):
+            review_manifest(self.core,m)
+
+    def test_e11_refuses_oversized_data_and_missing_explicit_consent(self):
+        m=self._e11_manifest()
+        m["sources"]["B"]["text"]="A"*60001
+        with self.assertRaisesRegex(ValueError,"text must"):
+            review_manifest(self.core,m)
+        m=self._e11_manifest()
+        m["sources"]["B"]["usage_rights_note"]=""
+        with self.assertRaisesRegex(ValueError,"usage-rights note"):
+            review_manifest(self.core,m)
+        m=self._e11_manifest()
+        m["annotations"]=[{}]*41
+        with self.assertRaisesRegex(ValueError,"limit exceeded"):
+            review_manifest(self.core,m)
+
+    def test_e11_cli_prepares_owner_editable_template_without_database_writes(self):
+        pair=review_all(self.core,question="genetiikka")["dossiers"][0]
+        first=pair["source_a"]["event_id"]
+        second=pair["source_b"]["event_id"]
+        target=self.root/"e11-template.json"
+        before=self.core.read_bytes()
+        result=evidence_main([
+            "--klone-db",str(self.core),"--question","genetiikka",
+            "--prepare",str(first),str(second),"--output",str(target)])
+        self.assertEqual(result,0)
+        prepared=json.loads(target.read_text())
+        self.assertFalse(prepared["sources"]["A"]["owner_supplied"])
+        self.assertEqual(prepared["annotations"],[])
+        self.assertTrue(prepared["sources"]["A"]["source_url"].startswith("https://"))
         self.assertEqual(before,self.core.read_bytes())
 
     def test_e10_readonly_council_workbench_endpoints(self):

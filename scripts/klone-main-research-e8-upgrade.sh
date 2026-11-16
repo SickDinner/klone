@@ -44,7 +44,7 @@ if (health.get("service")!="klone-main-research-readonly"
     or health.get("room_scope")!="research-room"):
     raise SystemExit("Portti 8041 on väärä palvelu tai eri tietokanta. Ei pysäytetä.")
 
-if health.get("feature_version")=="E9.1":
+if health.get("feature_version")=="E10":
     print("E8-päämuistilukija on jo käytössä.")
     sys.exit(12)
 
@@ -100,7 +100,7 @@ from urllib.request import build_opener,ProxyHandler
 opener=build_opener(ProxyHandler({}))
 with opener.open("http://127.0.0.1:8041/health",timeout=5) as r:
     h=json.load(r)
-if h.get("read_only") is not True or h.get("feature_version")!="E9.1":
+if h.get("read_only") is not True or h.get("feature_version")!="E10":
     raise SystemExit("E8-lukijan versiotarkistus epäonnistui")
 print("Päämuistin E8-lukija on valmis:",h["feature_version"])
 PY

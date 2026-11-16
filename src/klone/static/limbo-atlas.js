@@ -453,6 +453,27 @@
         }
         results.append(section);
       }
+      if(report.council72_preview?.packets?.length){
+        const council=el("article",undefined,"atlas-packet");
+        council.append(el("h3","Council72 · muistista johdetut erikoisagenttien ideat"));
+        council.append(el("p",report.council72_preview.packets.length+
+          " tutkimuspakettia. Kyseessä on simuloitu neuvostoistunto, ei toteutettu tutkimus."));
+        for(const packet of report.council72_preview.packets){
+          const details=el("details");
+          details.append(el("summary","Rinki "+packet.target_ring+
+            " · "+packet.target_ring_name+
+            " · "+(packet.specialist_ideas||[]).length+" erikoisagenttia"));
+          for(const idea of packet.specialist_ideas||[]){
+            const item=el("section",undefined,"atlas-specialist");
+            item.append(el("b","#"+idea.member_id+" "+idea.name));
+            item.append(el("p",idea.research_prompt));
+            item.append(el("p","Simuloitu ehdotus, ei näyttöä tai hyväksyttyä päätöstä.","atlas-stats"));
+            details.append(item);
+          }
+          council.append(details);
+        }
+        results.append(council);
+      }
       say("atlas-e6-status","E6-analyysi valmistui: "+report.matched_memory_count+
           " julkista muistiviitettä ja "+report.research_drafts.length+
           " tutkimusluonnosta. Ei muistikirjoituksia eikä uusia verkkohakuja.");

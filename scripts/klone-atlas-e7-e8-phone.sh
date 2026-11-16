@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# KLONE Atlas E7/E8: safe Termux local tests, E8 public-memory research and UI.
+# KLONE Atlas E9.1: safe Termux local tests and deduplicated source dossiers.
 # No automated journal writes, no mutation of Memory Core or port 8000.
 set -euo pipefail
 
@@ -11,9 +11,10 @@ cd "$ROOT"
 test -x "$PY" || { echo "KLONE Python .venv puuttuu"; exit 1; }
 test -f "$ROOT/src/klone/limbo_hypotheses.py" || { echo "E7-koodi puuttuu"; exit 1; }
 test -f "$ROOT/src/klone/limbo_discovery.py" || { echo "E8-koodi puuttuu"; exit 1; }
+test -f "$ROOT/src/klone/limbo_source_dossiers.py" || { echo "E9.1-koodi puuttuu"; exit 1; }
 mkdir -p "$VAR" "$HOME/storage/downloads"
 
-echo "=== E7/E8 tutkimus-, turvallisuus- ja tietokantatestit ==="
+echo "=== E7/E8/E9.1 tutkimus-, turvallisuus- ja tietokantatestit ==="
 PYTHONPATH="$ROOT/src" "$PY" -m unittest discover \
   -s "$ROOT/tests" -p "test_limbo_hypotheses.py" || exit 1
 
@@ -63,10 +64,10 @@ PYTHONPATH="$ROOT/src" "$PY" -m klone.limbo_hypotheses \
   --falsifier "Etukäteen määritelty riippumaton toistokoe ei vahvista samaa tulosta." \
   --output "$VAR/atlas-e7-preview-$STAMP.json" || exit 1
 
-echo "=== Päivitä vain päämuistin VAIN LUKU -lukija 8041 E8-versioon ==="
+echo "=== Päivitä vain päämuistin VAIN LUKU -lukija 8041 E9.1-versioon ==="
 bash scripts/klone-main-research-e8-upgrade.sh || exit 1
 
-echo "=== Varmista E8:n rajapinnat ==="
+echo "=== Varmista E8/E9.1 rajapinnat ==="
 curl -fsS --max-time 6 \
   "http://127.0.0.1:8031/api/limbo-atlas/discovery?q=genetiikka&limit=12" \
   > /dev/null || exit 1
@@ -77,7 +78,7 @@ curl -fsS --max-time 8 \
   "http://127.0.0.1:8041/api/limbo-atlas/dossiers?q=genetiikka" \
   > /dev/null || exit 1
 
-echo "=== KLONE E7/E8 VALMIS ==="
+echo "=== KLONE E7/E8/E9.1 VALMIS ==="
 echo "Päämuistia tai tutkimusarkistoa ei muutettu."
 echo "E8-raportti: $REPORT"
 echo "E9-lähdekortit: $DOSSIERS"

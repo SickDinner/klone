@@ -192,6 +192,58 @@ class E7E8Tests(unittest.TestCase):
         self.assertEqual(self.core_before,self.core.read_bytes())
         self.assertEqual(report,radar(self.core,"genetiikka",limit=48))
 
+    def test_single_field_query_explores_other_real_memory_domains(self):
+        documents=[
+            paper("genomics-arxiv",19224,
+                  "Telomerase telomere maintenance in genetic material",
+                  "Telomere maintenance assays for genomic stability."),
+            paper("bbc-health",19225,
+                  "Telomere maintenance in cellular ageing",
+                  "Cellular ageing measurements test telomere maintenance."),
+        ]
+        ingest(self.archive,documents,root=self.root)
+        bridge(self.archive,self.core,commit=True,root=self.root)
+        original=self.core.read_bytes()
+        report=radar(self.core,"telomerase",limit=24)
+        self.assertEqual(report["matched"],1)
+        self.assertEqual(report["selected"],1)
+        self.assertEqual(report["discipline_coverage"],{"genetics":1})
+        self.assertEqual(report["bridge_mode"],"cross_domain_expansion")
+        self.assertGreater(report["outside_domain_documents_examined"],0)
+        self.assertEqual(report["bridge_document_count"],1)
+        self.assertEqual(report["bridge_documents"][0]["domain"],"mind_medicine")
+        self.assertTrue(report["bridge_documents"][0]["source_url"].startswith("https://"))
+        links=report["cross_discipline_candidates"]
+        self.assertEqual(len(links),1)
+        self.assertEqual(links[0]["candidate_origin"],"other_domain_public_memory")
+        self.assertIn("telomere",links[0]["shared_terms"])
+        self.assertIn("maintenance",links[0]["shared_terms"])
+        self.assertFalse(links[0]["cross_domain_hypothesis_verified"])
+        self.assertFalse(links[0]["independent_studies_confirmed"])
+        self.assertEqual(self.core.read_bytes(),original)
+        self.assertEqual(report,radar(self.core,"telomerase",limit=24))
+
+    def test_zero_links_explains_missing_domain_and_suggests_followup(self):
+        report=radar(self.core,"financial",limit=24)
+        self.assertEqual(report["matched"],1)
+        self.assertEqual(report["cross_discipline_candidates"],[])
+        self.assertEqual(report["bridge_document_count"],0)
+        self.assertGreater(report["outside_domain_documents_examined"],0)
+        diagnostic=report["diagnostics"]
+        self.assertEqual(diagnostic["matched_domain_count"],1)
+        self.assertTrue(diagnostic["why_no_pairs"])
+        self.assertTrue(diagnostic["suggested_next_queries"])
+        self.assertTrue(diagnostic["no_links_does_not_mean_no_scientific_relation"])
+        self.assertFalse(report["authority"]["writes_memory"])
+
+    def test_query_with_no_memory_hits_does_not_invent_discovery(self):
+        report=radar(self.core,"inventedunfindableterm",limit=24)
+        self.assertEqual(report["matched"],0)
+        self.assertEqual(report["selected"],0)
+        self.assertEqual(report["bridge_documents"],[])
+        self.assertEqual(report["cross_discipline_candidates"],[])
+        self.assertIn("No query-matched",report["diagnostics"]["why_no_pairs"])
+
     def test_radar_limits_and_no_private_memory(self):
         for limit in (0,1,97,True,"4"):
             with self.subTest(limit=limit):

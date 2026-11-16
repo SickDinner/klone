@@ -223,6 +223,45 @@ class E7E8Tests(unittest.TestCase):
         self.assertEqual(self.core.read_bytes(),original)
         self.assertEqual(report,radar(self.core,"telomerase",limit=24))
 
+    def test_e82_rejects_generic_word_soup_even_across_real_sources(self):
+        noise=[
+            paper("genomics-arxiv",19226,
+                  "Telomerase perspectives contributions theory work",
+                  "However potential results remain difficult, change historical past."),
+            paper("psychiatry-pmc",19227,
+                  "Perspectives contributions theory work",
+                  "However potential results remain difficult, change historical past."),
+        ]
+        ingest(self.archive,noise,root=self.root)
+        bridge(self.archive,self.core,commit=True,root=self.root)
+        original=self.core.read_bytes()
+        r=radar(self.core,"telomerase",limit=48)
+        for pair in r["cross_discipline_candidates"]:
+            # No E8.1 false link to the artificial boilerplate-only source.
+            self.assertNotEqual(pair["second_event_id"],
+                next(x["event_id"] for x in _memories(self.core)
+                     if x["source_id"]=="psychiatry-pmc" and
+                     x["title"]=="Perspectives contributions theory work"))
+            self.assertNotIn("however",pair["shared_terms"])
+            self.assertNotIn("potential",pair["shared_terms"])
+            self.assertNotIn("perspectives",pair["shared_terms"])
+            self.assertNotIn("contributions",pair["shared_terms"])
+            self.assertNotIn("theory",pair["shared_terms"])
+            self.assertTrue(pair["shared_title_concepts"])
+            self.assertEqual(pair["quality_gate"],
+                "e8.2-contextual-scientific-terms-v1")
+        self.assertTrue(r["diagnostics"]["generic_topic_words_ignored"])
+        self.assertTrue(r["diagnostics"]["shared_title_term_required_in_both_sources"])
+        self.assertEqual(self.core.read_bytes(),original)
+
+    def test_e82_detection_detecting_is_only_one_concept(self):
+        from klone.limbo_discovery import _concepts
+        self.assertEqual(_concepts(
+            "However potential remain detecting detection difficult"),
+            {"detection"})
+        self.assertEqual(_concepts("telomere maintenance"),
+                         {"telomere","maintenance"})
+
     def test_zero_links_explains_missing_domain_and_suggests_followup(self):
         report=radar(self.core,"financial",limit=24)
         self.assertEqual(report["matched"],1)

@@ -18,7 +18,7 @@ from klone.limbo_source_dossiers import review_pair,review_all,_collapse_source_
 from klone.limbo_intelligence import analyze,_memories
 from klone.limbo_council_workbench import council_review,council_all
 from klone.limbo_doctor import diagnose,_read_health
-from klone.limbo_evidence_review import prepare,review_manifest,main as evidence_main
+from klone.limbo_evidence_review import prepare,review_manifest,fill_template,main as evidence_main
 from klone.council72 import catalog
 from klone.repository import KloneRepository
 
@@ -654,6 +654,56 @@ class E7E8Tests(unittest.TestCase):
                            "stance":"context","note":"User note"}]*2
         with self.assertRaisesRegex(ValueError,"duplicate annotation"):
             review_manifest(self.core,m)
+
+    def test_e11_owner_text_files_are_filled_only_after_explicit_validation(self):
+        template=self._e11_manifest()
+        first=template["sources"]["A"]["text"]
+        second=template["sources"]["B"]["text"]
+        for source in template["sources"].values():
+            source["text"]=""
+            source["owner_supplied"]=False
+            source["usage_rights_note"]=""
+        original=self.core.read_bytes()
+        ready=fill_template(self.core,template,first.encode(),second.encode(),
+            rights_note_a="User-provided excerpt A for private study",
+            rights_note_b="User-provided excerpt B for private study")
+        self.assertFalse(template["sources"]["A"]["owner_supplied"])
+        self.assertEqual(ready["sources"]["A"]["text"],first)
+        self.assertEqual(ready["sources"]["B"]["text"],second)
+        self.assertEqual(review_manifest(self.core,ready)["annotation_count"],0)
+        self.assertEqual(original,self.core.read_bytes())
+        with self.assertRaisesRegex(ValueError,"UTF-8"):
+            fill_template(self.core,template,b"\xff"*40,second.encode(),
+                rights_note_a="user supplied",rights_note_b="user supplied")
+        with self.assertRaisesRegex(ValueError,"rights notes"):
+            fill_template(self.core,template,first.encode(),second.encode(),
+                rights_note_a="",rights_note_b="user supplied")
+
+    def test_e11_cli_fill_requires_explicit_owner_permission(self):
+        pair=review_all(self.core,question="genetiikka")["dossiers"][0]
+        template=prepare(self.core,pair["source_a"]["event_id"],
+                              pair["source_b"]["event_id"])
+        input_path=self.root/"e11-owner-template.json"
+        input_path.write_text(json.dumps(template))
+        a=self.root/"owner-a.txt"
+        b=self.root/"owner-b.txt"
+        a.write_text("Methods: Measure genetic associations and network expressions.")
+        b.write_text("Results: A network method was compared with existing markers.")
+        outfile=self.root/"e11-owner-filled.json"
+        base=["--klone-db",str(self.core),"--fill",str(input_path),
+              "--source-a-file",str(a),"--source-b-file",str(b),
+              "--rights-note-a","Owner-supplied private excerpt A",
+              "--rights-note-b","Owner-supplied private excerpt B",
+              "--output",str(outfile)]
+        with self.assertRaises(SystemExit):
+            evidence_main(base)
+        self.assertFalse(outfile.exists())
+        self.assertEqual(evidence_main(base+["--owner-confirms-supplied-text"]),0)
+        result=json.loads(outfile.read_text())
+        self.assertTrue(result["sources"]["A"]["owner_supplied"])
+        self.assertTrue(result["sources"]["B"]["owner_supplied"])
+        self.assertEqual(result["sources"]["A"]["text"],a.read_text())
+        self.assertEqual(self.core_before,self.core.read_bytes())
 
     def test_e11_refuses_oversized_data_and_missing_explicit_consent(self):
         m=self._e11_manifest()

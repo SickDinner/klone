@@ -13,6 +13,7 @@ from .limbo_memory_bridge import recall
 from .limbo_intelligence import analyze
 from .limbo_discovery import radar
 from .limbo_source_dossiers import review_pair, review_all
+from .limbo_council_workbench import council_review
 from .api import get_repository
 from .repository import KloneRepository
 
@@ -113,5 +114,19 @@ def atlas_all_source_pair_dossiers(
     """Read-only E9 dossiers for up to 24 source-backed E8.3 candidate pairs."""
     try:
         return review_all(repository.db_path,question=q)
+    except (ValueError,PermissionError) as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc
+
+
+@router.get("/council-workbench")
+def atlas_e10_council_workbench(
+    q: str = Query(default="genetiikka",min_length=3,max_length=160),
+    first_event_id: int = Query(...,ge=1),
+    second_event_id: int = Query(...,ge=1),
+    repository: KloneRepository = Depends(get_repository),
+):
+    """GET-only E10 task assignments; not authentic votes or completed work."""
+    try:
+        return council_review(repository.db_path,first_event_id,second_event_id,question=q)
     except (ValueError,PermissionError) as exc:
         raise HTTPException(status_code=422,detail=str(exc)) from exc

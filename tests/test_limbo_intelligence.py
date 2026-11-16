@@ -172,7 +172,7 @@ class E6ResearchTests(unittest.TestCase):
             self.skipTest("bash not installed on this test runner")
         root=Path(__file__).resolve().parents[1]
         for name in ("klone-atlas-e3-phone.sh","klone-main-research-canary.sh",
-                     "klone-atlas-main-memory.sh"):
+                     "klone-main8000-rescue.sh","klone-atlas-main-memory.sh"):
             with self.subTest(name=name):
                 result=subprocess.run([shell,"-n",str(root/"scripts"/name)],
                                       capture_output=True,text=True,timeout=10)
@@ -186,6 +186,20 @@ class E6ResearchTests(unittest.TestCase):
         self.assertIn("klone.limbo_main_research_canary:app",script)
         self.assertNotIn("kill -",script)
         self.assertNotIn("git switch",script)
+        self.assertNotIn("--commit",script)
+
+    def test_main8000_rescue_requires_existing_db_and_integrity_backup(self):
+        script=(Path(__file__).resolve().parents[1]/
+                "scripts"/"klone-main8000-rescue.sh").read_text(encoding="utf-8")
+        self.assertIn("$HOME/klone",script)
+        self.assertIn("klone_mission_control.db",script)
+        self.assertIn("test -f \"$DB\"",script)
+        self.assertIn("mode=ro",script)
+        self.assertIn("conn.backup(destination",script)
+        self.assertIn("PRAGMA integrity_check",script)
+        self.assertIn("--host 127.0.0.1 --port 8000",script)
+        self.assertNotIn("git switch",script)
+        self.assertNotIn("kill -",script)
         self.assertNotIn("--commit",script)
 
     def test_main_bridge_requires_running_research_room_and_owner(self):

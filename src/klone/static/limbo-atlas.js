@@ -339,6 +339,46 @@
       say("atlas-e4-status","Erän lataaminen epäonnistui: "+error.message);
     }
   });
+  id("atlas-e5-search").addEventListener("click",async()=>{
+    const q=id("atlas-e5-query").value.trim();
+    if(q.length<2){say("atlas-e5-status","Kirjoita vähintään kaksi merkkiä.");return;}
+    const out=id("atlas-e5-results");
+    out.replaceChildren();
+    id("atlas-e5-search").disabled=true;
+    say("atlas-e5-status","Haetaan julkisesta KLONE research-room -muistista...");
+    try{
+      const result=await api("/api/limbo-atlas/memory/recall?q="+encodeURIComponent(q)+"&limit=20");
+      say("atlas-e5-status","Memory Core: "+result.total_matches+
+        " tutkimushavaintoa. Kaikki ovat edelleen vahvistamattomia julkisia lähdeväitteitä.");
+      for(const item of result.results){
+        const card=el("article",undefined,"atlas-memory-card");
+        card.append(el("p","MUISTI #"+item.event_id+" · "+item.domain+
+                        " · versio "+item.version,"eyebrow"));
+        card.append(el("strong",item.title));
+        card.append(el("p","Lähde: "+item.source_id+
+                        " · Limbo-agentti #"+item.courier_id));
+        const original=el("a","Alkuperäinen julkaisu");
+        original.href=item.source_url;original.target="_blank";original.rel="noopener noreferrer";
+        card.append(original);
+        const memory=el("a","Avaa KLONEn lähteellinen muistokonteksti");
+        memory.href=item.memory_context_url;memory.target="_blank";memory.rel="noopener noreferrer";
+        card.append(memory);
+        out.append(card);
+      }
+      if(!result.results.length)
+        out.append(el("p","Ei osumia. Varmista ensin, että olet tuonut E3-tutkimukset Memory Coreen."));
+    }catch(error){
+      say("atlas-e5-status","Älymuistihaku epäonnistui: "+error.message+
+          ". Varmista oikea KLONE-tietokanta ja uusin E5-palvelin.");
+    }finally{id("atlas-e5-search").disabled=false;}
+  });
+  id("atlas-e5-query").addEventListener("keydown",event=>{
+    if(event.key==="Enter"){event.preventDefault();id("atlas-e5-search").click();}
+  });
+  id("atlas-e5-clear").addEventListener("click",()=>{
+    id("atlas-e5-results").replaceChildren();
+    say("atlas-e5-status","Hakutulokset tyhjennetty. Memory Coren tietoja ei muutettu.");
+  });
   async function init(){
     try{
       state.catalog=await api("/api/limbo-atlas/catalog");

@@ -454,6 +454,8 @@ class E7E8Tests(unittest.TestCase):
         self.assertIn('id="atlas-e8-form"',html.text)
         self.assertEqual(js.status_code,200)
         self.assertIn("klone-e7-hypothesis-list",js.text)
+        self.assertIn("/api/limbo-atlas/dossier?q=",js.text)
+        self.assertIn("Avaa E9-lähdeparin tutkimuskortti",js.text)
         self.assertIn('/api/limbo-atlas/discovery?q=',js.text)
         self.assertNotIn("innerHTML",js.text)
 
@@ -480,6 +482,8 @@ class E7E8Tests(unittest.TestCase):
         self.assertIn("--propose",launcher)
         self.assertNotIn(" --commit",launcher)
         self.assertIn("--klone-db",launcher)
+        self.assertIn("klone.limbo_source_dossiers",launcher)
+        self.assertIn("/api/limbo-atlas/dossiers?q=",launcher)
 
     def test_cli_is_explicit_commit_and_no_automatic_writes(self):
         from klone.limbo_hypotheses import main as journal_cli

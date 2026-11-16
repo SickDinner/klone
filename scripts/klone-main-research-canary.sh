@@ -50,7 +50,12 @@ if busy:
 PY
 result=$?
 set -e
-if [ "$result" -eq 12 ]; then exit 0; fi
+if [ "$result" -eq 12 ]; then
+  if command -v termux-open-url >/dev/null 2>&1; then
+    termux-open-url "$URL/research" || true
+  fi
+  exit 0
+fi
 if [ "$result" -ne 0 ]; then exit "$result"; fi
 
 (

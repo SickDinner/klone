@@ -13,9 +13,19 @@ TARGET="$("$PY" - <<'PY'
 import json
 from pathlib import Path
 from urllib.request import build_opener,ProxyHandler
+from urllib.error import URLError
 opener=build_opener(ProxyHandler({}))
-with opener.open("http://127.0.0.1:8000/api/health",timeout=5) as r:
-    data=json.load(r)
+try:
+    with opener.open("http://127.0.0.1:8000/api/health",timeout=5) as r:
+        data=json.load(r)
+except (URLError,TimeoutError,OSError) as exc:
+    raise SystemExit(
+        "KLONEn pääpalvelin portissa 8000 ei vastaa. "
+        "Palauta alkuperäinen palvelin ensin turvallisesti: "
+        "bash scripts/klone-main8000-rescue.sh. "
+        "E6 portissa 8031 jatkaa toimintaansa. "
+        "Syy: "+str(exc)
+    )
 if data.get("app")!="Klone" or data.get("status")!="ok":
     raise SystemExit("Pääpalvelimen health ei ole ok")
 path=data.get("database_path")

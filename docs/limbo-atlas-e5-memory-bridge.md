@@ -58,6 +58,26 @@ PYTHONPATH="$PWD/src" "$PY" -m unittest discover \
 bash scripts/klone-atlas-e3-phone.sh || exit 1
 \`\`\`
 
+## Yhden komennon omistajan tarkistama tuonti (suositeltu)
+
+Kun E5:n testit ovat läpäisseet ja paikallinen portti 8031 vastaa:
+
+\`\`\`sh
+cd ~/klone-arxiv-e1 || exit 1
+bash scripts/klone-atlas-e5-import.sh
+\`\`\`
+
+Skripti tarkistaa \`127.0.0.1:8031/api/health\`-rajapinnasta
+käynnissä olevan KLONEn **todellisen \`database_path\`-arvon**.
+Tämän ansiosta aineistoa ei vahingossa viedä toiseen eri
+tietokantaan. Skripti näyttää ensin esikatselun eikä koske muistiin,
+ennen kuin kirjoitat Termuxiin täsmälleen \`TUO\`.
+
+Tuonti käyttää nykyistä E3-muistia, tekee tapahtumakohtaisen
+provenienssin ja yhteisen audit-tapahtuman, ja tarkistaa lopuksi
+Memory Coren luku- ja Atlas E5 -hakurajapinnat. Jos jokin
+käyttöoikeus tai audit-raja pettää, muistia ei jätetä puoliksi tuoduksi.
+
 ## Esikatsele 147 tutkimusviitteen tuonti
 
 \`\`\`sh

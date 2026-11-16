@@ -23,7 +23,7 @@ ROOM_REGISTRY = [
     RoomCard(
         id="research-room",
         label="Public Research Memory",
-        room_type="public_research_room",
+        room_type="public_room",
         classification="public",
         supervisor="memory supervisor",
         status="active",

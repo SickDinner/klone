@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
+<title>KLONE · Päämuistin tutkimusäly E6</title>
+<link rel="stylesheet" href="/static/limbo-external.css">
+<link rel="stylesheet" href="/static/limbo-atlas.css">
+<script src="/static/main-research.js" defer></script>
+</head>
+<body>
+<header><a href="http://127.0.0.1:8000/">KLONE pääpalvelin</a><a href="http://127.0.0.1:8031/limbo-atlas">Limbo Atlas</a><span class="tag">PÄÄMUISTI · VAIN LUKU</span></header>
+<main>
+<section class="hero">
+  <p class="eyebrow">KLONE / MAIN MEMORY / COUNCIL72</p>
+  <h1>Pää-KLONEn tutkimusäly</h1>
+  <p>Tämä näkymä käyttää portin 8000 oikeaa Memory Core -tietokantaa erillisellä, vain luku -palvelimella. Voit vertailla julkisia tutkimusmuistoja, kysyä hypoteeseja ja tarkastella neuvoston simuloituja tutkimusehdotuksia. Yhtäkään väitettä ei vahvisteta automaattisesti.</p>
+</section>
+<p id="main-status" class="status" role="status" aria-live="polite">Tarkistetaan päämuistin lukuoikeus...</p>
+<section class="panel">
+  <h2>1. Tutki päämuistia</h2>
+  <form id="main-form" class="form-stack">
+    <label>Tutkimuskysymys tai tieteenala<input id="main-query" required minlength="3" maxlength="160" placeholder="genetiikka, farmakologia, muisti, filosofia, talous"></label>
+    <div class="atlas-controls">
+      <label>Erikoisrinki
+        <select id="main-ring">
+          <option value="">Automaattinen monialainen reititys</option>
+          <option value="2">2 · Merkitys ja luovuus</option>
+          <option value="3">3 · Muisti</option>
+          <option value="4">4 · Talous ja resurssit</option>
+          <option value="5">5 · Kognitio ja riskit</option>
+          <option value="6">6 · Tutkimushypoteesit</option>
+          <option value="7">7 · Arkkitehtuuri ja testit</option>
+          <option value="8">8 · Lähdekritiikki ja auditointi</option>
+        </select>
+      </label>
+      <label>Havaintojen määrä
+        <select id="main-limit">
+          <option value="12">12</option><option value="24" selected>24</option><option value="48">48</option>
+        </select>
+      </label>
+    </div>
+    <div class="toolbar">
+      <button type="submit" id="main-run">Tutki muistit ja luonnostele</button>
+      <button type="button" id="main-export" disabled>Lataa tutkimusraportti</button>
+    </div>
+  </form>
+</section>
+<section class="panel">
+  <h2>2. Muistihavainnot, vertailut ja neuvoston ideat</h2>
+  <p id="main-result-status" role="status" aria-live="polite">Anna tutkimuskysymys aloittaaksesi.</p>
+  <div id="main-results" class="atlas-packets"></div>
+</section>
+<footer>KLONE E6 · Päämuisti VAIN LUKU · ei yksityisiä huoneita · ei julkaisuja · sanallinen ristiriitaehdotus ei ole näyttö</footer>
+</main>
+</body>
+</html>

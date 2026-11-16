@@ -156,6 +156,19 @@ class E6ResearchTests(unittest.TestCase):
             self.assertEqual(client.post("/api/memory/events",json={}).status_code,404)
             self.assertEqual(before,self.klone.read_bytes())
 
+    def test_termux_upgrade_scripts_parse_as_bash(self):
+        import shutil,subprocess
+        shell=shutil.which("bash")
+        if not shell:
+            self.skipTest("bash not installed on this test runner")
+        root=Path(__file__).resolve().parents[1]
+        for name in ("klone-atlas-e3-phone.sh","klone-main-research-canary.sh",
+                     "klone-atlas-main-memory.sh"):
+            with self.subTest(name=name):
+                result=subprocess.run([shell,"-n",str(root/"scripts"/name)],
+                                      capture_output=True,text=True,timeout=10)
+                self.assertEqual(result.returncode,0,result.stderr)
+
     def test_sidecar_launcher_never_restarts_main_service(self):
         script=(Path(__file__).resolve().parents[1]/
             "scripts"/"klone-main-research-canary.sh").read_text(encoding="utf-8")

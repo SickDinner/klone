@@ -14,6 +14,7 @@ from klone.limbo_memory import ingest
 from klone.limbo_memory_bridge import bridge
 from klone.limbo_hypotheses import create,attach,review,detail,list_hypotheses
 from klone.limbo_discovery import radar,compare_snapshots
+from klone.limbo_source_dossiers import review_pair,review_all
 from klone.limbo_intelligence import analyze,_memories
 from klone.repository import KloneRepository
 
@@ -352,6 +353,73 @@ class E7E8Tests(unittest.TestCase):
         self.assertTrue(delta["read_only"])
         with self.assertRaises(ValueError):
             compare_snapshots(a,analyze(self.core,"employment"))
+
+    def test_e9_dossier_uses_current_real_public_memory_sources(self):
+        found=radar(self.core,"genetiikka")["cross_discipline_candidates"]
+        self.assertTrue(found)
+        pair=found[0]
+        before=self.core.read_bytes()
+        result=review_pair(self.core,pair["first_event_id"],pair["second_event_id"])
+        self.assertEqual(result["kind"],"klone-atlas-e9-pair-dossier")
+        self.assertEqual(result["concepts_in_both_titles"],pair["shared_title_concepts"])
+        self.assertEqual(result["quality_gate"],pair["quality_gate"])
+        self.assertTrue(result["source_a"]["source_url"].startswith("https://"))
+        self.assertTrue(result["source_b"]["title"])
+        self.assertTrue(result["source_a"]["receipt_sha256"])
+        self.assertFalse(result["source_a"]["full_text_reviewed"])
+        self.assertFalse(result["source_b"]["study_design_verified"])
+        self.assertFalse(result["independence"]["independent_studies_confirmed"])
+        self.assertFalse(result["scientific_truth_verified"])
+        self.assertFalse(result["memory_write"])
+        self.assertFalse(result["external_network_actions"])
+        self.assertEqual(before,self.core.read_bytes())
+        self.assertEqual(result,review_pair(
+            self.core,pair["first_event_id"],pair["second_event_id"]))
+
+    def test_e9_dossiers_reject_invalid_or_unselected_pairs(self):
+        with self.assertRaises(ValueError):
+            review_pair(self.core,1,1)
+        with self.assertRaises(ValueError):
+            review_pair(self.core,True,1)
+        with self.assertRaises(ValueError):
+            review_pair(self.core,999999,3)
+        batch=review_all(self.core,question="genetiikka")
+        self.assertEqual(batch["kind"],"klone-atlas-e9-review-batch")
+        self.assertEqual(batch["candidate_count"],len(batch["dossiers"]))
+        self.assertFalse(batch["memory_write"])
+        self.assertTrue(all(not x["scientific_truth_verified"]
+                            for x in batch["dossiers"]))
+        self.assertEqual(self.core_before,self.core.read_bytes())
+
+    def test_e9_get_only_apis_reject_writes_and_fake_papers(self):
+        import os
+        from klone.api import get_repository
+        from klone.main import create_app
+        from klone.limbo_main_research_canary import app as canary
+        app=create_app()
+        app.dependency_overrides[get_repository]=lambda:KloneRepository(self.core)
+        pair=radar(self.core,"genetiikka")["cross_discipline_candidates"][0]
+        params={"q":"genetiikka","first_event_id":pair["first_event_id"],
+                "second_event_id":pair["second_event_id"]}
+        before=self.core.read_bytes()
+        with TestClient(app) as client:
+            response=client.get("/api/limbo-atlas/dossier",params=params)
+            self.assertEqual(response.status_code,200,response.text[:500])
+            self.assertEqual(response.json()["kind"],"klone-atlas-e9-pair-dossier")
+            self.assertEqual(client.get("/api/limbo-atlas/dossier",params={
+                **params,"first_event_id":999999}).status_code,422)
+            self.assertEqual(client.post("/api/limbo-atlas/dossier",
+                                         json=params).status_code,405)
+        with patch.dict(os.environ,{"KLONE_MAIN_RESEARCH_DB":str(self.core)}):
+            with TestClient(canary) as client:
+                self.assertEqual(client.get("/health").json()["feature_version"],"E9")
+                self.assertEqual(client.get("/api/limbo-atlas/dossier",
+                                            params=params).status_code,200)
+                self.assertEqual(client.get("/api/limbo-atlas/dossiers",
+                                            params={"q":"genetiikka"}).status_code,200)
+                self.assertEqual(client.post("/api/limbo-atlas/dossier",
+                                             json=params).status_code,405)
+        self.assertEqual(before,self.core.read_bytes())
 
     def test_discovery_api_is_readonly_on_atlas_and_canary(self):
         import os

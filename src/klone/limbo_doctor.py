@@ -6,11 +6,10 @@ no schema bootstrap, no DB writes. Only output is an opt-in diagnostic JSON.
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 from datetime import datetime, timezone
-from hashlib import sha256
 import json
 from pathlib import Path
-import socket
 import sqlite3
 import stat
 from urllib.error import HTTPError, URLError
@@ -61,7 +60,7 @@ def _validate_file(path,expected):
 
 def _inspect_db(path):
     # URI mode=ro does not initialize, migrate or create missing files.
-    with sqlite3.connect(path.as_uri()+"?mode=ro",uri=True,timeout=5) as conn:
+    with closing(sqlite3.connect(path.as_uri()+"?mode=ro",uri=True,timeout=5)) as conn:
         quick=conn.execute("PRAGMA quick_check").fetchone()[0]
         if quick!="ok":
             return {"quick_check":str(quick)[:120],"healthy":False}

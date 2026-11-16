@@ -572,6 +572,27 @@
       header.append(el("p","Tutkintaprioriteetit eivät ole luotettavuus- tai totuusprosentteja.",
           "atlas-stats"));
       root.append(header);
+      const hiddenDuplicatePairs=new Set();
+      try{
+        const batch=await api("/api/limbo-atlas/dossiers?q="+
+                            encodeURIComponent(question));
+        for(const dupe of batch.duplicate_memory_pairs||[])
+          hiddenDuplicatePairs.add(dupe.event_ids.join(":"));
+        const count=el("article",undefined,"atlas-packet");
+        count.append(el("h3","E9.1 · Eri julkaisut, ei päällekkäisiä muistiviitteitä"));
+        count.append(el("p",batch.raw_memory_pair_count+
+          " muistiparia → "+batch.candidate_count+" eri julkaisuparia ("+
+          batch.duplicate_memory_pair_count+" päällekkäistä muistiparia)."));
+        count.append(el("p","Tutkimusmetatietopareja "+
+          batch.source_type_counts.research_metadata_pairs+
+          " · uutis-/viitelähteen sisältäviä pareja "+
+          batch.source_type_counts.mixed_news_or_reference_pairs));
+        count.append(el("p","Uutisartikkeli ei ole riippumaton tutkimus.","atlas-stats"));
+        root.append(count);
+      }catch(err){
+        root.append(el("p","E9.1-deduplikointia ei voitu vahvistaa: "+err.message,"atlas-stats"));
+      }
+
       const diagnostics=report.diagnostics||{};
       const scan=el("article",undefined,"atlas-packet");
       scan.append(el("h3","E8.1 · Haku muiden tieteenalojen lähteistä"));
@@ -611,6 +632,7 @@
         root.append(weak);
       }
       for(const pair of report.cross_discipline_candidates){
+        if(hiddenDuplicatePairs.has(pair.first_event_id+":"+pair.second_event_id))continue;
         const card=el("article",undefined,"atlas-memory-card");
         card.append(el("p","Tutkimusyhteys · "+pair.domains.join(" × "),"eyebrow"));
         card.append(el("strong","Muistit #"+pair.first_event_id+" ja #"+

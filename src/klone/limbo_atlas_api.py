@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from .limbo_atlas import plan, roster
 from .limbo_memory_bridge import recall
+from .limbo_intelligence import analyze
 from .api import get_repository
 from .repository import KloneRepository
 
@@ -59,3 +60,17 @@ def atlas_memory_recall(
         return recall(repository.db_path, q, limit=limit)
     except (ValueError, PermissionError) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.get("/intelligence")
+def atlas_research_intelligence(
+    q: str = Query(..., min_length=3, max_length=160),
+    limit: int = Query(default=24, ge=1, le=48),
+    ring: int | None = Query(default=None, ge=2, le=8),
+    repository: KloneRepository = Depends(get_repository),
+):
+    """Read-only, deterministic E6 research leads from existing KLONE public memories."""
+    try:
+        return analyze(repository.db_path,q,limit=limit,target_ring=ring)
+    except (ValueError,PermissionError) as error:
+        raise HTTPException(status_code=422,detail=str(error)) from error

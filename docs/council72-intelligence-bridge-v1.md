@@ -128,6 +128,97 @@ Jos probe onnistuu, raporttiin tulee
 \`model_api_requests_performed=1\`, ja vain ensimmäisen
 ringin kahdeksan jäsenen arvio. Se ei valtuuta täyttä ajoa.
 
+## Android 17.11.2026: ringin 2 muototarkistus ja maksullisen työn jatkaminen
+
+Seuraavassa Android-kokeessa yksi ringin 1 GPT-analyysi valmistui,
+mutta rinki 2 pysähtyi virheeseen \`invalid seat statement\`.
+Vanha tarkistin edellytti jokaiselta kahdeksalta jäseneltä
+enintään 300 merkin \`observation\`- ja \`challenge\`-lausuntoa.
+Tiedämme vain, että jokin kenttä ei täyttänyt tarkistusta;
+emme tiedä alkuperäisen, hylätyn vastauksen pituutta tai sisältöä.
+
+Tässä versiossa:
+- Lausunnon sallittu maksimipituus nostetaan 900 merkkiin.
+  Tyhjä, vääräntyyppinen tai tätä pidempi teksti hylätään edelleen.
+- Virhe ilmoittaa turvallisesti \`member_id\`-, \`field\`- ja
+  \`chars\`-tiedot, ei yksityisiä tekstikatkelmia.
+- Jokainen API:lta vastaanotettu vastaus tallentuu
+  \`ring-XX-received-unverified.json\`-tiedostoon ennen validointia,
+  \`ring-XX-accepted.json\` vasta validoinnin jälkeen.
+- Perustajien yhdeksäs vastaus tallennetaan samalla tavalla.
+- Paikallisia vastauksia luetaan vain, jos tietueen SHA-tarkiste,
+  kysymys, malli, lähdeketju, luettelo, täsmällinen
+  rinkikohtainen pyyntö ja rooli-/lähde-ID:t täsmäävät.
+- Virheellistä vastaanotettua vastausta ei tilata automaattisesti
+  uudelleen. Se jää paikalliseksi, ei-hyväksytyksi
+  tietueeksi, jota voidaan tutkia ja kelpuuttaa vain
+  edelleen hyväksyttävän rakenteen mukaisesti.
+- Tarkiste on eheysmekanismi, **ei kryptografinen allekirjoitus**.
+- \`store=false\`, ei uusia muistikirjoituksia, ulkoisia
+  toimia eikä automaattisia uusintayrityksiä.
+
+**Vanhan keskeytyneen live-ajon** onnistunut ringin 1 vastaus
+ei tallentunut, eikä vanhaa hylättyä ringin 2 vastausta
+voi palauttaa paikallisesta raportista. Sen sijaan 16:26
+onnistunut erillinen probe-ajo teki ringin 1 vastauksesta
+uuden, pysyvän \`council72-intelligence-probe-...\`-raportin.
+
+\`resume\`-tila voi käyttää **juuri tätä aiemmin maksettua ja
+validia** ringin 1 tulosta, jolloin vain jäljellä olevat
+rinkien 2–8 seitsemän kutsua ja perustajien yksi
+kutsu tehdään uutena: **enintään 8 uutta API-kutsua**.
+
+### Suositeltu käyttö, vasta uuden erillisen maksullisen hyväksynnän jälkeen
+
+\`\`\`bash
+cd ~/klone-arxiv-e1 || exit 1
+git fetch origin feat/council72-intelligence-bridge-v1-20261117 || exit 1
+git switch --detach FETCH_HEAD || exit 1
+
+# Turvallinen preview ja regressiotestit, ei verkkokutsuja:
+bash scripts/klone-council72-intelligence-phone.sh preview
+
+# Vain jos hyväksyt enintään kahdeksan UUTTA maksullista mallikutsua
+# jo tarkistamiisi julkisiin tutkimuskatkelmiin:
+read -r -s -p 'OpenAI API -avain: ' OPENAI_API_KEY
+printf '\n'
+export OPENAI_API_KEY
+export KLONE_COUNCIL72_CONFIRM_PUBLIC=VAHVISTAN_JULKISUUDEN
+export KLONE_COUNCIL72_RESUME_APPROVAL=HYVAKSY_ENINTAAN_8_GPT_KUTSUA
+
+bash scripts/klone-council72-intelligence-phone.sh resume
+RESULT=$?
+
+unset OPENAI_API_KEY
+unset KLONE_COUNCIL72_CONFIRM_PUBLIC
+unset KLONE_COUNCIL72_RESUME_APPROVAL
+
+echo "Lopetuskoodi: $RESULT"
+\`\`\`
+
+Uusi \`resume\` etsii viimeisimmän \`probe-*.json\`-raportin
+(jonka identiteetti varmennetaan) ja luo yksilöllisen,
+mutta samalla lähdepaketilla, kysymyksellä, mallilla ja probella
+toistettavan istuntokansion
+\`~/klone-var/e11/council72-sessions/resume-<tarkiste>\`.
+Uusi ajokerta löytää samat tarkistuspisteet eikä lähetä
+uudelleen jo hyväksyttyjä vastauksia.
+
+**Jokainen resume-yritys vaatii silti uuden nimenomaisen
+hyväksynnän mahdollisille puuttuville uusille API-kutsuille.**
+Virheen jälkeen tarkista tarkistuspisteet ja varoitukset
+ennen uutta yritystä. Jos keskeytys johtui sisällön
+validointivirheestä, sama vastaus säilyy ja uusi yritys
+hylkää sen uudelleen ilman lisälaskutusta. Maksullinen,
+mutta täysin saamatta jäänyt API-vastaus ei ole
+jälkikäteen palautettavissa näistä paikallisista tiedostoista.
+
+Hyväksytysti koottu täysi raportti sisältää
+\`model_analyses_total=9\`, \`model_api_requests_performed=8\`
+ja \`model_api_requests_reused=1\` ensimmäisessä
+onnistuneessa resume-ajossa. Jos aiempia rinkejä on
+jo tallennettu, uusien kutsujen määrä voi olla pienempi.
+
 ## Termux — tarkka käyttö
 
 Käytä viimeisintä E11.11-raporttiasi. Tätä tehtävää varten mitään
@@ -190,7 +281,7 @@ Tämä PR toteuttaa API-adapterin, roolitetut mallikutsut,
 jäsenten ID- ja lähdeviitevalidoinnin, offline-esikatselun,
 jäljitettävät tulos-/kutsutiivisteet, kulutuksen
 token-laskurit ja eksplisiittisen käytön eston oletustilassa.
-V1 sisältää verkottomat regressiotestit, myös yhden kutsun probesta ja API:n kesken jääneen vastauksen virhediagnostiikasta.
+V1 sisältää verkottomat regressiotestit myös yhden kutsun probesta, API:n kesken jääneen vastauksen virhediagnostiikasta ja laskutetun mallivastauksen paikallisesta palautuksesta.
 
 PR ei sisällä piilotettuja API-avaimia, live-ajoa, avointa
 hakuagenttia, agenttien toimivaltuutta tai Memory Core -muutoksia.

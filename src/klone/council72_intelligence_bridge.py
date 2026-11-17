@@ -31,7 +31,7 @@ ENDPOINT = "https://api.openai.com/v1/responses"
 MAX_QUESTION_CHARS = 1000
 MAX_EVIDENCE_CARDS = 20
 MAX_SNIPPET_CHARS = 240
-MAX_REQUEST_BYTES = 28_000
+MAX_REQUEST_BYTES = 48_000
 MAX_RESPONSE_BYTES = 256_000
 MAX_OUTPUT_TOKENS_RING = 3400
 MAX_OUTPUT_TOKENS_FOUNDERS = 3400
@@ -222,14 +222,17 @@ def _founder_prompt(question, compact, ring_results, model, members):
          "stewards_ring": members[fid]["stewards_ring"]}
         for fid in model["founder_ids"]
     ]
+    # Deliberately compact ring conclusions before the founder call: preserve
+    # all 64 member IDs and seat perspectives while bounding request size.
+    # The full validated ring outputs remain in the local checkpoint files.
     reduced = [
         {"ring_id": item["ring_id"],
-         "findings": item["findings"],
-         "counterarguments": item["counterarguments"],
-         "open_questions": item["open_questions"],
+         "findings": [v[:240] for v in item["findings"][:3]],
+         "counterarguments": [v[:240] for v in item["counterarguments"][:3]],
+         "open_questions": [v[:240] for v in item["open_questions"][:3]],
          "evidence_card_ids": item["evidence_card_ids"],
          "seat_observations": [
-             {"member_id": z["member_id"], "observation": z["observation"]}
+             {"member_id": z["member_id"], "observation": z["observation"][:180]}
              for z in item["seat_assessments"]
          ]}
         for item in ring_results
@@ -255,7 +258,7 @@ def _founder_prompt(question, compact, ring_results, model, members):
     return instruction, json.dumps(data, ensure_ascii=False, sort_keys=True)
 
 
-def _validate_strings(values, limit_count=8, limit_len=450):
+def _validate_strings(values, limit_count=8, limit_len=900):
     if (type(values) is not list or len(values) > limit_count or
         any(type(v) is not str or not 1 <= len(v.strip()) <= limit_len for v in values)):
         raise CouncilModelError("invalid or unbounded model text list")
@@ -299,7 +302,7 @@ def _validate_seats(output, members, ring, allowed):
         _validate_strings(output[key])
     _validate_ids(output["evidence_card_ids"], allowed)
     if (type(output["uncertainty_note"]) is not str or
-        not 1 <= len(output["uncertainty_note"].strip()) <= 600):
+        not 1 <= len(output["uncertainty_note"].strip()) <= 1100):
         raise CouncilModelError("uncertainty note missing")
 
 
@@ -315,12 +318,12 @@ def _validate_founders(output, founder_ids, allowed):
         if (type(ent["member_id"]) is not int or
             ent["position"] not in ("support_next_review", "revise", "defer") or
             type(ent["reason"]) is not str or
-            not 1 <= len(ent["reason"].strip()) <= 350):
+            not 1 <= len(ent["reason"].strip()) <= 900):
             raise CouncilModelError("invalid founder opinion")
     for key in ("disagreements", "next_experiments"):
         _validate_strings(output[key], limit_count=12)
     if (type(output["synthesis"]) is not str or
-        not 1 <= len(output["synthesis"].strip()) <= 1500):
+        not 1 <= len(output["synthesis"].strip()) <= 2400):
         raise CouncilModelError("invalid founder synthesis")
     _validate_ids(output["evidence_card_ids"], allowed)
     if output["decision"] != "owner_review_required":

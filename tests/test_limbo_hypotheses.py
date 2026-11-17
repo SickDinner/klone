@@ -23,6 +23,7 @@ from klone.limbo_evidence_candidates import suggest, main as candidate_main
 from klone.limbo_evidence_accept import accept_context, main as accept_main
 from klone.limbo_evidence_quality import audit_quality, main as quality_main
 from klone.limbo_evidence_verification_queue import build_queue,main as queue_main
+from klone.limbo_arxiv_primary import prepare as arxiv_prepare, fetch as arxiv_fetch, parse_atom, _source_ids, _atom_url_from_url, main as arxiv_main
 from klone.council72 import catalog
 from klone.repository import KloneRepository
 
@@ -1169,6 +1170,134 @@ class E7E8Tests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             queue_main(args)
         self.assertEqual(original_bytes,self.core.read_bytes())
+
+    def _e116_mock_board(self):
+        return {
+            "seat_count":72,
+            "source_snapshot_sha256":"a"*64,
+            "source_summary":{
+                "source_a":{"event_id":26,
+                    "source_url":"https://arxiv.org/abs/2611.13801v1",
+                    "title":"Gene Network Test Study",
+                    "receipt_sha256":"b"*64,"version":1},
+                "source_b":{"event_id":24,
+                    "source_url":"https://arxiv.org/abs/2611.15598v1",
+                    "title":"Graph Temperature Test Study",
+                    "receipt_sha256":"c"*64,"version":1},
+            },
+        }
+
+    def _e116_atom(self,*,second_id="2611.15598v1"):
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<feed xmlns="http://www.w3.org/2005/Atom">'
+            '<entry><id>http://arxiv.org/abs/2611.13801v1</id>'
+            '<title>Gene Network Test Study</title>'
+            '<summary>Graph learning methods on supplied test data; no genuine findings are asserted by this fixture.</summary>'
+            '<published>2026-11-16T12:00:00Z</published>'
+            '<updated>2026-11-17T12:00:00Z</updated></entry>'
+            '<entry><id>http://arxiv.org/abs/'+second_id+'</id>'
+            '<title>Graph Temperature Test Study</title>'
+            '<summary>Graph learning methods applied to missing air temperature test data without authentic experiments.</summary>'
+            '</entry></feed>'
+        ).encode()
+
+    def test_e116_dry_run_is_offline_and_canonical_arxiv_only(self):
+        board=self._e116_mock_board()
+        original_db=self.core.read_bytes()
+        with patch("klone.limbo_arxiv_primary.council_review",return_value=board):
+            with patch("klone.limbo_arxiv_primary._get_feed") as online:
+                result=arxiv_prepare(self.core,26,24)
+                self.assertEqual(result["source_event_ids"],[26,24])
+                self.assertFalse(result["network_performed"])
+                self.assertFalse(result["owner_network_authorization"])
+                self.assertFalse(result["scientific_truth_verified"])
+                self.assertEqual(len(result["sources"]),2)
+                online.assert_not_called()
+                with self.assertRaisesRegex(ValueError,"explicit owner approval"):
+                    arxiv_fetch(self.core,26,24)
+                online.assert_not_called()
+            unsafe=dict(board)
+            unsafe["source_summary"]=dict(board["source_summary"])
+            unsafe["source_summary"]["source_a"]=dict(board["source_summary"]["source_a"])
+            unsafe["source_summary"]["source_a"]["source_url"]="https://127.0.0.1/abs/2611.13801v1"
+            with patch("klone.limbo_arxiv_primary.council_review",return_value=unsafe):
+                with self.assertRaisesRegex(ValueError,"exact HTTPS"):
+                    arxiv_prepare(self.core,26,24)
+        self.assertEqual(original_db,self.core.read_bytes())
+
+    def test_e116_owner_authorized_mocked_atom_creates_metadata_only_receipt(self):
+        board=self._e116_mock_board()
+        before=self.core.read_bytes()
+        with patch("klone.limbo_arxiv_primary.council_review",return_value=board):
+            with patch("klone.limbo_arxiv_primary._get_feed",return_value=self._e116_atom()) as getter:
+                result=arxiv_fetch(self.core,26,24,
+                                   owner_authorizes_public_read=True)
+        self.assertEqual(getter.call_count,1)
+        self.assertTrue(getter.call_args.args[0].startswith(
+            "https://export.arxiv.org/api/query?id_list="))
+        self.assertTrue(result["metadata_title_pair_matches_memory"])
+        self.assertEqual([x["memory_event_id"] for x in result["documents"]],[26,24])
+        self.assertEqual([x["arxiv_id"] for x in result["documents"]],
+                         ["2611.13801v1","2611.15598v1"])
+        self.assertFalse(result["primary_full_text_fetched"])
+        self.assertFalse(result["scientific_truth_verified"])
+        self.assertFalse(result["independent_research_verification"])
+        self.assertFalse(result["memory_write"])
+        self.assertEqual(result["council_reviews_performed"],0)
+        self.assertEqual(result["report_sha256"],
+                         __import__("klone.limbo_council_workbench",fromlist=["_fingerprint"])._fingerprint({
+                             k:v for k,v in result.items() if k!="report_sha256"
+                         }))
+        self.assertEqual(before,self.core.read_bytes())
+
+    def test_e116_rejects_forged_or_oversized_atom_responses(self):
+        entries=_source_ids(self._e116_mock_board())
+        for payload,match in (
+            (self._e116_atom(second_id="2611.00001v1"),"does not match"),
+            (self._e116_atom().replace(b"<feed",b"<!DOCTYPE feed><feed",1),"DTD"),
+            (self._e116_atom()[:50],"invalid arXiv Atom"),
+            (b"A"*(256*1024+1),"invalid bounded"),
+            (self._e116_atom().replace(b"2611.15598v1",b"2611.13801v1"),"duplicate"),
+        ):
+            with self.subTest(match=match):
+                with self.assertRaisesRegex(ValueError,match):
+                    parse_atom(payload,entries)
+        for bad in (
+            "https://evil.test/api/query?id_list=2611.13801v1,2611.15598v1&max_results=2",
+            "http://export.arxiv.org/api/query?id_list=2611.13801v1,2611.15598v1&max_results=2",
+            "https://export.arxiv.org/api/query?id_list=2611.13801v1,2611.15598v1&max_results=200",
+            "https://export.arxiv.org/api/query?id_list=2611.13801v1,2611.15598v1&max_results=2&url=http://127.0.0.1",
+        ):
+            with self.subTest(url=bad):
+                with self.assertRaises(ValueError):
+                    _atom_url_from_url(bad)
+
+    def test_e116_cli_enforces_owner_permission_before_any_network_or_output(self):
+        import contextlib,io
+        board=self._e116_mock_board()
+        output=self.root/"e116-arxiv.json"
+        args=["--klone-db",str(self.core),"--pair","26","24","--fetch",
+              "--output",str(output)]
+        before=self.core.read_bytes()
+        with patch("klone.limbo_arxiv_primary.council_review",return_value=board):
+            with patch("klone.limbo_arxiv_primary._get_feed") as online:
+                with contextlib.redirect_stderr(io.StringIO()):
+                    with self.assertRaises(SystemExit):
+                        arxiv_main(args)
+                online.assert_not_called()
+                self.assertFalse(output.exists())
+            with patch("klone.limbo_arxiv_primary._get_feed",return_value=self._e116_atom()):
+                self.assertEqual(arxiv_main(args+["--owner-authorizes-public-read"]),0)
+        receipt=json.loads(output.read_text())
+        self.assertTrue(receipt["owner_network_authorization"])
+        self.assertEqual(receipt["source_event_ids"],[26,24])
+        self.assertFalse(receipt["memory_write"])
+        self.assertEqual(before,self.core.read_bytes())
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                arxiv_main(args+["--owner-authorizes-public-read"])
+        self.assertEqual(before,self.core.read_bytes())
 
     def test_e10_readonly_council_workbench_endpoints(self):
         import os

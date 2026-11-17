@@ -24,6 +24,7 @@ from klone.limbo_evidence_accept import accept_context, main as accept_main
 from klone.limbo_evidence_quality import audit_quality, main as quality_main
 from klone.limbo_evidence_verification_queue import build_queue,main as queue_main
 from klone.limbo_arxiv_primary import prepare as arxiv_prepare, fetch as arxiv_fetch, parse_atom, _source_ids, _atom_url_from_url, main as arxiv_main
+from klone.limbo_arxiv_abstract_compare import compare_abstracts, main as abstract_compare_main, _numbers
 from klone.council72 import catalog
 from klone.repository import KloneRepository
 
@@ -1297,6 +1298,174 @@ class E7E8Tests(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit):
                 arxiv_main(args+["--owner-authorizes-public-read"])
+        self.assertEqual(before,self.core.read_bytes())
+
+    def _e117_inputs(self):
+        from hashlib import sha256
+        from klone.limbo_arxiv_primary import _atom_url
+        from klone.limbo_council_workbench import _fingerprint
+        original,proposals,selected,ledger=self._e114_reviewed(summary=True)
+        quality=audit_quality(self.core,selected,ledger,original,proposals)
+        queue=build_queue(self.core,original,proposals,selected,ledger,quality)
+        board=council_review(self.core,*queue["source_event_ids"],
+                             question=original["question"])
+        # E7/E11 historical fixtures have unversioned paper paths. Patch only
+        # this fixture's arXiv version identifiers; actual E11.7 will require
+        # _source_ids(board) to independently verify real versioned arXiv URLs.
+        urls=["2611.13801v1","2611.15598v1"]
+        entries=[]
+        for idx,src in enumerate((original["sources"]["A"],original["sources"]["B"])):
+            entries.append({
+                "event_id":src["event_id"],
+                "arxiv_id":urls[idx],
+                "source_url":src["source_url"],
+                "memory_title":src["title"],
+                "memory_receipt_sha256":src["receipt_sha256"],
+                "memory_version":src["version"],
+            })
+        docs=[]
+        for idx,src in enumerate(entries):
+            abstract=(("Graph learning methods reported experimental comparisons "
+                       "for synthetic cohorts, no independent validation." )
+                      if idx==0 else
+                      ("Graph learning and missing temperature observations "
+                       "were compared using synthetic data without source validation."))
+            docs.append({
+                "arxiv_id":src["arxiv_id"],
+                "source_url":src["source_url"],
+                "memory_event_id":src["event_id"],
+                "memory_receipt_sha256":src["memory_receipt_sha256"],
+                "atom_entry_id":"http://arxiv.org/abs/"+src["arxiv_id"],
+                "atom_published":"2026-11-16T12:00:00Z",
+                "atom_updated":"2026-11-17T12:00:00Z",
+                "title_from_arxiv":src["memory_title"],
+                "title_matches_memory":True,
+                "abstract_from_arxiv":abstract,
+                "abstract_sha256":sha256(abstract.encode()).hexdigest(),
+                "abstract_content":"remote_arxiv_atom_not_peer_reviewed_or_independently_replicated",
+                "publisher_full_text_authenticated":False,
+                "scientific_truth_verified":False,
+            })
+        receipt={
+            "kind":"klone-e11-6-arxiv-metadata-receipts",
+            "schema_version":1,
+            "source_event_ids":queue["source_event_ids"],
+            "source_snapshot_sha256":queue["source_snapshot_sha256"],
+            "request_url":_atom_url(entries),
+            "remote_host":"export.arxiv.org",
+            "atom_response_sha256":"a"*64,
+            "atom_response_bytes":1000,
+            "documents":docs,
+            "network_performed":True,
+            "owner_network_authorization":True,
+            "metadata_title_pair_matches_memory":True,
+            "metadata_obtained_from_arxiv_atom":True,
+            "primary_full_text_fetched":False,
+            "independent_research_verification":False,
+            "scientific_truth_verified":False,
+            "council_reviews_performed":0,
+            "memory_write":False,
+        }
+        receipt["report_sha256"]=_fingerprint(receipt)
+        return (original,proposals,selected,ledger,quality,queue,receipt,
+                board,entries)
+
+    def test_e117_replays_eleven_five_and_compares_only_original_abstract(self):
+        original,proposals,selected,ledger,quality,queue,receipt,board,entries=self._e117_inputs()
+        before=self.core.read_bytes()
+        with patch("klone.limbo_arxiv_abstract_compare.council_review",return_value=board):
+            with patch("klone.limbo_arxiv_abstract_compare._source_ids",return_value=entries):
+                result=compare_abstracts(
+                    self.core,original,proposals,selected,ledger,quality,queue,receipt)
+                self.assertEqual(result,compare_abstracts(
+                    self.core,original,proposals,selected,ledger,quality,queue,receipt))
+        self.assertEqual(result["kind"],"klone-e11-7-arxiv-abstract-correspondence")
+        self.assertEqual(result["local_quotes_compared"],queue["primary_source_checks_needed"])
+        self.assertEqual(result["confirmed_scientific_claims"],0)
+        self.assertEqual(result["full_text_papers_checked"],0)
+        self.assertEqual(result["independent_council_reviews"],0)
+        self.assertEqual(result["new_network_requests"],0)
+        self.assertFalse(result["memory_write"])
+        self.assertFalse(any(result["authority"].values()))
+        self.assertEqual(result["e11_5_report_sha256"],queue["report_sha256"])
+        self.assertEqual(result["e11_6_report_sha256"],receipt["report_sha256"])
+        self.assertTrue(result["comparisons"])
+        for item in result["comparisons"]:
+            self.assertFalse(item["claim_verified"])
+            self.assertFalse(item["absence_from_abstract_is_disproof"])
+            self.assertFalse(item["publisher_full_text_checked"])
+            self.assertEqual(item["status"],"needs_independent_full_text_or_methods_review")
+            self.assertTrue(item["arxiv_abstract_sha256"])
+        self.assertEqual(before,self.core.read_bytes())
+
+    def test_e117_fails_closed_on_swapped_receipts_and_tampered_queue(self):
+        from copy import deepcopy
+        original,proposals,selected,ledger,quality,queue,receipt,board,entries=self._e117_inputs()
+        def run(r=receipt,q=queue):
+            with patch("klone.limbo_arxiv_abstract_compare.council_review",return_value=board):
+                with patch("klone.limbo_arxiv_abstract_compare._source_ids",return_value=entries):
+                    return compare_abstracts(
+                        self.core,original,proposals,selected,ledger,quality,q,r)
+        tampered=deepcopy(queue)
+        tampered["queue"][0]["quote"]="Forged research evidence."
+        with self.assertRaisesRegex(ValueError,"queue differs"):
+            run(q=tampered)
+        for key,value in (("owner_network_authorization",False),
+                          ("memory_write",True),
+                          ("primary_full_text_fetched",True)):
+            bad=deepcopy(receipt)
+            bad[key]=value
+            with self.assertRaises(ValueError):
+                run(r=bad)
+        bad=deepcopy(receipt)
+        bad["documents"].reverse()
+        bad["report_sha256"]=__import__("klone.limbo_council_workbench",fromlist=["_fingerprint"])._fingerprint({
+            k:v for k,v in bad.items() if k!="report_sha256"})
+        with self.assertRaisesRegex(ValueError,"source ID"):
+            run(r=bad)
+        bad=deepcopy(receipt)
+        bad["documents"][0]["abstract_sha256"]="0"*64
+        bad["report_sha256"]=__import__("klone.limbo_council_workbench",fromlist=["_fingerprint"])._fingerprint({
+            k:v for k,v in bad.items() if k!="report_sha256"})
+        with self.assertRaisesRegex(ValueError,"abstract hash"):
+            run(r=bad)
+        bad=deepcopy(receipt)
+        bad["source_snapshot_sha256"]="f"*64
+        bad["report_sha256"]=__import__("klone.limbo_council_workbench",fromlist=["_fingerprint"])._fingerprint({
+            k:v for k,v in bad.items() if k!="report_sha256"})
+        with self.assertRaisesRegex(ValueError,"current canonical"):
+            run(r=bad)
+
+    def test_e117_numeric_tokens_are_literal_and_do_not_prove_study(self):
+        self.assertEqual(_numbers("Raportoitiin 13,7 % ja 0,997 kelvin."),
+                         ["0.997","13.7%"])
+        self.assertEqual(_numbers("A model had 10.1% error and 31% change."),
+                         ["10.1%","31%"])
+        self.assertNotIn("3",_numbers("The 2023 study achieved a 0.5% change."))
+
+    def test_e117_cli_generates_new_readonly_receipt_never_overwrites(self):
+        original,proposals,selected,ledger,quality,queue,receipt,board,entries=self._e117_inputs()
+        data=(("original",original),("proposals",proposals),
+              ("selected",selected),("ledger",ledger),("quality",quality),
+              ("queue",queue),("receipt",receipt))
+        args=["--klone-db",str(self.core)]
+        for key,value in data:
+            file=self.root/("e117-"+key+".json")
+            file.write_text(json.dumps(value))
+            args.extend(("--"+key,str(file)))
+        out=self.root/"e117-output.json"
+        args.extend(("--output",str(out)))
+        before=self.core.read_bytes()
+        with patch("klone.limbo_arxiv_abstract_compare.council_review",return_value=board):
+            with patch("klone.limbo_arxiv_abstract_compare._source_ids",return_value=entries):
+                self.assertEqual(abstract_compare_main(args),0)
+        report=json.loads(out.read_text())
+        self.assertEqual(report["local_quotes_compared"],queue["primary_source_checks_needed"])
+        self.assertEqual(report["new_network_requests"],0)
+        with patch("klone.limbo_arxiv_abstract_compare.council_review",return_value=board):
+            with patch("klone.limbo_arxiv_abstract_compare._source_ids",return_value=entries):
+                with self.assertRaises(SystemExit):
+                    abstract_compare_main(args)
         self.assertEqual(before,self.core.read_bytes())
 
     def test_e10_readonly_council_workbench_endpoints(self):

@@ -50,7 +50,7 @@ def _verification_questions(row, topic):
         checks.append(
             "Find explicit failure cases, missing-data assumptions and unresolved sources of bias."
         )
-    if re.search(r"(?<!\w)\d+(?:[.,]\d+)?\s*(?:%|prosent|kelvin|rmse)\b",
+    if re.search(r"(?<!\w)\d+(?:[.,]\d+)?\s*(?:%|prosent(?:tia)?|kelvin|rmse)(?!\w)",
                  row["quote"],flags=re.IGNORECASE):
         checks.append(
             "Check numerical units, rounding, baseline, study setting and uncertainty for any quoted numbers."

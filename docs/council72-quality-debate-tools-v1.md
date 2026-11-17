@@ -1,5 +1,62 @@
 # Council72 Quality, Debate and Public Tools v1
 
+## Android real-data outcome and v1.1 size fix (17 Nov 2026)
+
+Verified on the user's OnePlus Android / Termux (commit 83bd136):
+- Offline quality audit: 12/12 new unit tests, all 72 roles accounted
+  for, 10/10 public citation card IDs used at least once, 0 Memory writes.
+- Debate preview and public local tools: passed, 0 API requests.
+- The FIRST separately approved debate-live attempt stopped at the
+  FIRST cross-examination stage with the error:
+  model request exceeds its public-data budget.
+  The old 48,000-byte request limit rejected the constructed JSON body
+  BEFORE HTTP, so that failed attempt did not produce a paid model call.
+- Previous output had "0 high lexical-overlap pairs"; this is NOT
+  evidence of semantic specialization or low repetition. The eight
+  rings' actual findings showed considerable semantic repetition.
+
+### Fixed in subsequent v1.1 commits
+
+- The debate stage now samples bounded but REAL statements from all
+  64 specialist roles and findings from all eight rings.
+- Choose the largest of five deterministic compression profiles that
+  fits the ACTUAL UTF-8 serialized OpenAI Responses body, including
+  the full strict JSON schema and instructions, under 48 kB.
+- Include source snippets from both arXiv versions where possible,
+  a public-only discrepancy summary, founder disagreement and
+  abbreviated founder synthesis. This is a lossy sample:
+  full original ring data remains in the immutable local JSON file.
+- Before EACH paid call, re-check body size after prior model turns
+  have been safely compacted. No silent request-body overflow.
+- The zero-cost debate-preview now includes the FIRST real request's
+  byte count, selected compression profile and all 64 retained role
+  IDs. Subsequent turns require their actual previous outputs and
+  are checked just before sending.
+- Store prompt_compaction_version=2 in the checkpoint context and
+  write to debate-v2-* session folders; old v1 answered checkpoint
+  files block new paid calls rather than being repurchased silently.
+  The user's initial v1 run failed before HTTP, so it has no paid
+  response to migrate.
+
+These changes are tested with large, multi-byte Finnish text and
+long prior model arguments. A passing mock test is NOT a claim that
+the user's first real debate-live v1.1 has already succeeded.
+
+### Termux sequence after pulling the fixed commit
+
+    cd ~/klone-arxiv-e1 || exit 1
+    git fetch origin feat/council72-quality-debate-tools-20261117 || exit 1
+    git switch --detach FETCH_HEAD || exit 1
+    bash scripts/klone-council72-quality-phone.sh debate-preview
+
+This preview is free and should show something like:
+Mallisyötteen preflight: X / 48000 tavua
+Mukana asiantuntijarooleja: 64
+
+The later debate-live remains an OPTIONAL, separately approved,
+up-to-three-call billable action. Do not restart any debate-live
+in parallel with an already running session.
+
 ## Scope and factual boundary
 
 This component builds on Council72 Intelligence Bridge PR #181.

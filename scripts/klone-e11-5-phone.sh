@@ -57,7 +57,7 @@ else:
     raise SystemExit("E11.2:n vastaavaa ehdotusraporttia ei löydy")
 print(proposals)
 print(selected)
-print(file if False else root/("e11-3-tarkistus-"+suf))
+print(root/("e11-3-tarkistus-"+suf))
 PY
 )" || exit 1
 PROPOSALS="$(printf '%s\n' "$INPUTS" | sed -n '1p')"

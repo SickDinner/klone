@@ -55,8 +55,10 @@ case "$MODE" in
     ;;
   debate-preview)
     echo "=== Neuvoston väittelyaineisto: offline ==="
-    PYTHONPATH="$ROOT/src" "$PY" -m klone.council72_quality_lab \
-      --report "$REPORT" --evidence "$SOURCE" --mode debate-preview \
+    # Run the real API serializer preflight without sending any HTTP
+    # request; report includes exact stage-one UTF-8 byte size and profile.
+    PYTHONPATH="$ROOT/src" "$PY" -m klone.council72_debate \
+      --report "$REPORT" --evidence "$SOURCE" --model "$MODEL" \
       --output "$OUTPUT"
     ;;
   tools)
@@ -91,7 +93,18 @@ h.update(sys.argv[3].encode())
 print(h.hexdigest()[:24])
 PY
 )"
-    DIR="$WORK/council72-sessions/debate-$SESSION"
+    OLD_DIR="$WORK/council72-sessions/debate-$SESSION"
+    # Do not silently rebill responses that an old prompt version already
+    # received. A previously empty directory (preflight failure) is safe.
+    if [ -d "$OLD_DIR" ] && \
+       find "$OLD_DIR" -maxdepth 1 -type f \
+         \( -name '*-accepted.json' -o -name '*-received-unverified.json' \) \
+         -print -quit | grep -q .; then
+      echo "VANHAN debate-v1-istunnon vastauksia löytyy: $OLD_DIR"
+      echo "Pysäytetty varmuuden vuoksi; ensin on tarkistettava maksetut vastaukset."
+      exit 2
+    fi
+    DIR="$WORK/council72-sessions/debate-v2-$SESSION"
     echo "=== Enintään kolme maksullista GPT-kutsua: vastaväite, puolustus, yhteenveto ==="
     echo "=== Tarkistuspisteet: $DIR ==="
     PYTHONPATH="$ROOT/src" "$PY" -m klone.council72_debate \
@@ -114,7 +127,13 @@ if "role_count" in r:
     print("Arvioituja rooleja:",r["role_count"])
     print("Lexikaalisesti samankaltaisia pareja:",len(r["likely_lexical_overlaps"]))
     print("Lähdekorttien viittauskattavuus:",r["citation_coverage"])
+if "request_preflight" in r:
+    p = r["request_preflight"]
+    print("Mallisyötteen preflight:", p["cross_examination_body_bytes"],
+          "/", p["hard_request_limit_bytes"], "tavua")
+    print("Mukana asiantuntijarooleja:", p["retained_member_statements"])
 if "debate_turns" in r:
     print("Väittelykierroksia:",len(r["debate_turns"]))
     print("Päätös:",r["debate_turns"][-1]["answer"]["decision"])
+    print("Pyyntöjen koot:", [v["request_bytes"] for v in r["request_size_audit"]])
 PY

@@ -52,6 +52,10 @@ def _measures(text):
             value=Decimal(hit.group(1).replace(",","."))
         except InvalidOperation:
             continue
+        # A bare lowercase "k" can mean k-nearest neighbours in graph
+        # methods, not Kelvin. Only uppercase symbol "K" is a kelvin unit.
+        if hit.group(2)=="k":
+            continue
         unit=UNIT[hit.group(2).casefold()]
         normalized=format(value.normalize(),"f")
         key=(normalized,unit)

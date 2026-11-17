@@ -818,6 +818,8 @@ def main(argv=None):
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--live", action="store_true")
     mode.add_argument("--probe", action="store_true")
+    parser.add_argument("--resume-from-probe", type=Path)
+    parser.add_argument("--checkpoint-dir", type=Path)
     parser.add_argument("--owner-confirms-public-data", action="store_true")
     args = parser.parse_args(argv)
     try:
@@ -829,6 +831,8 @@ def main(argv=None):
             owner_confirms_public=args.owner_confirms_public_data,
             model=args.model,
             api_key=os.environ.get("OPENAI_API_KEY", ""),
+            seed_probe=args.resume_from_probe,
+            checkpoint_dir=args.checkpoint_dir,
         )
         write_new_report(
             args.output.expanduser(),
@@ -842,6 +846,7 @@ def main(argv=None):
         "kind": result["kind"], "mode": result["mode"],
         "model": result["model"],
         "model_api_requests_performed": result["model_api_requests_performed"],
+        "model_api_requests_reused": result.get("model_api_requests_reused", 0),
         "scientific_truth_verified": False,
         "memory_write": False,
         "output": str(args.output.expanduser()),

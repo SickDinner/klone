@@ -141,6 +141,7 @@ def suggest(core_db,manifest,*,per_source_limit=8):
         "kind":"klone-e11-2-evidence-review-candidates",
         "schema_version":1,
         "question":manifest["question"],
+        "per_source_limit":per_source_limit,
         "source_snapshot_sha256":validated["source_snapshot_sha256"],
         "source_event_ids":validated["source_event_ids"],
         "source_info":source_info,

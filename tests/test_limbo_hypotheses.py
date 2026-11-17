@@ -25,6 +25,7 @@ from klone.limbo_evidence_quality import audit_quality, main as quality_main
 from klone.limbo_evidence_verification_queue import build_queue,main as queue_main
 from klone.limbo_arxiv_primary import prepare as arxiv_prepare, fetch as arxiv_fetch, parse_atom, _source_ids, _atom_url_from_url, main as arxiv_main
 from klone.limbo_arxiv_abstract_compare import compare_abstracts, main as abstract_compare_main, _numbers
+from klone.limbo_evidence_cards import build_cards, main as cards_main, _measures
 from klone.council72 import catalog
 from klone.repository import KloneRepository
 
@@ -1466,6 +1467,102 @@ class E7E8Tests(unittest.TestCase):
             with patch("klone.limbo_arxiv_abstract_compare._source_ids",return_value=entries):
                 with self.assertRaises(SystemExit):
                     abstract_compare_main(args)
+        self.assertEqual(before,self.core.read_bytes())
+
+    def _e118_inputs(self):
+        original,proposals,selected,ledger,quality,queue,receipt,board,entries=self._e117_inputs()
+        with patch("klone.limbo_arxiv_abstract_compare.council_review",return_value=board):
+            with patch("klone.limbo_arxiv_abstract_compare._source_ids",return_value=entries):
+                comparison=compare_abstracts(self.core,original,proposals,selected,
+                                             ledger,quality,queue,receipt)
+        return (original,proposals,selected,ledger,quality,queue,receipt,
+                comparison,board,entries)
+
+    def test_e118_eight_document_replay_produces_only_pending_review_cards(self):
+        original,proposals,selected,ledger,quality,queue,receipt,comp,board,entries=self._e118_inputs()
+        before=self.core.read_bytes()
+        with patch("klone.limbo_arxiv_abstract_compare.council_review",return_value=board):
+            with patch("klone.limbo_arxiv_abstract_compare._source_ids",return_value=entries):
+                report=build_cards(self.core,original,proposals,selected,ledger,
+                                   quality,queue,receipt,comp)
+                self.assertEqual(report,build_cards(
+                    self.core,original,proposals,selected,ledger,
+                    quality,queue,receipt,comp))
+        self.assertEqual(report["kind"],"klone-e11-8-source-verification-cards")
+        self.assertEqual(report["card_count"],queue["primary_source_checks_needed"])
+        self.assertEqual(report["proposed_pending_council_tasks"],2*report["card_count"])
+        self.assertEqual(report["council_completed_reviews"],0)
+        self.assertEqual(report["scientifically_verified_claims"],0)
+        self.assertEqual(report["new_network_requests"],0)
+        self.assertFalse(any(report["authority"].values()))
+        self.assertEqual(report["e11_7_report_sha256"],comp["report_sha256"])
+        self.assertEqual(report["e11_6_receipt_sha256"],receipt["report_sha256"])
+        self.assertTrue(report["cards"])
+        for card in report["cards"]:
+            self.assertEqual(card["completed_review_count"],0)
+            self.assertFalse(card["scientific_claim_verified"])
+            self.assertFalse(card["not_found_in_abstract_is_disproof"])
+            self.assertEqual(len(card["verification_tasks"]),2)
+            self.assertTrue(all(t["status"]=="pending_no_agent_executed"
+                                for t in card["verification_tasks"]))
+        self.assertEqual(before,self.core.read_bytes())
+
+    def test_e118_numerical_units_do_not_promote_unrelated_matching_numbers(self):
+        fi=_measures("Parannus 13,7 prosentin sekä RMSE 0,997 kelvinin tasolla. "
+                     "Ero 31 prosenttiyksikköä, ja 3 k lähintä naapuria.")
+        en=_measures("The improvement was 13.7%, RMSE is 0.997 K. "
+                     "Also 31% compared to 31 percentage points.")
+        self.assertIn(("13.7","percent"),{(x["number"],x["unit"]) for x in fi})
+        self.assertIn(("0.997","kelvin"),{(x["number"],x["unit"]) for x in fi})
+        self.assertIn(("31","percentage_point"),{(x["number"],x["unit"]) for x in fi})
+        self.assertNotIn(("3","kelvin"),{(x["number"],x["unit"]) for x in fi})
+        self.assertIn(("13.7","percent"),{(x["number"],x["unit"]) for x in en})
+        self.assertIn(("0.997","kelvin"),{(x["number"],x["unit"]) for x in en})
+        self.assertIn(("31","percent"),{(x["number"],x["unit"]) for x in en})
+        self.assertNotEqual(("31","percentage_point"),("31","percent"))
+
+    def test_e118_tampered_comparison_or_receipt_cannot_create_cards(self):
+        from copy import deepcopy
+        original,proposals,selected,ledger,quality,queue,receipt,comp,board,entries=self._e118_inputs()
+        def run(r=receipt,c=comp):
+            with patch("klone.limbo_arxiv_abstract_compare.council_review",return_value=board):
+                with patch("klone.limbo_arxiv_abstract_compare._source_ids",return_value=entries):
+                    return build_cards(self.core,original,proposals,selected,
+                                       ledger,quality,queue,r,c)
+        bad=deepcopy(comp)
+        bad["comparisons"][0]["comparison_class"]="scientifically_verified"
+        with self.assertRaisesRegex(ValueError,"stale, tampered"):
+            run(c=bad)
+        bad=deepcopy(receipt)
+        bad["documents"][0]["abstract_sha256"]="0"*64
+        with self.assertRaises(ValueError):
+            run(r=bad)
+        bad=deepcopy(comp)
+        bad["source_event_ids"]=[24,26]
+        with self.assertRaisesRegex(ValueError,"stale, tampered"):
+            run(c=bad)
+
+    def test_e118_cli_new_export_does_not_overwrite_or_modify_db(self):
+        original,proposals,selected,ledger,quality,queue,receipt,comp,board,entries=self._e118_inputs()
+        payload={"original":original,"proposals":proposals,
+                 "selected":selected,"ledger":ledger,"quality":quality,
+                 "queue":queue,"receipt":receipt,"comparison":comp}
+        args=["--klone-db",str(self.core)]
+        for name,data in payload.items():
+            p=self.root/("e118-"+name+".json")
+            p.write_text(json.dumps(data))
+            args.extend(("--"+name,str(p)))
+        output=self.root/"e118-cards.json"
+        args.extend(("--output",str(output)))
+        before=self.core.read_bytes()
+        with patch("klone.limbo_arxiv_abstract_compare.council_review",return_value=board):
+            with patch("klone.limbo_arxiv_abstract_compare._source_ids",return_value=entries):
+                self.assertEqual(cards_main(args),0)
+                with self.assertRaises(SystemExit):
+                    cards_main(args)
+        actual=json.loads(output.read_text())
+        self.assertEqual(actual["card_count"],queue["primary_source_checks_needed"])
+        self.assertFalse(actual["memory_write"])
         self.assertEqual(before,self.core.read_bytes())
 
     def test_e10_readonly_council_workbench_endpoints(self):

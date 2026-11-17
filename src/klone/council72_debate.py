@@ -18,8 +18,8 @@ import os
 from pathlib import Path
 
 from .council72_intelligence_bridge import (
-    ALLOWED_MODELS, MODEL, CouncilModelError, _network_response,
-    _object, _array_of_strings, _text_schema, _stage_record,
+    ALLOWED_MODELS, MODEL, MAX_REQUEST_BYTES, CouncilModelError,
+    _network_response, _object, _array_of_strings, _text_schema, _stage_record,
 )
 from .council72_quality_lab import (
     _load, _validate_bundle, quality_assessment, debate_preview, evidence_tool
@@ -110,9 +110,46 @@ def _arbiter_check(answer, allowed_cards):
     _text_check(answer["independence_warning"], limit=900)
 
 
-def _compact_issues(report, audit):
-    # The adversarial model must actually SEE the original claims it challenges.
-    # Bound every source-derived sentence: ~64 seats, eight ring-level summaries.
+# The maximum public input payload budget is 48,000 bytes including
+# JSON schema, instructions, headers and UTF-8. Limits here are in
+# characters but acceptance is determined by the EXACT encoded byte count.
+# We preserve all 64 seat IDs and at least a short original observation
+# and challenge from each seat, even in the tightest profile.
+PROMPT_COMPACTION_VERSION = 2
+DEBATE_REQUEST_HEADROOM_BYTES = 1024
+DEBATE_PROFILES = (
+    {"observation": 130, "challenge": 95, "task": 75,
+     "finding_count": 2, "finding": 180, "counter": 160,
+     "open": 150, "uncertainty": 120, "source": 260,
+     "sources": 4, "founder": 440, "disagreement": 210,
+     "disagreement_count": 3},
+    {"observation": 95, "challenge": 65, "task": 60,
+     "finding_count": 2, "finding": 140, "counter": 125,
+     "open": 125, "uncertainty": 90, "source": 220,
+     "sources": 3, "founder": 350, "disagreement": 170,
+     "disagreement_count": 2},
+    {"observation": 65, "challenge": 45, "task": 50,
+     "finding_count": 1, "finding": 110, "counter": 100,
+     "open": 100, "uncertainty": 65, "source": 170,
+     "sources": 2, "founder": 250, "disagreement": 140,
+     "disagreement_count": 2},
+    {"observation": 35, "challenge": 25, "task": 30,
+     "finding_count": 1, "finding": 75, "counter": 70,
+     "open": 70, "uncertainty": 45, "source": 110,
+     "sources": 2, "founder": 130, "disagreement": 90,
+     "disagreement_count": 1},
+    {"observation": 16, "challenge": 12, "task": 20,
+     "finding_count": 1, "finding": 45, "counter": 35,
+     "open": 35, "uncertainty": 25, "source": 65,
+     "sources": 1, "founder": 70, "disagreement": 55,
+     "disagreement_count": 1},
+)
+
+
+def _compact_issues(report, audit, config):
+    """Round-robin bounded data, all 64 IDs and both original seat positions."""
+    tasks = {seat["member_id"]: seat["specialist_task"]
+             for seat in audit["role_assessments"]}
     summary = []
     for row, record in zip(audit["ring_diagnostics"], report["ring_calls"]):
         value = record["eight_seat_assessments"]
@@ -121,25 +158,175 @@ def _compact_issues(report, audit):
             "domain": row["domain"],
             "seat_statements_unverified": [
                 {"member_id": seat["member_id"],
-                 "assigned_task": next(
-                     x["specialist_task"] for x in audit["role_assessments"]
-                     if x["member_id"] == seat["member_id"]
-                 ),
-                 "observation": seat["observation"][:190],
-                 "challenge": seat["challenge"][:150]}
+                 "assigned_task": tasks[seat["member_id"]][:config["task"]],
+                 "observation": seat["observation"][:config["observation"]],
+                 "challenge": seat["challenge"][:config["challenge"]]}
                 for seat in value["seat_assessments"]
             ],
-            "findings_unverified": [v[:270] for v in value["findings"][:3]],
+            "findings_unverified": [
+                v[:config["finding"]] for v in value["findings"][
+                    :config["finding_count"]
+                ]
+            ],
             "counterarguments_unverified": [
-                v[:270] for v in value["counterarguments"][:3]
+                v[:config["counter"]] for v in value["counterarguments"][
+                    :config["finding_count"]
+                ]
             ],
             "open_questions_unverified": [
-                v[:240] for v in value["open_questions"][:3]
+                v[:config["open"]] for v in value["open_questions"][:1]
             ],
             "cited_source_card_ids": row["cited_cards"],
-            "uncertainty": row["uncertainty_note"][:250],
+            "uncertainty": row["uncertainty_note"][:config["uncertainty"]],
         })
     return summary
+
+
+def _compact_prior(stage_rows):
+    """Bound untrusted previous model responses before the next paid call."""
+    reduced = []
+    for turn in stage_rows:
+        answer = turn["answer"]
+        if turn["stage"] in ("cross_examination", "defense"):
+            summary = {
+                "stance": answer["stance"],
+                "role_focus_ids": answer["role_focus_ids"][:8],
+                "arguments": [
+                    {"claim": item["claim"][:170],
+                     "challenge_or_defense": item["challenge_or_defense"][:170],
+                     "falsification_test": item["falsification_test"][:170],
+                     "source_card_ids": item["source_card_ids"][:8]}
+                    for item in answer["arguments"][:3]
+                ],
+                "uncertainties": [
+                    x[:140] for x in answer["uncertainties"][:3]
+                ],
+            }
+        else:
+            raise CouncilModelError("unexpected earlier debate stage")
+        reduced.append({"stage": turn["stage"], "answer_unverified": summary})
+    return reduced
+
+
+def _balanced_card_ids(cards, max_cards):
+    """Deterministically sample diverse arXiv versions and discrepancy classes."""
+    selected = []
+    versions = sorted({x["arxiv_version"] for x in cards})
+    for version in versions:
+        found = next(
+            (c for c in cards if c["arxiv_version"] == version),
+            None,
+        )
+        if found is not None:
+            selected.append(found)
+    seen_classes = {x["discrepancy"] for x in selected}
+    for card in cards:
+        if len(selected) >= max_cards:
+            break
+        if (card not in selected and
+            card["discrepancy"] not in seen_classes):
+            selected.append(card)
+            seen_classes.add(card["discrepancy"])
+    for card in cards:
+        if len(selected) >= max_cards:
+            break
+        if card not in selected:
+            selected.append(card)
+    return selected[:max_cards]
+
+
+def _packet_for_profile(report, dossier, cards, audit, config):
+    # Only approved public local tool reads. Tools are NOT exposed to the
+    # model as callable actions. Receipts are retained in the final report.
+    sample = _balanced_card_ids(cards, config["sources"])
+    compact_reads = []
+    for card in sample:
+        receipt = evidence_tool(dossier, "card_lookup",
+                                card_id=card["card_id"])
+        record = receipt["result"]["card"]
+        compact_reads.append({
+            "tool": "card_lookup",
+            "card_id": record["card_id"],
+            "arxiv_version": record["arxiv_version"],
+            "discrepancy": record["discrepancy"],
+            "excerpt_untrusted": record["excerpt_untrusted"][:config["source"]],
+            "source_report_sha256": dossier["report_sha256"],
+        })
+    counts = evidence_tool(dossier, "discrepancy_counts")
+    return {
+        "user_question": report["question"],
+        "input_report_sha256": report["report_sha256"],
+        "member_ids_allowed": sorted(
+            m["member_id"] for m in audit["role_assessments"]
+        ) + sorted(m["member_id"] for m in audit["founder_positions"]),
+        "source_card_ids_allowed": sorted(c["card_id"] for c in cards),
+        "ring_context_unverified": _compact_issues(report, audit, config),
+        "founder_synthesis_unverified":
+            audit["founder_synthesis"][:config["founder"]],
+        "founder_disagreements_unverified": [
+            v[:config["disagreement"]]
+            for v in audit["explicit_founder_disagreements"][
+                :config["disagreement_count"]
+            ]
+        ],
+        "local_read_only_tool_results": compact_reads + [{
+            "tool": "discrepancy_counts",
+            "result": counts["result"],
+            "source_report_sha256": dossier["report_sha256"],
+        }],
+        "scientifically_verified": False,
+        "prompt_compaction_version": PROMPT_COMPACTION_VERSION,
+    }
+
+
+def _exact_request_size(model, instructions, payload, schema):
+    """Match the production serializer exactly, including UTF-8 + schema."""
+    message = {
+        "model": model, "instructions": instructions,
+        "input": [{"role": "user", "content": payload}],
+        "tools": [], "store": False,
+        "max_output_tokens": 3400,
+        "reasoning": {
+            "effort": "none" if model == "gpt-6-luna" else "low"
+        },
+        "text": {"format": {
+            "type": "json_schema", "name": "klone_council72_v1",
+            "strict": True, "schema": schema,
+        }},
+    }
+    return len(json.dumps(message, ensure_ascii=False).encode("utf-8"))
+
+
+def _budgeted_stage(stage, model, schema, report, dossier, cards, audit,
+                    prior_rows):
+    """Choose most informative fit for this stage. No network or retry."""
+    prior = _compact_prior(prior_rows)
+    sizes = []
+    for index, config in enumerate(DEBATE_PROFILES):
+        packet = _packet_for_profile(report, dossier, cards, audit, config)
+        instructions, payload = _prompt(stage, packet, prior)
+        count = _exact_request_size(model, instructions, payload, schema)
+        sizes.append(count)
+        if count <= MAX_REQUEST_BYTES - DEBATE_REQUEST_HEADROOM_BYTES:
+            return {
+                "instructions": instructions,
+                "payload": payload,
+                "request_bytes": count,
+                "size_limit_bytes": MAX_REQUEST_BYTES,
+                "profile": index,
+                "retained_seat_ids": sum(
+                    len(x["seat_statements_unverified"])
+                    for x in packet["ring_context_unverified"]
+                ),
+                "tool_receipt_count":
+                    len(packet["local_read_only_tool_results"]),
+            }
+    raise CouncilModelError(
+        "debate input too large even with minimum profile: "
+        f"bytes={sizes[-1]}, cap={MAX_REQUEST_BYTES}, "
+        "no model request attempted"
+    )
+
 
 
 def _prompt(stage, packet, prior=None):

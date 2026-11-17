@@ -23,7 +23,8 @@ from klone.council72_quality_lab import (
 )
 from klone.council72_debate import (
     APPROVAL, PUBLIC_CONFIRM, TURN_SCHEMA, ARBITER_SCHEMA,
-    _arbiter_check, _turn_check, run_debate, main as debate_main
+    _arbiter_check, _turn_check, _exact_request_size,
+    _budgeted_stage, run_debate, main as debate_main
 )
 from klone.limbo_council_workbench import _fingerprint
 
@@ -196,9 +197,17 @@ class QualityAndDebateTests(unittest.TestCase):
         self.assertEqual(len(preview["eight_ring_debate_axes"]), 8)
         self.assertEqual(len(preview["role_specialist_topics"]), 64)
         self.assertIn("card_lookup", preview["tools_available_read_only"])
-        self.assertEqual(run_debate(
-            self.report, self.evidence
-        ), preview)
+        checked = run_debate(self.report, self.evidence)
+        self.assertEqual(checked["mode"], preview["mode"])
+        self.assertEqual(checked["role_specialist_topics"],
+                         preview["role_specialist_topics"])
+        self.assertEqual(
+            checked["request_preflight"]["retained_member_statements"], 64
+        )
+        self.assertLess(
+            checked["request_preflight"]["cross_examination_body_bytes"],
+            checked["request_preflight"]["hard_request_limit_bytes"]
+        )
 
     def test_live_debate_requires_separate_approval_and_bound_checkpoint_dir(self):
         with self.assertRaisesRegex(PermissionError, "public-data"):
@@ -273,6 +282,130 @@ class QualityAndDebateTests(unittest.TestCase):
                 )
             self.assertEqual(again["model_api_requests_performed"], 0)
             self.assertEqual(again["model_api_responses_reused"], 3)
+
+    def test_utf8_heavy_realistic_council_inputs_fit_all_three_requests(self):
+        # Reproduce why Android failed: original 64*2 long statements plus
+        # 8 rings of many long findings once exceeded the 48-kB body limit.
+        # Multi-byte UTF-8 gives a stronger test than ASCII lorem ipsum.
+        def very_long_sender(model, instructions, text, schema, api_key, max_tokens):
+            info = json.loads(text)
+            usage = {"input_tokens": 650, "output_tokens": 1100,
+                     "total_tokens": 1750}
+            if schema is RING_SCHEMA:
+                ids = [x["member_id"] for x in info["eight_distinct_roles"]]
+                item = fake_ring(info["ring_id"], ids)
+                for seat in item["seat_assessments"]:
+                    seat["observation"] = "ä" * 850
+                    seat["challenge"] = "ö" * 850
+                for key in ("findings", "counterarguments", "open_questions"):
+                    item[key] = ["é" * 850] * 8
+                item["uncertainty_note"] = "ù" * 1050
+                return item, usage, "verbose-ring-" + str(info["ring_id"])
+            if schema is FOUNDER_SCHEMA:
+                item = fake_founders([
+                    x["member_id"] for x in info["eight_founders"]
+                ])
+                item["synthesis"] = "á" * 1900
+                return item, usage, "verbose-founders"
+            raise AssertionError("unexpected council request")
+
+        with patch.dict(os.environ, {
+            "KLONE_COUNCIL72_API_APPROVAL": API_APPROVAL
+        }):
+            report = run_council(
+                self.report["question"], self.evidence,
+                live=True, owner_confirms_public=True, api_key="mock-key",
+                network_sender=very_long_sender
+            )
+        preview = run_debate(report, self.evidence)
+        self.assertEqual(
+            preview["request_preflight"]["retained_member_statements"], 64
+        )
+        self.assertLess(
+            preview["request_preflight"]["cross_examination_body_bytes"],
+            48_000
+        )
+        observed_bytes = []
+        observed_member_sets = []
+        def sender(model, instructions, text, schema, api_key, output_tokens):
+            count = _exact_request_size(model, instructions, text, schema)
+            observed_bytes.append(count)
+            data = json.loads(text)
+            observed_member_sets.append({
+                v["member_id"] for ring in data["ring_context_unverified"]
+                for v in ring["seat_statements_unverified"]
+            })
+            self.assertLessEqual(count, 48_000 - 1024)
+            if schema is ARBITER_SCHEMA:
+                ans = fake_referee()
+                for key in (
+                    "improved_claims", "unresolved_disputes",
+                    "falsifiable_next_tests"
+                ):
+                    ans[key] = ["é" * 800] * 8
+                return ans, {"input_tokens": 3500, "output_tokens": 2200,
+                             "total_tokens": 5700}, "referee"
+            stance = ("cross_examination" if len(observed_bytes) == 1
+                      else "defense")
+            ans = fake_debate_turn(stance, sorted(self.members))
+            ans["arguments"] = [
+                {**ans["arguments"][0],
+                 "claim": "ä" * 800,
+                 "challenge_or_defense": "ö" * 800,
+                 "falsification_test": "é" * 800}
+                for _ in range(6)
+            ]
+            ans["uncertainties"] = ["ù" * 800] * 6
+            return ans, {"input_tokens": 3300, "output_tokens": 2600,
+                         "total_tokens": 5900}, "debate-stage"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {
+                "KLONE_COUNCIL72_DEBATE_APPROVAL": APPROVAL,
+                "KLONE_COUNCIL72_CONFIRM_PUBLIC": PUBLIC_CONFIRM
+            }):
+                result = run_debate(
+                    report, self.evidence, live=True,
+                    owner_confirms_public=True, api_key="mock-key",
+                    checkpoint_dir=Path(tmp)/"v2-stage-records",
+                    network_sender=sender
+                )
+        self.assertEqual(len(observed_bytes), 3)
+        self.assertEqual(
+            set(observed_member_sets[0]), observed_member_sets[1]
+        )
+        self.assertTrue(all(
+            len(ids) == 64 for ids in observed_member_sets
+        ))
+        self.assertEqual(result["model_api_requests_performed"], 3)
+        self.assertEqual(
+            [e["request_bytes"] for e in result["request_size_audit"]],
+            observed_bytes
+        )
+        self.assertEqual(result["prompt_compaction_version"], 2)
+        self.assertFalse(result["scientific_truth_verified"])
+        self.assertFalse(result["memory_write"])
+
+    def test_preflight_fails_closed_without_api_for_extreme_payload(self):
+        # An input that genuinely cannot fit even minimum profile must
+        # NEVER be partially billed before we can report its size.
+        report = deepcopy(self.report)
+        report["question"] = "är" * 400
+        report["report_sha256"] = _fingerprint({
+            k: v for k, v in report.items() if k != "report_sha256"
+        })
+        # Modified question invalidates every ring request hash. The
+        # validator must reject it before a new model call.
+        with patch.dict(os.environ, {
+            "KLONE_COUNCIL72_DEBATE_APPROVAL": APPROVAL,
+            "KLONE_COUNCIL72_CONFIRM_PUBLIC": PUBLIC_CONFIRM
+        }):
+            with self.assertRaisesRegex(CouncilModelError, "request"):
+                run_debate(
+                    report, self.evidence, live=True,
+                    owner_confirms_public=True, api_key="mock-key",
+                    checkpoint_dir="invalid-evidence"
+                )
 
     def test_fabricated_source_or_role_rejected(self):
         valid = fake_debate_turn("cross_examination", sorted(self.members))

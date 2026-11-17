@@ -19,6 +19,7 @@ from klone.limbo_intelligence import analyze,_memories
 from klone.limbo_council_workbench import council_review,council_all
 from klone.limbo_doctor import diagnose,_read_health
 from klone.limbo_evidence_review import prepare,review_manifest,fill_template,main as evidence_main
+from klone.limbo_evidence_candidates import suggest, main as candidate_main
 from klone.council72 import catalog
 from klone.repository import KloneRepository
 
@@ -767,6 +768,107 @@ class E7E8Tests(unittest.TestCase):
         self.assertTrue(prepared["sources"]["A"]["title"])
         self.assertIn(prepared["sources"]["A"]["source_class"],
                       ("research_preprint","indexed_research","news_or_reference_feed"))
+        self.assertEqual(before,self.core.read_bytes())
+
+    def test_e112_candidates_are_verbatim_and_reviewer_tasks_are_unperformed(self):
+        manifest=self._e11_manifest()
+        before=self.core.read_bytes()
+        result=suggest(self.core,manifest,per_source_limit=3)
+        self.assertEqual(result["kind"],"klone-e11-2-evidence-review-candidates")
+        self.assertTrue(2<=result["candidate_count"]<=6)
+        self.assertEqual(result["council_completed_reviews"],0)
+        self.assertEqual(result["council_vote_count"],0)
+        self.assertEqual(result["reviewer_assignment_state"],"proposed_not_performed")
+        self.assertFalse(result["source_texts_embedded"])
+        self.assertFalse(any(result["authority"].values()))
+        self.assertEqual(result["annotation_count"],0)
+        self.assertEqual(result,suggest(self.core,manifest,per_source_limit=3))
+        ids={m["id"] for m in catalog()["members"]}
+        for c in result["candidates"]:
+            source=manifest["sources"][c["source"]]["text"]
+            self.assertEqual(
+                source[c["char_start"]:c["char_end"]],c["quote"])
+            self.assertEqual(source.count(c["quote"]),1)
+            self.assertIn(c["proposed_reviewer"]["member_id"],ids)
+            self.assertEqual(c["proposed_reviewer"]["state"],
+                             "pending_not_executed")
+            self.assertEqual(c["suggested_stance"],"context")
+            self.assertTrue(c["quote_matched_owner_text"])
+            self.assertFalse(c["quote_authenticated_against_publisher"])
+            self.assertFalse(c["scientific_truth_verified"])
+            self.assertFalse(c["review_completed"])
+        self.assertEqual(self.core.read_bytes(),before)
+        self.assertEqual(manifest["annotations"],[])
+
+    def test_e112_summary_is_not_automatically_authentic_primary_evidence(self):
+        manifest=self._e11_manifest()
+        manifest["sources"]["A"]["usage_rights_note"] = (
+            "Omistajan toimittama lähdeselostus, ei varmennettu kokoteksti")
+        manifest["sources"]["B"]["usage_rights_note"] = (
+            "AI-generated summary, not an authenticated paper")
+        report=suggest(self.core,manifest)
+        self.assertEqual(report["source_info"]["A"]["content_origin"],
+                         "owner_declared_summary_unverified")
+        self.assertEqual(report["source_info"]["B"]["content_origin"],
+                         "owner_declared_summary_unverified")
+        for role in ("A","B"):
+            self.assertFalse(report["source_info"][role][
+                "publisher_full_text_authenticated"])
+        self.assertTrue(all(not x["scientific_truth_verified"]
+                            for x in report["candidates"]))
+
+    def test_e112_rejects_fake_provenance_missing_consent_and_unsafe_limits(self):
+        manifest=self._e11_manifest()
+        for limit in (0,13,True):
+            with self.assertRaises(ValueError):
+                suggest(self.core,manifest,per_source_limit=limit)
+        manifest["source_snapshot_sha256"]="x"*64
+        with self.assertRaisesRegex(ValueError,"stale"):
+            suggest(self.core,manifest)
+        manifest=self._e11_manifest()
+        manifest["sources"]["B"]["owner_supplied"]=False
+        with self.assertRaisesRegex(ValueError,"owner-supplied"):
+            suggest(self.core,manifest)
+        manifest=self._e11_manifest()
+        manifest["sources"]["A"]["receipt_sha256"]="0"*64
+        with self.assertRaisesRegex(ValueError,"provenance mismatch"):
+            suggest(self.core,manifest)
+
+    def test_e112_skips_ambiguous_duplicate_phrases_in_local_text(self):
+        manifest=self._e11_manifest()
+        repeated="Methods: This method is only a demonstration."
+        manifest["sources"]["A"]["text"]=(
+            repeated+" "+repeated+" Unique result: A genetic experiment is described."
+        )
+        report=suggest(self.core,manifest,per_source_limit=8)
+        self.assertTrue(report["candidates"])
+        self.assertFalse(any(repeated==c["quote"] for c in report["candidates"]))
+        self.assertEqual(
+            [c["source"] for c in report["candidates"] if c["source"]=="A"],
+            sorted(c["source"] for c in report["candidates"] if c["source"]=="A"))
+
+    def test_e112_cli_generates_only_new_offline_proposal_report(self):
+        manifest=self._e11_manifest()
+        owner=self.root/"e112-manifest.json"
+        outfile=self.root/"e112-suggestions.json"
+        owner.write_text(json.dumps(manifest))
+        before=self.core.read_bytes()
+        result=candidate_main([
+            "--klone-db",str(self.core),"--manifest",str(owner),
+            "--per-source-limit","4","--output",str(outfile),
+        ])
+        self.assertEqual(result,0)
+        parsed=json.loads(outfile.read_text())
+        self.assertEqual(parsed["schema_version"],1)
+        self.assertGreaterEqual(parsed["candidate_count"],2)
+        self.assertFalse(parsed["authority"]["memory_write"])
+        self.assertTrue(all(c["source_text_sha256"] for c in parsed["candidates"]))
+        self.assertEqual(before,self.core.read_bytes())
+        with self.assertRaises(SystemExit):
+            candidate_main([
+                "--klone-db",str(self.core),"--manifest",str(owner),
+                "--output",str(outfile),
+            ])
         self.assertEqual(before,self.core.read_bytes())
 
     def test_e10_readonly_council_workbench_endpoints(self):

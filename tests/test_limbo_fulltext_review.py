@@ -164,6 +164,9 @@ class E119Tests(unittest.TestCase):
             bad["cards"][1]["original_publication_url"] = (
                 "https://arxiv.org/abs/" + self.ids["A"]
             )
+            bad["report_sha256"] = _fingerprint({
+                key: val for key, val in bad.items() if key != "report_sha256"
+            })
             replay.return_value = bad
             with self.assertRaisesRegex(ValueError, "duplicate"):
                 review_fulltexts(

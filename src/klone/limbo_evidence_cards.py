@@ -24,8 +24,9 @@ MAX_CARDS=40
 # 0.997 kelvin with 0.997% just because the digits overlap.
 MEASURE=re.compile(
     r"(?<![\w.,])(\d{1,6}(?:[.,]\d{1,6})?)\s*"
-    r"(%|prosenttia|prosentin|prosenttiyksikköä|prosenttiyksikön|"
-    r"prosenttiyksikkö|percent|percentage|kelviniä|kelvinin|kelvin|K)"
+    r"(%|prosenttiyksikköä|prosenttiyksikön|prosenttiyksikkö|"
+    r"percentage points|percentage point|prosenttia|prosentin|"
+    r"percent|percentage|kelviniä|kelvinin|kelvin|K)"
     r"(?![\w])",
     re.IGNORECASE,
 )
@@ -35,6 +36,8 @@ UNIT={
     "prosenttiyksikkö":"percentage_point",
     "prosenttiyksikköä":"percentage_point",
     "prosenttiyksikön":"percentage_point",
+    "percentage point":"percentage_point",
+    "percentage points":"percentage_point",
     "kelviniä":"kelvin","kelvinin":"kelvin","kelvin":"kelvin","k":"kelvin",
 }
 PRIORITY={

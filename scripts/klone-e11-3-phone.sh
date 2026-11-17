@@ -39,6 +39,11 @@ print("Ehdotettuja asiayhteyslainauksia:",data.get("candidate_count"))
 for role in ("A","B"):
     info=data["source_info"][role]
     print("Lähde",role,":",info["content_origin"])
+for idx,item in enumerate(data["candidates"],1):
+    print(f"\nEHDOKAS {idx}: {item['candidate_id']}")
+    print("Lähde:",item["source"],"Aihe:",item["topic_for_review"])
+    print("Ehdotettu tarkistaja:",item["proposed_reviewer"]["member_name"])
+    print("TEKSTIKATKELMA:",item["quote"])
 print("HUOM: paikalliset selostukset EIVÄT ole varmennettuja alkuperäisjulkaisuja.")
 print("Tämä lisää vain kontekstimerkinnät. 0 tutkimuspäätöstä, 0 neuvostoääntä.")
 PY

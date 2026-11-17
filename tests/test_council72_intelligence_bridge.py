@@ -184,7 +184,7 @@ class BridgeTests(unittest.TestCase):
             _validate_founders(valid, self.model["founder_ids"], {"card-1"})
         invalid = fake_founders(self.model["founder_ids"])
         invalid["decision"] = "publish"
-        with self.assertRaisesRegex(CouncilModelError, "model response"):
+        with self.assertRaisesRegex(CouncilModelError, "cannot approve"):
             _validate_founders(invalid, self.model["founder_ids"], {"card-1"})
 
     def test_changed_evidence_fail_closed_before_any_model_call(self):

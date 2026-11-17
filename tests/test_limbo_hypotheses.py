@@ -20,6 +20,7 @@ from klone.limbo_council_workbench import council_review,council_all
 from klone.limbo_doctor import diagnose,_read_health
 from klone.limbo_evidence_review import prepare,review_manifest,fill_template,main as evidence_main
 from klone.limbo_evidence_candidates import suggest, main as candidate_main
+from klone.limbo_evidence_accept import accept_context, main as accept_main
 from klone.council72 import catalog
 from klone.repository import KloneRepository
 
@@ -870,6 +871,96 @@ class E7E8Tests(unittest.TestCase):
                 "--output",str(outfile),
             ])
         self.assertEqual(before,self.core.read_bytes())
+
+    def test_e113_explicit_selection_creates_only_owner_context_annotations(self):
+        manifest=self._e11_manifest()
+        proposals=suggest(self.core,manifest,per_source_limit=4)
+        ids=[c["candidate_id"] for c in proposals["candidates"][:3]]
+        before=self.core.read_bytes()
+        with self.assertRaisesRegex(ValueError,"owner must explicitly"):
+            accept_context(self.core,manifest,proposals,ids)
+        selected=accept_context(
+            self.core,manifest,proposals,ids,
+            owner_confirms_selection=True)
+        self.assertEqual(selected["annotations"][0]["stance"],"context")
+        self.assertEqual([a["stance"] for a in selected["annotations"]],
+                         ["context"]*len(ids))
+        self.assertEqual(selected["e11_context_selection"]["selected_candidate_ids"],ids)
+        self.assertFalse(selected["e11_context_selection"]["scientific_truth_verified"])
+        self.assertFalse(selected["e11_context_selection"]["council_review_completed"])
+        self.assertEqual(manifest["annotations"],[])
+        report=review_manifest(self.core,selected)
+        self.assertEqual(report["annotation_count"],len(ids))
+        self.assertEqual(report["epistemic_state"],"owner_annotated_not_verified")
+        self.assertEqual(report["opposing_annotation_candidates"],[])
+        self.assertEqual(report["council_state"]["completed_reviews"],0)
+        self.assertFalse(any(report["authority"].values()))
+        self.assertEqual(before,self.core.read_bytes())
+
+    def test_e113_tampered_proposals_forged_quote_and_stale_origin_denied(self):
+        from copy import deepcopy
+        manifest=self._e11_manifest()
+        proposals=suggest(self.core,manifest)
+        ids=[proposals["candidates"][0]["candidate_id"]]
+        changed=deepcopy(proposals)
+        changed["candidates"][0]["quote"]="Unverified fabricated evidence"
+        with self.assertRaisesRegex(ValueError,"stale or altered"):
+            accept_context(self.core,manifest,changed,ids,
+                           owner_confirms_selection=True)
+        changed=deepcopy(proposals)
+        changed["candidates"][0]["proposed_reviewer"]["member_id"]=1234567
+        with self.assertRaisesRegex(ValueError,"stale or altered"):
+            accept_context(self.core,manifest,changed,ids,
+                           owner_confirms_selection=True)
+        changed=deepcopy(manifest)
+        changed["sources"]["A"]["text"]+=" Extra sentence was added."
+        with self.assertRaisesRegex(ValueError,"stale or altered"):
+            accept_context(self.core,changed,proposals,ids,
+                           owner_confirms_selection=True)
+        with self.assertRaisesRegex(ValueError,"unknown candidate"):
+            accept_context(self.core,manifest,proposals,["deadbeef"],
+                           owner_confirms_selection=True)
+        with self.assertRaisesRegex(ValueError,"distinct"):
+            accept_context(self.core,manifest,proposals,ids*2,
+                           owner_confirms_selection=True)
+        with self.assertRaisesRegex(ValueError,"distinct"):
+            accept_context(self.core,manifest,proposals,[],
+                           owner_confirms_selection=True)
+        changed=deepcopy(manifest)
+        changed["annotations"]=[{"not":"empty"}]
+        with self.assertRaisesRegex(ValueError,"unannotated"):
+            accept_context(self.core,changed,proposals,ids,
+                           owner_confirms_selection=True)
+
+    def test_e113_cli_no_consent_no_write_and_successful_review_chain(self):
+        manifest=self._e11_manifest()
+        proposal=suggest(self.core,manifest)
+        root=self.root
+        source=root/"e11-3-input.json"
+        candidates=root/"e11-3-proposals.json"
+        selected=root/"e11-3-selected.json"
+        checked=root/"e11-3-reviewed.json"
+        source.write_text(json.dumps(manifest))
+        candidates.write_text(json.dumps(proposal))
+        base=["--klone-db",str(self.core),"--manifest",str(source),
+              "--proposals",str(candidates),"--all-context",
+              "--output",str(selected)]
+        before=self.core.read_bytes()
+        with self.assertRaises(SystemExit):
+            accept_main(base)
+        self.assertFalse(selected.exists())
+        self.assertEqual(accept_main(base+[
+            "--owner-confirms-candidate-selection"]),0)
+        approved=json.loads(selected.read_text())
+        self.assertEqual(len(approved["annotations"]),proposal["candidate_count"])
+        self.assertEqual(evidence_main([
+            "--klone-db",str(self.core),"--review",str(selected),
+            "--output",str(checked)]),0)
+        report=json.loads(checked.read_text())
+        self.assertEqual(report["annotation_count"],proposal["candidate_count"])
+        self.assertFalse(report["authority"]["scientific_truth_verified"])
+        self.assertEqual(report["council_state"]["recorded_votes"],0)
+        self.assertEqual(self.core.read_bytes(),before)
 
     def test_e10_readonly_council_workbench_endpoints(self):
         import os

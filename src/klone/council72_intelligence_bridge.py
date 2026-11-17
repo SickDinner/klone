@@ -417,6 +417,194 @@ def _network_response(model, instructions, text, schema, api_key, max_output_tok
         raise CouncilModelError("malformed model output or invalid JSON") from None
 
 
+def _request_digest(instruction, text):
+    return sha256((instruction + "\n" + text).encode("utf-8")).hexdigest()
+
+
+def _valid_ring_record(record, ring, pair, members, allowed_ids):
+    """Check stored/returned model data. A fingerprint is NOT a signature."""
+    _check_exact_fields(record, {
+        "ring_id", "eight_seat_assessments", "api_response_id", "usage",
+        "request_sha256", "response_sha256", "model_generated_not_verified",
+    })
+    if (type(record["ring_id"]) is not int or
+        record["ring_id"] != ring["id"] or
+        record["request_sha256"] != _request_digest(*pair) or
+        record["model_generated_not_verified"] is not True or
+        type(record["api_response_id"]) is not str or
+        len(record["api_response_id"]) > 128):
+        raise CouncilModelError("ring checkpoint does not match current request")
+    _validate_seats(record["eight_seat_assessments"], members, ring, allowed_ids)
+    if record["response_sha256"] != _fingerprint(record["eight_seat_assessments"]):
+        raise CouncilModelError("ring checkpoint model response checksum mismatch")
+    usage = record["usage"]
+    if type(usage) is not dict or set(usage) != {
+        "input_tokens", "output_tokens", "total_tokens"
+    } or any(type(v) is not int or not 0 <= v <= 1_000_000
+             for v in usage.values()):
+        raise CouncilModelError("ring checkpoint token usage invalid")
+
+
+def _valid_founder_record(record, prompt, board, allowed_ids):
+    _check_exact_fields(record, {
+        "founder_synthesis", "founder_api_response_id", "founder_usage",
+        "founder_request_sha256", "founder_response_sha256",
+    })
+    if (record["founder_request_sha256"] != _request_digest(*prompt) or
+        type(record["founder_api_response_id"]) is not str or
+        len(record["founder_api_response_id"]) > 128):
+        raise CouncilModelError("founder checkpoint request mismatch")
+    _validate_founders(record["founder_synthesis"], board["founder_ids"], allowed_ids)
+    if record["founder_response_sha256"] != _fingerprint(record["founder_synthesis"]):
+        raise CouncilModelError("founder checkpoint response checksum mismatch")
+    usage = record["founder_usage"]
+    if (type(usage) is not dict or
+        set(usage) != {"input_tokens", "output_tokens", "total_tokens"} or
+        any(type(v) is not int or not 0 <= v <= 1_000_000
+            for v in usage.values())):
+        raise CouncilModelError("founder checkpoint token usage invalid")
+
+
+def _checkpoint_context(dossier, board, question, model):
+    return {
+        "e11_11_report_sha256": dossier["report_sha256"],
+        "catalog_sha256": _fingerprint(board),
+        "question_sha256": sha256(question.strip().encode("utf-8")).hexdigest(),
+        "model": model,
+    }
+
+
+def _checkpoint_doc(stage, state, context, data):
+    doc = {
+        "kind": "klone-council72-local-response-checkpoint",
+        "schema_version": 1,
+        "stage": stage,
+        "state": state,
+        "context": context,
+        "payload": data,
+        "model_generated_not_verified": True,
+        "memory_write": False,
+    }
+    doc["report_sha256"] = _fingerprint(doc)
+    return doc
+
+
+def _load_checkpoint(path, stage, state, context):
+    doc = json_object(_read_input(path, MAX_MANIFEST_BYTES,
+                                  "Council72 " + stage + " checkpoint"))
+    if (doc.get("kind") != "klone-council72-local-response-checkpoint" or
+        doc.get("schema_version") != 1 or
+        doc.get("stage") != stage or doc.get("state") != state or
+        doc.get("context") != context or
+        doc.get("memory_write") is not False or
+        doc.get("model_generated_not_verified") is not True or
+        doc.get("report_sha256") != _fingerprint({
+            k:v for k,v in doc.items() if k != "report_sha256"
+        })):
+        raise CouncilModelError(
+            f"checkpoint {stage} identity or fingerprint mismatch; no API request"
+        )
+    return doc["payload"]
+
+
+def _save_checkpoint(path, stage, state, context, payload):
+    record = _checkpoint_doc(stage, state, context, payload)
+    write_new_report(
+        path, json.dumps(record, ensure_ascii=False, indent=2,
+                         allow_nan=False) + "\n", Path.cwd().resolve()
+    )
+
+
+def _validated_probe_seed(path, question, dossier, board, members,
+                          allowed_ids, model, pair):
+    """Use an owner-approved, already PAID ring-1 result, no API request."""
+    probe = json_object(_read_input(Path(path).expanduser(),
+                                    MAX_MANIFEST_BYTES, "Council72 probe seed"))
+    if (probe.get("kind") != "klone-council72-intelligence-bridge-v1" or
+        probe.get("schema_version") != SCHEMA_VERSION or
+        probe.get("mode") != "api_one_ring_probe_completed" or
+        probe.get("report_sha256") != _fingerprint({
+            k:v for k,v in probe.items() if k != "report_sha256"
+        }) or
+        probe.get("model") != model or
+        probe.get("e11_11_report_sha256") != dossier["report_sha256"] or
+        probe.get("catalog_sha256") != _fingerprint(board) or
+        probe.get("question") != question.strip() or
+        probe.get("model_api_requests_performed") != 1 or
+        probe.get("planned_api_requests") != 1 or
+        probe.get("owner_review_required") is not True or
+        probe.get("scientific_truth_verified") is not False or
+        probe.get("memory_write") is not False or
+        probe.get("council_binding_votes") != 0 or
+        type(probe.get("ring_calls")) is not list or
+        len(probe["ring_calls"]) != 1):
+        raise CouncilModelError(
+            "probe seed does not match this model, public source, question or council"
+        )
+    record = probe["ring_calls"][0]
+    _valid_ring_record(record, board["rings"][0], pair, members, allowed_ids)
+    return record
+
+
+def _stage_record(stage, state_dir, context, validator, generate,
+                  *, seed=None):
+    """Resume accepted or received responses before ever billing again.
+
+    A successfully received but locally rejected model answer is kept in a
+    separate unverified file for offline re-validation. Never regenerate it
+    automatically or silently trust it.
+    """
+    if state_dir is None:
+        record = seed if seed is not None else generate()
+        validator(record)
+        return record, seed is None
+
+    directory = Path(state_dir).expanduser()
+    if directory.exists() and (not directory.is_dir() or directory.is_symlink()):
+        raise CouncilModelError("checkpoint location is not a normal directory")
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    accepted_path = directory / (stage + "-accepted.json")
+    received_path = directory / (stage + "-received-unverified.json")
+
+    if accepted_path.exists():
+        record = _load_checkpoint(accepted_path, stage, "accepted", context)
+        validator(record)
+        if seed is not None and record != seed:
+            raise CouncilModelError("ring-1 checkpoint differs from approved probe")
+        if received_path.exists():
+            received = _load_checkpoint(
+                received_path, stage, "received_unverified", context
+            )
+            if received != record:
+                raise CouncilModelError(
+                    "received and accepted stage data disagree; no API request"
+                )
+        return record, False
+
+    if received_path.exists():
+        record = _load_checkpoint(
+            received_path, stage, "received_unverified", context
+        )
+        # Important: if validation rejects it again, do not request a
+        # replacement with another billable API call.
+        validator(record)
+        _save_checkpoint(accepted_path, stage, "accepted", context, record)
+        return record, False
+
+    if seed is not None:
+        validator(seed)
+        _save_checkpoint(accepted_path, stage, "accepted", context, seed)
+        return seed, False
+
+    record = generate()  # EXACTLY ONE network request, never retried
+    _save_checkpoint(
+        received_path, stage, "received_unverified", context, record
+    )
+    validator(record)
+    _save_checkpoint(accepted_path, stage, "accepted", context, record)
+    return record, True
+
+
 def run_council(question, dossier, *, live=False, probe=False,
                 owner_confirms_public=False, model=MODEL, api_key="",
                 network_sender=None):

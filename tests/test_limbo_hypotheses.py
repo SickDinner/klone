@@ -1519,6 +1519,7 @@ class E7E8Tests(unittest.TestCase):
         self.assertIn(("13.7","percent"),{(x["number"],x["unit"]) for x in en})
         self.assertIn(("0.997","kelvin"),{(x["number"],x["unit"]) for x in en})
         self.assertIn(("31","percent"),{(x["number"],x["unit"]) for x in en})
+        self.assertIn(("31","percentage_point"),{(x["number"],x["unit"]) for x in en})
         self.assertNotEqual(("31","percentage_point"),("31","percent"))
 
     def test_e118_tampered_comparison_or_receipt_cannot_create_cards(self):

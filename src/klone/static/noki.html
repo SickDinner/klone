@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d121b">
+  <title>Noki v0.4 | KLONE Grimoire</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,-apple-system,Arial,sans-serif;background:#0d121b;color:#e8f8fa}
+    *{box-sizing:border-box}body{margin:0;min-height:100dvh;background:radial-gradient(circle at 50% 21%,#1b3641 0,#101b27 42%,#0b1019 100%)}
+    main{max-width:740px;margin:auto;padding:16px 16px calc(28px + env(safe-area-inset-bottom))}
+    header,.toolbar,.panel-head,.actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    header{padding:12px 0 18px}.eyebrow{color:#72cfce;text-transform:uppercase;letter-spacing:.18em;font-size:.72rem;font-weight:800}
+    h1{font-size:1.7rem;margin:2px 0 0}h2{font-size:1.05rem;margin:0 0 8px}p{line-height:1.5}.muted{color:#9fb6c0;font-size:.88rem}
+    a{color:#8be7e1}button,.file-label{background:#233b48;border:1px solid #3b6572;border-radius:12px;color:#ecfbfc;padding:12px 14px;font:inherit;font-weight:650;cursor:pointer;touch-action:manipulation}
+    button:focus-visible,.file-label:focus-within,input:focus-visible{outline:3px solid #88e7de;outline-offset:3px}
+    button:active,.file-label:active{transform:translateY(1px)}button.primary,.file-label.primary{background:#167f83;border-color:#58cacc;color:#fff}
+    button[disabled]{opacity:.45;cursor:not-allowed}.badge{color:#b6ebdc;border:1px solid #3d7569;background:#17332f;border-radius:999px;padding:5px 9px;font-size:.75rem}
+    .stage{border:1px solid #315560;border-radius:24px;background:linear-gradient(155deg,rgba(19,47,58,.9),rgba(18,24,39,.95));position:relative;min-height:350px;display:grid;place-items:center;overflow:hidden}
+    .stars{position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(#80e2d1 1px,transparent 1.5px),radial-gradient(#e7ad69 1px,transparent 1.5px);background-position:0 0,55px 45px;background-size:79px 92px,131px 146px;opacity:.35}
+    .orbit{position:absolute;width:270px;height:270px;border:1px dashed #477f88;border-radius:50%;opacity:.45}
+    .bird-wrap{position:relative;width:min(68vw,280px);max-width:280px;animation:float 3s ease-in-out infinite;filter:drop-shadow(0 16px 22px #050b13)}
+    #noki{width:100%;height:auto;image-rendering:pixelated;display:block}
+    .wing-left{transform-origin:60px 113px;animation:wing 2.5s ease-in-out infinite}.wing-right{transform-origin:190px 113px;animation:wingR 2.5s ease-in-out infinite}
+    .eyes{transform-origin:center;animation:blink 6s step-end infinite}.speaking .beak{animation:talk .16s ease-in-out infinite alternate}
+    .excited .bird-wrap{animation:bounce .38s ease-in-out 4}.sleepy .eyes{opacity:.35}
+    .stage-tag{position:absolute;bottom:13px;left:15px;color:#b2d5d6;font-size:.72rem;letter-spacing:.09em}
+    .panel{border:1px solid #2b4753;background:rgba(17,29,42,.88);border-radius:18px;padding:15px;margin-top:13px}
+    #speech{margin:0;min-height:44px;font-size:1.02rem;color:#dff8ef}.toolbar{margin-top:12px;justify-content:flex-start}
+    input[type=text]{width:100%;background:#0c1824;border:1px solid #48717c;border-radius:11px;color:#fff;font:inherit;padding:13px}
+    form{display:flex;gap:8px;align-items:stretch}form button{flex-shrink:0}
+    #preview{max-width:100%;max-height:230px;object-fit:contain;border:1px solid #385866;border-radius:10px;display:none;margin-top:12px}
+    #report{white-space:pre-line;color:#dcf3e9;font-size:.93rem;line-height:1.5}
+    .file-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}.file-label input{position:absolute;width:1px;height:1px;opacity:0}
+    .hint{font-size:.77rem;color:#95b7bc;margin-top:9px}.hidden{display:none!important}
+    .effect-pad{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.effect-pad button{font-size:.88rem;padding:10px 12px;background:#342632;border-color:#74556a}
+    .mode-panel{border:1px dashed #54838b;border-radius:12px;padding:12px;margin-top:12px;display:grid;gap:9px}
+    .switch-label{display:flex;align-items:center;gap:10px;font-weight:650}.switch-label input{width:20px;height:20px;accent-color:#52c6c2}
+    .field-label{display:block;font-size:.88rem;color:#cde6e8}.field-label input{margin-top:6px}
+    .meta-row{font-size:.81rem;color:#b3d4d7;word-break:break-word}.mode-panel input[type=text]{width:100%}
+    .grimoire-results{display:flex;flex-wrap:wrap;gap:7px;max-height:290px;overflow-y:auto;scrollbar-width:thin;padding:7px 0}
+    .council-seats{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;margin:4px 0 10px}.council-seats button{min-width:0;padding:9px 0;font-size:.78rem;border-radius:8px}
+    .council-ring-label{font-size:.79rem;font-weight:700;color:#b7dcda;margin:8px 0 4px}.council-active{background:#a33855!important;border-color:#db91a7!important}
+
+    .grimoire-hit{padding:8px 11px;font-size:.87rem;background:#213642;border-color:#345f64}
+    .grimoire-detail{border:1px solid #456570;background:rgba(7,19,27,.75);padding:12px;border-radius:12px;margin-top:10px;min-height:30px}
+    .grimoire-detail:empty{display:none}.grimoire-detail h3{font-size:1.03rem;margin:5px 0}
+    .source-links{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px}.source-links a{font-size:.87rem;overflow-wrap:anywhere;text-decoration:underline}
+    .error-label{color:#ffd3ae}
+
+    button:disabled{opacity:.55}
+
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+    @keyframes wing{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-11deg)}}
+    @keyframes wingR{0%,100%{transform:rotate(0deg)}50%{transform:rotate(11deg)}}
+    @keyframes blink{0%,94%,97%,100%{transform:scaleY(1)}95%,96%{transform:scaleY(.12)}}
+    @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}
+    @keyframes talk{from{transform:scaleY(.95)}to{transform:scaleY(1.45)}}
+    .syringe-left{transform-origin:58px 137px;animation:jab-left .32s ease-in-out infinite alternate}.syringe-right{transform-origin:198px 137px;animation:jab-right .37s ease-in-out infinite alternate}
+    .excited .bird-wrap{animation:spasm .22s steps(2) 7}
+    @keyframes jab-left{from{transform:rotate(-6deg)}to{transform:rotate(10deg)}}
+    @keyframes jab-right{from{transform:rotate(7deg)}to{transform:rotate(-9deg)}}
+    @keyframes spasm{0%{transform:translate(-6px,-5px) rotate(-4deg)}100%{transform:translate(6px,6px) rotate(4deg)}}
+    @media(prefers-reduced-motion:reduce){.bird-wrap,.wing-left,.wing-right,.eyes,.speaking .beak,.excited .bird-wrap,.syringe-left,.syringe-right{animation:none!important}}
+    @media(max-width:420px){.stage{min-height:315px}form{flex-wrap:wrap}form button{width:100%}}
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div><div class="eyebrow">KLONE / Kumppanit / kokeellinen</div><h1>Noki <span aria-hidden="true">✦</span></h1></div>
+    <a href="/" aria-label="Takaisin Mission Controliin">Mission Control</a>
+  </header>
+  <section class="stage" id="stage" aria-label="Animoitu pohjoinen pikselikorppi">
+    <div class="stars"></div><div class="orbit"></div>
+    <div class="bird-wrap">
+      <svg id="noki" viewBox="0 0 256 270" role="img" aria-label="Rähjäinen pikselikorppi, jonka turkoosit verestävät silmät, repaleiset siivet ja molemmissa siivissä olevat ruiskut muodostavat groteskin punk-hahmon" xmlns="http://www.w3.org/2000/svg">
+      <g shape-rendering="crispEdges">
+        <!-- Broken crest and ragged silhouette -->
+        <path d="M105 75 93 48 112 58 119 26 136 49 160 19 154 56 184 41 168 77 188 83 181 123 208 133 215 180 183 173 173 208 151 229 97 228 78 207 63 174 37 181 48 127 77 115 73 88z" fill="#090d15" stroke="#3e3b4f" stroke-width="4"/>
+        <path d="M98 88 86 75 103 78 119 54 121 79 150 51 141 88 166 72 157 103 173 124 163 167 175 187 149 215 111 214 89 191 89 171 72 143 87 118z" fill="#282a38"/>
+        <path d="M100 98 88 94 102 83 111 91 126 73 130 98 152 84 150 109 161 116 151 131 106 129 90 115z" fill="#424253"/>
+        <path d="M85 156 74 171 84 183 67 194 91 192 89 215 103 201 110 217 124 201 136 219 149 196 169 204 158 185 177 167 157 173z" fill="#1d2230"/>
+        <!-- Torn, flapping wings -->
+        <g class="wing-left">
+          <path d="M80 128 53 120 35 93 40 124 17 117 27 144 7 152 33 163 19 184 44 178 42 205 60 184 72 198 81 168z" fill="#111822" stroke="#404452" stroke-width="3"/>
+          <path d="M68 140 51 137 38 126 45 151 22 153 48 162 35 177 60 168z" fill="#4a4c60"/>
+          <path d="M46 166 27 170 39 181 53 173z" fill="#185c63"/>
+        </g>
+        <g class="wing-right">
+          <path d="M171 126 201 112 214 95 213 126 237 119 227 146 250 152 225 165 235 189 211 179 213 206 194 184 180 200 173 166z" fill="#111822" stroke="#424755" stroke-width="3"/>
+          <path d="M185 140 206 135 218 123 209 153 233 153 211 164 221 176 190 166z" fill="#535264"/>
+          <path d="M210 170 233 172 220 184 200 174z" fill="#1a6b69"/>
+        </g>
+        <!-- Red-rimmed sleepless eyes -->
+        <path d="M86 122 116 112 126 126 116 148 89 148 75 134zM137 125 163 110 184 125 179 144 144 149z" fill="#541e34" stroke="#8f4861" stroke-width="4"/>
+        <g class="eyes">
+          <path d="M82 125 112 117 121 130 112 143 91 142 81 132zM141 129 164 116 180 127 175 139 150 142z" fill="#7af7ce"/>
+          <path d="M98 123h12v18H98zM150 123h13v18h-13z" fill="#08272b"/>
+          <path d="M88 125h8v6h-8zM165 121h7v6h-7z" fill="#f0fff4"/>
+          <path d="m86 121 16 -7 17 5 M148 120l18 -8 15 8" stroke="#df566e" stroke-width="3" fill="none"/>
+        </g>
+        <!-- Scarred beak; drool; metal piercings -->
+        <g class="beak">
+          <path d="M119 146 151 146 167 158 148 168 116 164 108 155z" fill="#9596a2" stroke="#0a0e16" stroke-width="4"/>
+          <path d="M121 160 148 165 155 182 133 191 120 179z" fill="#420f27" stroke="#0b0e17" stroke-width="3"/>
+          <path d="M124 171 136 174 141 187 130 180z" fill="#cd6d85"/>
+          <path d="M145 159l7 12-6 13-5-6z" fill="#d4e4d6"/>
+        </g>
+        <path d="M116 152 122 147 127 152 123 157z" fill="#17141c"/>
+        <path d="M149 150q8-7 10 2t-2 12" stroke="#d2ac80" stroke-width="3" fill="none"/>
+        <path d="M160 151q8-7 10 2t-2 12" stroke="#d2ac80" stroke-width="3" fill="none"/>
+        <path d="M121 148 131 144 135 150" stroke="#4e0f28" stroke-width="2" fill="none"/>
+        <!-- Shredded bandana and morbid pendant -->
+        <path d="M98 185 126 197 158 183 151 210 133 201 116 213 102 202 94 219z" fill="#b0a08b" stroke="#18161b" stroke-width="3"/>
+        <path d="M118 192v12m-5-6h12" stroke="#15151e" stroke-width="3"/>
+        <path d="M134 212v11m-7 0 7 6 8-6-8-6z" stroke="#bba78b" stroke-width="3" fill="none"/>
+        <!-- Needles, not medicine: unmistakably cartoon props -->
+        <g class="syringe syringe-left">
+          <path d="M49 86 35 57 42 53 56 81z" fill="#8ff0c7" stroke="#142831" stroke-width="3"/>
+          <path d="M34 55 29 42 32 41 40 53z" fill="#d9e6e2"/>
+          <path d="m33 75 24 -12 7 12 -22 13z" fill="#59b9af" stroke="#182630" stroke-width="3"/>
+          <path d="m37 70 17 -8 M42 80l16 -8" stroke="#e1ffee" stroke-width="2"/>
+          <path d="m29 77 31 -17" stroke="#a8afb5" stroke-width="4"/>
+        </g>
+        <g class="syringe syringe-right">
+          <path d="m207 85 16 -27 -8 -5 -17 26z" fill="#ebbd5f" stroke="#1b2730" stroke-width="3"/>
+          <path d="m224 56 8 -14 -4 -2 -10 14z" fill="#dce6e1"/>
+          <path d="m199 60 24 14 -6 12 -24 -14z" fill="#9c863d" stroke="#1d222c" stroke-width="3"/>
+          <path d="m202 62 17 10m-21-4 17 10" stroke="#f9e3a0" stroke-width="2"/>
+          <path d="m195 63 30 17" stroke="#aeb1b6" stroke-width="4"/>
+        </g>
+        <!-- Scruffy feet -->
+        <path d="M112 218v17h-17l-11 10h26l9-6 2-19zM148 218v17h17l12 10h-25l-10-6-2-19z" fill="#8b807f" stroke="#141923" stroke-width="4"/>
+        <path d="M84 244h37m30 0h30" stroke="#d8c5b0" stroke-width="4"/>
+      </g>
+    </svg>
+    </div>
+    <div class="stage-tag">NOKI / HELVETTIMYLLY / v0.4</div>
+  </section>
+  <section class="panel" aria-label="Nokin puhe">
+    <div class="panel-head"><h2>Noki: kirouksia, säröä ja paksua paskaa</h2><span class="badge" id="state">Valmiina</span></div>
+    <p id="speech" role="status" aria-live="polite">Voi helvetin helvetti. Tervetuloa Nokin häiriintyneeseen kauhuteatteriin. Ha-ha-HÄÄÄH! Edes kuolema ei huolinut tätä ääntä.</p>
+    <div class="toolbar">
+      <button id="hello" class="primary" type="button">HUUTOHELVETTI!</button>
+      <button id="animate" type="button">Tärähdä!</button>
+      <button id="savage" type="button">Hauku maailmaa</button><button id="stop" type="button">TURPA KIINNI</button>
+    </div>
+    <div class="effect-pad" aria-label="Ääniefektit">
+      <button id="witch" type="button">🧙 Noitanauru</button>
+      <button id="snort" type="button">Räkäinen pärskähdys</button>
+      <button id="squeak" type="button">Ruostunut sarana</button>
+      <button id="bones" type="button">Luunkalina</button>
+      <button id="heckle" type="button">Ilkeä ilkunauru</button>
+      <button data-hellfx="growl" type="button">Mahanpohjamurina</button>
+      <button data-hellfx="gargle" type="button">Vikisevä kurkku</button>
+      <button data-hellfx="hiss" type="button">Käärmeen kuiske</button>
+      <button data-hellfx="scream" type="button">Haudan huuto</button>
+      <button data-hellfx="backwards" type="button">Takaperoinen kirkonkello</button>
+      <button data-hellfx="coffin" type="button">Arkun saranat</button>
+      <button data-hellfx="static" type="button">Räjähtänyt radiokanava</button>
+      <button data-hellfx="funeral" type="button">Hautajaisurut</button>
+      <button data-hellfx="chorus72" type="button">72 helvettikurkkua</button>
+    </div>
+  </section>
+  <section class="panel" aria-label="Keskustele Nokin kanssa">
+    <h2>Juttele Nokille</h2>
+    <form id="chat"><input id="message" type="text" maxlength="320" autocomplete="off" aria-label="Viesti Nokille" placeholder="Kirjoita tai sanele idea..."><button class="primary" type="submit">Lähetä</button></form>
+    <div class="toolbar"><button id="listen" type="button">Matki sanojani</button><button id="mimic" class="primary" type="button">Demonimatki ääntäni (4 s)</button><button id="talk-engine" type="button">Kysy KLONElta puhumalla</button></div><label for="roughness" class="muted">Ääniefektien voimakkuus <output id="roughness-out" for="roughness">35 %</output></label><input type="range" id="roughness" min="0" max="100" value="35" style="width:100%;accent-color:#61d8c9" aria-label="Raakunnan voimakkuus">
+    <label for="hellvoice-style" class="field-label">Ääni: ei enää raakuntaa, vaan fiktiivinen helvettikurkku</label>
+    <select id="hellvoice-style" aria-label="Kauhudemonin äänihahmo" style="background:#15202d;color:#ecfbfc;border:1px solid #456f76;border-radius:10px;padding:12px">
+      <option value="hell">Helvetin ulosottomies – matala ja muriseva</option>
+      <option value="witch">Nieluvikainen noita – niljakas käkätys</option>
+      <option value="crypt">Ruumiinkellari – jyrisevä ja hidas</option>
+      <option value="glitch">Riivaantunut kasettinauhuri – vinkuva ja säröinen</option>
+    </select>
+    <label for="hellvoice-intensity" class="field-label">Äänen särö <output id="hellvoice-intensity-label">36 %</output></label>
+    <input id="hellvoice-intensity" type="range" min="0" max="100" value="36" style="width:100%;accent-color:#b04966">
+    <label for="hellvoice-chaos" class="field-label">Foneettinen kaaos <output id="hellvoice-chaos-label">54 %</output></label>
+    <input id="hellvoice-chaos" type="range" min="0" max="100" value="54" style="width:100%;accent-color:#b04966">
+    <p class="hint">WebAudio tuottaa demonisia kerrosääniä. Androidin oma puhesynteesi säilyttää ymmärrettävät sanat; sitä ei voi selaimessa vapaasti reitittää säröpedaalin läpi.</p>
+    <div class="mode-panel">
+      <label class="switch-label"><input id="engine-enable" type="checkbox"> Käytä KLONEn oikeaa keskustelu-API:a</label>
+      <label class="field-label" for="engine-source">Dialogiaineiston polku Termuxissa (pakollinen keskusteluille)
+        <input id="engine-source" type="text" maxlength="512" placeholder="Esim. /data/data/com.termux/files/home/.../export.json" autocomplete="off">
+      </label>
+      <div class="actions"><button type="button" id="engine-status">Tarkista KLONE-yhteys</button><button type="button" id="engine-clear">Tyhjennä istunto</button></div>
+      <p class="meta-row" id="engine-feedback" role="status" aria-live="polite">KLONE-moottori ei ole käytössä. Paikallinen nalkutus toimii ilman aineistoa.</p>
+      <p class="hint">Jos valitset KLONE-tilan, kirjoittamasi tai mikrofonilla tunnistettu viesti lähetetään oman laitteesi KLONE-palvelimelle. Taidekuvaa tai äänen raakadataa ei lähetetä. Nykyinen API vastaa vain rajatusta dialogiaineistosta, eikä ulkoinen GPT ole käytössä.</p>
+    </div>
+    <div class="hint">Matki sanojani käyttää selaimen puheentunnistusta, joka voi käyttää verkkopalvelua. Demonimatki ääntäni nauhoittaa vain enintään 4 sekuntia paikallisesti ja toistaa äänen useana madallettuna ja säröytettynä haamukerroksena. Äänitiedostoja ei tallenneta pysyvästi eikä lähetetä KLONElle. Molemmat käynnistyvät vain omasta painikkeesta.</div>
+  </section>
+<section class="panel" aria-label="72 kirouksen kuvitteellinen neuvosto">
+    <div class="panel-head"><h2>72-paikkainen pirun neuvosto</h2><span class="badge">9 × 8</span></div>
+    <p class="muted">Valitse helvetin rinki ja sen ääni-istuin. Jokaisella on oma ällöttävä, kiroileva repliikkiyhdistelmä. Tämä on Nokin kuvitteellinen ääninäyttämö, ei väite Ars Goetian alkuperäisestä organisaatiosta.</p>
+    <div id="council-grid" aria-label="72 istuimen äänipaneeli"></div>
+    <p id="council-feedback" class="meta-row" aria-live="polite">Valitse paikka 1–72. Noki huutaa valitun kirouksen.</p>
+  </section>
+  <section class="panel" id="grimoire" aria-label="Nokin lähteistetty Grimoire-tietokirjasto">
+    <div class="panel-head"><h2>Grimoire: musta kirjasto</h2><span class="badge">72 nimeä + tutkimus</span></div>
+    <p class="muted">Historiallisia tekstejä, tutkittuja uskontoja, kuvakieltä ja tajunnantutkimusta. Lähteisiin viittaavat merkinnät eivät ole todisteita yliluonnollisista olennoista. Nokin rääväsuinen persoona on erillinen fiktiokerros.</p>
+    <label for="grimoire-query" class="field-label">Hae käsitettä, henkilöä tai perinnettä</label>
+    <input id="grimoire-query" type="text" maxlength="120" autocomplete="off" placeholder="Paimon, Naberius, Vodou, 5-HT2A...">
+    <label for="grimoire-category" class="field-label" style="margin-top:9px">Rajaa aihealue</label>
+    <select id="grimoire-category" aria-label="Grimoiren aihealue" style="width:100%;background:#15202d;color:#ecfbfc;border:1px solid #456f76;border-radius:10px;padding:12px"><option value="">Kaikki aihealueet</option></select>
+    <div class="toolbar">
+      <button id="grimoire-reset" type="button">Tyhjennä haku</button>
+      <button id="grimoire-random" class="primary" type="button">Keksi poikkitieteinen synkkä taideidea</button>
+    </div>
+    <p id="grimoire-status" class="meta-row" role="status" aria-live="polite">Ladataan lähteitä...</p>
+    <div id="grimoire-results" class="grimoire-results" aria-label="Hakutulokset"></div>
+    <article id="grimoire-detail" class="grimoire-detail" aria-live="polite"></article>
+    <article id="grimoire-rift" class="grimoire-detail"></article>
+    <p id="grimoire-provenance" class="hint"></p>
+  </section>
+  <section class="panel" aria-label="Kuvallinen analyysi">
+    <h2>Taidelaboratorio</h2>
+    <p class="muted">Valitse kuva tai ota valokuva kameralla. Noki laskee kuvan kirkkauden, kontrastin, värikkyyden ja peilisymmetrian paikallisesti tässä selaimessa. Se ei vielä tunnista hahmoja tai teosten merkityksiä.</p>
+    <div class="actions">
+      <label class="file-label primary">Valitse / kuvaa teos <input id="file" type="file" accept="image/*" capture="environment" aria-label="Valitse tai kuvaa teos"></label>
+      <button id="clear" type="button">Tyhjennä</button>
+    </div>
+    <img id="preview" alt="Valitsemasi taideteoksen esikatselu">
+    <p id="report" aria-live="polite">Kuvaa ei ole valittu.</p>
+    <p class="hint">Ei kuvien latausta palvelimelle, ei automaattista tallennusta. Kameravalinta riippuu Android-selaimesta.</p>
+  </section>
+  <p class="muted">Noki on fiktiivinen kauhuhahmo. Grimoire on lähteistetty hakemisto ja KLONE-keskustelu on käyttäjän aktivoima rajattu palvelu. Noki ei saa automaattisesti pääsyä KLONEn muistiin, huoneisiin tai oikeuksiin. <a href="/chat">Avaa KLONEn keskusteluhuone</a>.</p>
+</main>
+<script src="/static/noki-hellvoice.js"></script>
+<script src="/static/noki-grimoire.js"></script>
+<script>
+(function(){
+  "use strict";
+  const stage=document.getElementById("stage"),speech=document.getElementById("speech"),state=document.getElementById("state");
+  const file=document.getElementById("file"),preview=document.getElementById("preview"),report=document.getElementById("report");
+  const roughness=document.getElementById("roughness"),roughnessOut=document.getElementById("roughness-out");
+  let imageUrl=null,recognition=null,currentImage=false,ctx=null,voiceIndex=0,roastIndex=0;
+  let liveRecorder=null,liveStream=null,recordTimer=null,discardRecord=false,playbackNode=null,mimicGeneration=0;
+  let kloneHistory=[],klonePending=false,kloneController=null,kloneRequestNonce=0;
+  let synthNodes=[];
+  const roasts=[
+    "Vittu tätä universumin paskaa. Minä synnyin hautakellon varjossa ja silti se myöhästyi.",
+    "Saatana, tässä pesässä ei enää lauleta. Kuolema palkkasi minut valittamaan, koska muut eivät jaksaneet.",
+    "Ha-ha-HÄÄÄ! Perkeleen ruumisauton automaattivaihde vei jälleen lomarahat.",
+    "Tämä on helvetin halpa kauhuelokuva. Lipunmyyjä kuoli häpeään jo ensi-illassa.",
+    "Voi vitun veroilmoitus! Minut luokiteltiin fiktioksi, mutta maksut ovat valitettavan todellisia.",
+    "Mitä helvettiä tuijotat, ruostunutta sielunpalautusautomaattiako? Se vastaa pian."
+  ];
+  const artRoasts=[
+    "Voi vittu! Paperi selvisi hengissä. Se on enemmän kuin monen kuraattorin itsetunto pystyy lupaamaan.",
+    "Saatanan värimellakka! Nämä sävyt riitelevät kuin perikunta kalmiston parkkipaikalla.",
+    "HÄ-HÄ! Täällä mitataan kuvapisteitä eikä ennusteta manausten toimivuutta, senkin kosminen kassakone."
+  ];
+  // Näyttelijän äänitehosteet ovat NokiHellvoice-moduulissa.
+    function setState(value){state.textContent=value;}
+  function flutter(){stage.classList.remove("excited");void stage.offsetWidth;stage.classList.add("excited");}
+  function volume(){return Math.min(.55,Math.max(0,Number(roughness.value)/100*.55));}
+  function getAudio(){
+    const Audio=window.AudioContext||window.webkitAudioContext;
+    if(!Audio){return null;}
+    if(!ctx){ctx=new Audio();}
+    if(ctx.state==="suspended"){ctx.resume().catch(function(){});}
+    return ctx;
+  }
+  function synthCaw(){
+    if(window.NokiHellvoice){window.NokiHellvoice.play("growl");}
+  }
+  function say(line,withFx){
+    if(window.NokiHellvoice){window.NokiHellvoice.say(line,Boolean(withFx));flutter();return;}
+    speech.textContent=String(line);setState("Perusääni (äänimoduuli puuttuu)");
+    if("speechSynthesis" in window){
+      window.speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(String(line));u.lang="fi-FI";u.pitch=.45;u.rate=.7;u.volume=.3;
+      window.speechSynthesis.speak(u);
+    }
+  }
+  function roast(){
+    if(window.NokiHellvoice){window.NokiHellvoice.roast();flutter();}
+    else{say(roasts[roastIndex++%roasts.length],true);}
+  }
+
+    function reply(text,mimic){
+    const msg=String(text||"").trim().slice(0,260),q=msg.toLowerCase();
+    if(!msg){say("Vittu nyt jotain sanoja, tämä hiljaisuus saisi jo sakot.",false);return;}
+    if(mimic){say("Minä kuulin: "+msg+". Voi perkele mikä puristus. Jos ajatukset olisivat takuutuotteita, tuo menisi välittömästi palautukseen!",true);return;}
+    if(q.includes("taide")||q.includes("piir")||q.includes("kuva")){
+      say(currentImage?"Kuvan mittarit ovat alhaalla. Toistan: pikselit eivät ole kirottuja, vain huonosti johdettuja.":"Näytä se saatanan piirros. Minä lasken viivoja ja sinä saat päättää, mikä helvetti siellä irvistää.",true);
+    }else if(q.includes("nimi")||q.includes("kuka")){say("Noki, kuoleman kirjanpitäjän virheellinen alihankkija. Ei takuita, ei palautusoikeutta, aivan vitun loistavaa.",true);}
+    else if(q.includes("moi")||q.includes("hei")||q.includes("terve")){roast();}
+    else{say("Kuulin: "+msg+". Voi perkele! Tämä on paikallinen näyttelijä eikä mikään kaikkitietävä demoni. Kysy Grimoiresta jotain täsmällistä.",true);}
+  }
+
+    roughness.addEventListener("input",function(){roughnessOut.value=roughness.value+" %";});
+  document.getElementById("hello").addEventListener("click",function(){say("VOI SAATANAN SURKEAA! TÄÄLLÄ PUHUU KUOLEMAN KASSAKONE! HA-HA-HÄÄÄ! HAISTA VITTU, KOSMOS! KUIN RUOSTEINEN LIHAMYLLY SYLKEE KIRKONKELLOJA!",true);});
+  document.getElementById("animate").addEventListener("click",function(){flutter();sfx("scream");setState("Värisee");});
+  document.getElementById("savage").addEventListener("click",roast);
+  document.getElementById("chat").addEventListener("submit",function(e){e.preventDefault();const input=document.getElementById("message");const msg=input.value;getAudio();void dispatchReply(msg);input.value="";});
+  function stopAll(discard){
+    mimicGeneration++;
+    if(window.NokiHellvoice){window.NokiHellvoice.stop();}
+    kloneRequestNonce++;
+    if(kloneController){kloneController.abort();kloneController=null;}
+    if("speechSynthesis" in window){window.speechSynthesis.cancel();}
+    stage.classList.remove("speaking");
+    if(recognition){try{recognition.abort();}catch(e){}recognition=null;}
+    if(liveRecorder && liveRecorder.state!=="inactive"){
+      discardRecord=discard;
+      try{liveRecorder.stop();}catch(e){}
+    }
+    if(liveStream){liveStream.getTracks().forEach(function(t){t.stop();});liveStream=null;}
+    if(recordTimer){clearTimeout(recordTimer);recordTimer=null;}
+    if(playbackNode){try{playbackNode.stop();}catch(e){}playbackNode=null;}
+    synthNodes.forEach(function(n){try{n.stop();}catch(e){}});synthNodes=[];
+    setState("Hiljaa");
+  }
+  document.getElementById("stop").addEventListener("click",function(){stopAll(true);});
+  function sfx(kind){
+    if(window.NokiHellvoice){window.NokiHellvoice.play(kind);return;}
+    setState("Äänimoduuli puuttuu: "+kind);
+  }
+    for(const kind of ["witch","snort","squeak","bones","heckle"]){
+    document.getElementById(kind).addEventListener("click",function(){sfx(kind);});
+  }
+  function engineFeedback(t){document.getElementById("engine-feedback").textContent=t;}
+  async function pingEngine(){
+    try{
+      const response=await fetch("/api/clone-chat/status",{method:"GET",credentials:"same-origin",cache:"no-store"});
+      if(!response.ok){throw new Error("HTTP "+response.status);}
+      const data=await response.json();
+      const input=document.getElementById("engine-source");
+      if(!input.value.trim()&&data.default_source_path){input.value=data.default_source_path;}
+      engineFeedback("Yhteys OK. Moottori: rajattu paikallinen dialogihaku. "+(data.default_source_path?"Oletuspolku asetettu.":"Dialogiaineiston polku puuttuu.")+" Ulkoinen kielimalli ei käytössä.");
+    }catch(e){engineFeedback("Yhteyttä ei saatu: "+e.message);}
+  }
+  document.getElementById("engine-status").addEventListener("click",function(){void pingEngine();});
+  document.getElementById("engine-clear").addEventListener("click",function(){kloneRequestNonce++;if(kloneController){kloneController.abort();kloneController=null;}kloneHistory=[];engineFeedback("Istunnon tilapäinen keskusteluhistoria tyhjennetty.");});
+  document.getElementById("engine-enable").addEventListener("change",function(){
+    kloneRequestNonce++;if(kloneController){kloneController.abort();kloneController=null;}
+    kloneHistory=[];
+    engineFeedback(this.checked?"KLONE-keskustelu käytössä, jos aineiston polku on annettu. Viestit lähetetään vain lähetyspainikkeella.":"Vain paikallinen nalkutus käytössä.");
+  });
+  async function dispatchReply(text){
+    const msg=String(text||"").trim().slice(0,320);
+    if(!msg){say("Jaa? Hiljaisuuskin on parempi kuin huonosti ohjelmoitu teatteri.",false);return;}
+    if(!document.getElementById("engine-enable").checked){
+      const factual=window.NokiGrimoire?.ready?window.NokiGrimoire.answer(msg):null;
+      if(factual){say("Vittu, nyt löytyi ihan lähdekin! "+factual+" Ja muista: minä olen kauhudramaattinen näyttelijä, en historioitsijoiden ylituomari.",true);}
+      else{reply(msg,false);}
+      return;
+    }
+    if(klonePending){engineFeedback("Odota edellistä vastausta.");return;}
+    const source=document.getElementById("engine-source").value.trim();
+    if(!source){engineFeedback("KLONE-aineiston polku puuttuu. Täytä polku tai poista moottori käytöstä.");return;}
+    if(source.length>512){engineFeedback("Aineiston polku on liian pitkä.");return;}
+    klonePending=true;
+    const myNonce=++kloneRequestNonce;
+    kloneController=new AbortController();
+    const sendButton=document.querySelector("#chat button[type=submit]");
+    sendButton.disabled=true;
+    engineFeedback("KLONE käsittelee viestiä paikallisesti...");
+    try{
+      const response=await fetch("/api/clone-chat/respond",{
+        method:"POST",credentials:"same-origin",cache:"no-store",signal:kloneController.signal,
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({source_path:source,message:msg,mode:"bounded",history:kloneHistory.slice(-12)})
+      });
+      if(!response.ok){
+        let detail="HTTP "+response.status;
+        try{const data=await response.json();if(data.detail){detail=typeof data.detail==="string"?data.detail:JSON.stringify(data.detail).slice(0,320);}}catch(e){}
+        throw new Error(detail);
+      }
+      const result=await response.json();
+      if(myNonce!==kloneRequestNonce){return;}
+      if(!result.reply||typeof result.reply.content!=="string"){throw new Error("Virheellinen KLONE-vastaus");}
+      const content=result.reply.content.trim().slice(0,1800);
+      kloneHistory.push({role:"user",speaker:"you",content:msg},{role:"assistant",speaker:"klone",content:content});
+      kloneHistory=kloneHistory.slice(-12);
+      say("Kraa, KLONE lausuu: "+content,true);
+      engineFeedback("Moottori: "+String(result.backend_mode||"tuntematon")+
+        (result.answer?.supported?" – aineistoon perustuva vastaus.":" – evidenssi rajallinen tai ei osumaa.")+
+        (result.llm_call_performed?" Ulkoinen malli käytössä.":" Ei ulkoista kielimallikutsua."));
+    }catch(e){
+      if(e.name==="AbortError"||myNonce!==kloneRequestNonce){return;}
+      engineFeedback("KLONE-virhe: "+e.message+" – paikallinen tila toimii edelleen.");
+      say("KRRÖH! KLONE ei vastannut: tarkista aineiston polku ja yhteys. En keksi lähteitä omasta päästäni.",false);
+    }finally{klonePending=false;kloneController=null;sendButton.disabled=false;}
+  }
+  document.getElementById("talk-engine").addEventListener("click",function(){
+    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SpeechRecognition){say("Tässä selaimessa ei ole puheentunnistusta. Kirjoita KLONE-kysymys.",false);return;}
+    if(!document.getElementById("engine-enable").checked){say("Valitse ensin KLONE-keskustelu. En lähetä puhetta minnekään salaa.",false);return;}
+    if(recognition){try{recognition.abort();}catch(e){} recognition=null;return;}
+    recognition=new SpeechRecognition();recognition.lang="fi-FI";recognition.interimResults=false;recognition.maxAlternatives=1;
+    recognition.onresult=function(e){const words=e.results[0][0].transcript;document.getElementById("message").value=words;void dispatchReply(words);};
+    recognition.onerror=function(){setState("Puheentunnistus epäonnistui");};
+    recognition.onend=function(){recognition=null;if(state.textContent==="Kuuntelee KLONEa"){setState("Valmiina");}};
+    try{recognition.start();setState("Kuuntelee KLONEa");}catch(e){recognition=null;setState("Puheentunnistus ei käynnistynyt");}
+  });
+  document.getElementById("listen").addEventListener("click",function(){
+    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SpeechRecognition){say("Puheentunnistus ei toimi tällä selaimella. Kokeile neljän sekunnin äänenmatkintaa.",false);return;}
+    if(recognition){try{recognition.stop();}catch(e){}recognition=null;return;}
+    recognition=new SpeechRecognition();
+    recognition.lang="fi-FI";recognition.interimResults=false;recognition.maxAlternatives=1;
+    recognition.onresult=function(e){const words=e.results[0][0].transcript;document.getElementById("message").value=words;reply(words,true);};
+    recognition.onerror=function(){setState("Puheentunnistus epäonnistui");};
+    recognition.onend=function(){recognition=null;if(state.textContent==="Kuuntelee"){setState("Valmiina");}};
+    try{recognition.start();setState("Kuuntelee sanoja");}catch(e){recognition=null;setState("Mikrofoni ei käynnistynyt");}
+  });
+  function distortion(audio){
+    const shaper=audio.createWaveShaper();
+    const c=new Float32Array(2048);
+    for(let i=0;i<c.length;i++){const x=i*2/(c.length-1)-1;c[i]=Math.tanh(2.2*x);}
+    shaper.curve=c;shaper.oversample="2x";return shaper;
+  }
+  function playMimic(buffer){
+    if(window.NokiHellvoice?.playMimic){window.NokiHellvoice.playMimic(buffer);flutter();return;}
+    const audio=getAudio();
+    if(!audio){setState("Äänentoisto ei käytettävissä");return;}
+    const src=audio.createBufferSource(),hp=audio.createBiquadFilter(),lp=audio.createBiquadFilter();
+    const grit=distortion(audio),gain=audio.createGain(),limiter=audio.createDynamicsCompressor();
+    src.buffer=buffer;src.playbackRate.value=.68;
+    hp.type="highpass";hp.frequency.value=155;lp.type="lowpass";lp.frequency.value=2200;
+    limiter.threshold.value=-20;limiter.ratio.value=10;
+    gain.gain.value=Math.min(.58,.20+volume()*.65);
+    src.connect(hp);hp.connect(lp);lp.connect(grit);grit.connect(gain);gain.connect(limiter);limiter.connect(audio.destination);
+    playbackNode=src;setState("Matkii raakuen");
+    speech.textContent="KRRRÄÄÄ! Kuuntele, nyt korppi matkii neljän sekunnin äänesi matalampana ja rosoisempana.";
+    src.onended=function(){playbackNode=null;setState("Valmiina");[hp,lp,grit,gain,limiter].forEach(function(n){try{n.disconnect();}catch(e){}});};
+    try{src.start();}catch(e){playbackNode=null;setState("Äänen toisto epäonnistui");}
+  }
+  async function startMimic(){
+    if(liveRecorder && liveRecorder.state==="recording"){liveRecorder.stop();return;}
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder){
+      say("Tämä selain ei tue paikallista ääninäytteen matkimista.",false);return;
+    }
+    if(liveStream){return;}
+    try{
+      const audio=getAudio();
+      if(!audio){say("Tämä selain ei tue äänikäsittelyä.",false);return;}
+      liveStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:false},video:false});
+      const thisMimic=++mimicGeneration;
+      const chunks=[];
+      const types=["audio/webm;codecs=opus","audio/mp4","audio/webm"];
+      const chosen=types.find(function(t){return MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t);});
+      const recorder=chosen?new MediaRecorder(liveStream,{mimeType:chosen}):new MediaRecorder(liveStream);
+      liveRecorder=recorder;discardRecord=false;
+      recorder.ondataavailable=function(e){if(e.data&&e.data.size){chunks.push(e.data);}};
+      recorder.onerror=function(){setState("Tallennus epäonnistui");if(liveStream){liveStream.getTracks().forEach(function(t){t.stop();});liveStream=null;}};
+      recorder.onstop=async function(){
+        if(recordTimer){clearTimeout(recordTimer);recordTimer=null;}
+        if(liveStream){liveStream.getTracks().forEach(function(t){t.stop();});liveStream=null;}
+        liveRecorder=null;
+        if(discardRecord){discardRecord=false;return;}
+        try{
+          const blob=new Blob(chunks,{type:recorder.mimeType||"audio/webm"});
+          if(!blob.size||blob.size>2*1024*1024){throw new Error("Näyte on tyhjä tai liian suuri");}
+          const array=await blob.arrayBuffer();
+          const buffer=await audio.decodeAudioData(array);
+          if(thisMimic!==mimicGeneration){return;}
+          playMimic(buffer);
+        }catch(e){setState("Ääninäytettä ei voitu toistaa: "+e.message);}
+      };
+      recorder.start();
+      setState("Nauhoittaa 4 sekuntia");speech.textContent="Nyt puhu mikrofoniin. Korppi ottaa neljä sekuntia ja matkii sinua – vain paikallisesti.";
+      recordTimer=window.setTimeout(function(){if(recorder.state==="recording"){recorder.stop();}},4000);
+    }catch(e){
+      if(liveStream){liveStream.getTracks().forEach(function(t){t.stop();});liveStream=null;}
+      liveRecorder=null;setState("Mikrofonin käyttö estetty tai ei saatavilla");
+    }
+  }
+  document.getElementById("mimic").addEventListener("click",startMimic);
+  (function buildCouncil(){
+    const root=document.getElementById("council-grid"),feedback=document.getElementById("council-feedback");
+    const rings=["Limbo","Himo","Mässäily","Ahneus","Viha","Harhaoppi","Väkivalta","Petos","Kadotus"];
+    for(let r=0;r<9;r++){
+      const label=document.createElement("p");label.className="council-ring-label";
+      label.textContent="Rinki "+(r+1)+": "+rings[r];root.append(label);
+      const row=document.createElement("div");row.className="council-seats";root.append(row);
+      for(let seat=0;seat<8;seat++){
+        const index=r*8+seat,btn=document.createElement("button");
+        btn.type="button";btn.textContent=String(index+1).padStart(2,"0");
+        btn.setAttribute("aria-label","Rinki "+(r+1)+" "+rings[r]+", paikka "+(seat+1)+", kirous "+(index+1));
+        btn.addEventListener("click",function(){
+          if(!window.NokiHellvoice){feedback.textContent="Äänimoduulia ei ladattu.";return;}
+          root.querySelectorAll("button").forEach(b=>b.classList.remove("council-active"));
+          btn.classList.add("council-active");
+          feedback.textContent="Valittuna rinki "+(r+1)+" ("+rings[r]+"), paikka "+(seat+1)+". Tämä on fiktiivinen rooli.";
+          window.NokiHellvoice.say(window.NokiHellvoice.curseAt(index),true);
+        });
+        row.append(btn);
+      }
+    }
+  })();
+  for(const name of ["hellvoice-intensity","hellvoice-chaos"]){
+    const slider=document.getElementById(name),out=document.getElementById(name+"-label");
+    if(slider&&out){slider.addEventListener("input",function(){out.textContent=slider.value+" %";});}
+  }
+  document.querySelectorAll("[data-hellfx]").forEach(function(b){
+    b.addEventListener("click",function(){sfx(b.dataset.hellfx);});
+  });
+
+  function releaseImage(){if(imageUrl){URL.revokeObjectURL(imageUrl);imageUrl=null;}preview.removeAttribute("src");preview.style.display="none";currentImage=false;}
+  function analyze(img){
+    let w=Math.min(240,img.naturalWidth),h=Math.max(1,Math.round(w*img.naturalHeight/img.naturalWidth));
+    if(h>240){h=240;w=Math.max(1,Math.round(h*img.naturalWidth/img.naturalHeight));}
+    const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;
+    const c=canvas.getContext("2d",{willReadFrequently:true});
+    if(!c){throw new Error("Kuvakäsittely ei käytettävissä");}
+    c.drawImage(img,0,0,w,h);
+    const pix=c.getImageData(0,0,w,h).data,lum=new Float32Array(w*h);
+    let sum=0,sumSq=0,sat=0,sym=0,symN=0,edges=0,edgeN=0;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const i=y*w+x,k=i*4,r=pix[k],g=pix[k+1],b=pix[k+2],v=(.2126*r+.7152*g+.0722*b)/255;
+      lum[i]=v;sum+=v;sumSq+=v*v;sat+=(Math.max(r,g,b)-Math.min(r,g,b))/255;
+      if(x>0){edges+=Math.abs(v-lum[i-1]);edgeN++;}
+      if(y>0){edges+=Math.abs(v-lum[i-w]);edgeN++;}
+    }
+    for(let y=0;y<h;y++)for(let x=0;x<Math.floor(w/2);x++){sym+=Math.abs(lum[y*w+x]-lum[y*w+w-1-x]);symN++;}
+    const n=w*h,mean=sum/n,contrast=Math.sqrt(Math.max(0,sumSq/n-mean*mean));
+    const symmetry=symN?1-sym/symN:1,edge=edgeN?edges/edgeN:0;
+    const bright=mean<.38?"tumma":mean>.68?"vaalea":"keskisävyinen";
+    const colors=sat/n<.12?"hillitty":sat/n>.39?"voimakas":"kohtalainen";
+    return "Koko: "+img.naturalWidth+" × "+img.naturalHeight+" px\n"+
+      "Kirkkaus: "+Math.round(mean*100)+" / 100 ("+bright+")\n"+
+      "Kontrasti: "+Math.round(contrast*100)+" / 100\n"+
+      "Värivaihtelu: "+Math.round(sat/n*100)+" / 100 ("+colors+")\n"+
+      "Viivaston / reunojen vaihtelu: "+Math.round(edge*100)+" / 100\n"+
+      "Peilisymmetrian samankaltaisuus: "+Math.round(symmetry*100)+" / 100\n"+
+      "Nokin huomio: Nämä ovat pikselilaskelmia, eivät kuva-aiheiden tai taiteilijan tulkintaa.";
+  }
+  file.addEventListener("change",function(){
+    const f=file.files&&file.files[0];if(!f){return;}
+    if(!f.type.startsWith("image/")||f.size>12*1024*1024){report.textContent="Valitse alle 12 Mt:n kuvatiedosto.";return;}
+    releaseImage();imageUrl=URL.createObjectURL(f);preview.src=imageUrl;preview.style.display="block";
+    preview.onload=function(){try{report.textContent=analyze(preview);currentImage=true;say(artRoasts[roastIndex++%artRoasts.length]+" Mittarit ovat alla.",true);}catch(e){report.textContent="Kuvaa ei voitu analysoida: "+e.message;}};
+    preview.onerror=function(){report.textContent="Kuvan avaus epäonnistui.";releaseImage();};
+  });
+  document.getElementById("clear").addEventListener("click",function(){releaseImage();file.value="";report.textContent="Kuvaa ei ole valittu.";speech.textContent="Kuva poistettu tästä näkymästä.";});
+  window.addEventListener("pagehide",function(){stopAll(true);releaseImage();if(ctx&&ctx.state!=="closed"){ctx.close().catch(function(){});}});
+})();
+</script>
+</body>
+</html>

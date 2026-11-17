@@ -13,6 +13,7 @@ from pathlib import Path
 from .evidence_io import json_object, write_new_report
 from .limbo_evidence_review import MAX_MANIFEST_BYTES, _read_input, review_manifest
 from .limbo_council_workbench import _fingerprint
+from .limbo_evidence_accept import accept_context
 
 QUESTIONS=("mitä ","miksi ","miten ","kuinka ","voiko ","onko ","millo",
            "what ","why ","how ","is there ","does ","can ")
@@ -58,9 +59,12 @@ def _next_step(label):
             "then compare exact quote, methods, population, endpoints and replication.")
 
 
-def audit_quality(core_db, selected_manifest, prior_ledger):
-    if type(selected_manifest) is not dict or type(prior_ledger) is not dict:
-        raise ValueError("both E11.3 documents must be objects")
+def audit_quality(core_db, selected_manifest, prior_ledger,
+                  original_manifest, proposal_report):
+    if any(type(obj) is not dict for obj in (
+        selected_manifest,prior_ledger,original_manifest,proposal_report
+    )):
+        raise ValueError("E11.2 and E11.3 source documents must be objects")
     selection=selected_manifest.get("e11_context_selection")
     if type(selection) is not dict or (
         selection.get("kind")!="klone-e11-3-owner-approved-context-only"
@@ -81,6 +85,15 @@ def audit_quality(core_db, selected_manifest, prior_ledger):
     for raw in annotations:
         if type(raw) is not dict or raw.get("stance")!="context":
             raise ValueError("E11.4 accepts owner-selected context only")
+    # Reconstruct E11.3 from the ORIGINAL owner-supplied manifest and exact
+    # E11.2 proposal file. The E11.3 owner-attestation field alone is not
+    # evidence of a valid provenance chain. No memory writes or agent runs.
+    replayed=accept_context(
+        core_db,original_manifest,proposal_report,ids,
+        owner_confirms_selection=True,
+    )
+    if replayed!=selected_manifest:
+        raise ValueError("E11.3 selected manifest does not match original replay")
     regenerated=review_manifest(core_db,selected_manifest)
     if prior_ledger!=regenerated:
         raise ValueError("E11.3 ledger does not match current canonical source anchors")
@@ -127,6 +140,7 @@ def audit_quality(core_db, selected_manifest, prior_ledger):
         "e11_3_ledger_sha256":regenerated["report_sha256"],
         "e11_2_proposal_sha256":selection["e11_2_report_sha256"],
         "owner_context_selected":True,
+        "e11_2_e11_3_exact_replay_matches":True,
         "context_quote_count":len(context),
         "counts_by_kind":dict(sorted(counts.items())),
         "source_quality_flags":context,
@@ -145,6 +159,8 @@ def audit_quality(core_db, selected_manifest, prior_ledger):
 def main(argv=None):
     p=argparse.ArgumentParser(description="KLONE E11.4 private read-only summary quality audit")
     p.add_argument("--klone-db",type=Path,required=True)
+    p.add_argument("--original",type=Path,required=True)
+    p.add_argument("--proposals",type=Path,required=True)
     p.add_argument("--selected",type=Path,required=True)
     p.add_argument("--ledger",type=Path,required=True)
     p.add_argument("--output",type=Path,required=True)
@@ -156,6 +172,10 @@ def main(argv=None):
                                     "E11.3-hyvaksytty manifesti")),
             json_object(_read_input(args.ledger,MAX_MANIFEST_BYTES,
                                     "E11.3-evidenssiraportti")),
+            json_object(_read_input(args.original,MAX_MANIFEST_BYTES,
+                                    "E11-alkuperainen manifesti")),
+            json_object(_read_input(args.proposals,MAX_MANIFEST_BYTES,
+                                    "E11.2-ehdotukset")),
         )
         write_new_report(args.output.expanduser(),
                          json.dumps(data,ensure_ascii=False,indent=2,allow_nan=False)+"\n",

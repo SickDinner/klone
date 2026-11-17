@@ -418,13 +418,38 @@ def run_debate(report, dossier, *, live=False, owner_confirms_public=False,
                network_sender=None):
     cards, board, members = _validate_bundle(report, dossier)
     audit = quality_assessment(report, dossier)
-    preview = debate_preview(report, dossier)
     if model not in ALLOWED_MODELS:
         raise ValueError("unsupported model")
+
+    # Preflight the ACTUAL encoded Responses API request before any network
+    # activity. Preserve 64 distinct member IDs at each bounded profile.
+    first_budget = _budgeted_stage(
+        "cross_examination", model, TURN_SCHEMA,
+        report, dossier, cards, audit, []
+    )
+    if first_budget["retained_seat_ids"] != 64:
+        raise CouncilModelError("debate input lost one or more specialist seats")
+
     if not live:
         if checkpoint_dir is not None:
             raise ValueError("offline debate preview cannot create paid checkpoints")
+        preview = debate_preview(report, dossier)
+        preview["request_preflight"] = {
+            "prompt_compaction_version": PROMPT_COMPACTION_VERSION,
+            "cross_examination_body_bytes": first_budget["request_bytes"],
+            "hard_request_limit_bytes": MAX_REQUEST_BYTES,
+            "model": model,
+            "selected_profile": first_budget["profile"],
+            "retained_member_statements": 64,
+            "network_requests_performed": 0,
+            "note": ("Stage 1 fits now. Stages 2–3 are checked again with "
+                     "the actual bounded prior outputs before their API calls."),
+        }
+        preview["report_sha256"] = _fingerprint({
+            k: v for k, v in preview.items() if k != "report_sha256"
+        })
         return preview
+
     if not owner_confirms_public:
         raise PermissionError("owner public-data consent required")
     if (not api_key or
@@ -436,49 +461,44 @@ def run_debate(report, dossier, *, live=False, owner_confirms_public=False,
 
     permitted = {c["card_id"] for c in cards}
     role_ids = {m["id"] for m in board["members"]}
-    # These are REAL allowlisted tool operations, executed locally by the
-    # orchestrator; the model itself never obtains arbitrary function access.
-    chosen_ids = sorted(permitted)[:4]
+    # Fixed local source lookup only; no autonomous API tool access.
+    chosen_ids = [c["card_id"] for c in _balanced_card_ids(cards, 4)]
     read_receipts = [
         evidence_tool(dossier, "card_lookup", card_id=cid)
         for cid in chosen_ids
     ] + [evidence_tool(dossier, "discrepancy_counts")]
-    packet = {
-        "user_question": report["question"],
-        "input_report_sha256": report["report_sha256"],
-        "member_ids_allowed": sorted(role_ids),
-        "source_card_ids_allowed": sorted(permitted),
-        "ring_context_unverified": _compact_issues(report, audit),
-        "founder_synthesis_unverified": audit["founder_synthesis"][:800],
-        "founder_disagreements_unverified": [
-            v[:350] for v in audit["explicit_founder_disagreements"][:8]
-        ],
-        "local_read_only_tool_receipts": read_receipts,
-        "scientifically_verified": False,
-    }
+
+    # Version the checkpoint identity to prevent the old oversized-request
+    # format colliding with a newly compacted debate. Never silently
+    # re-purchase a received model answer saved under the previous format.
     state_context = {
         "source_report_sha256": report["report_sha256"],
         "source_e11_sha256": dossier["report_sha256"],
         "debate_model": model,
         "question_sha256": sha256(report["question"].encode()).hexdigest(),
+        "prompt_compaction_version": PROMPT_COMPACTION_VERSION,
     }
     sender = network_sender or _network_response
     stage_rows = []
+    stage_input_sizes = []
     new_calls = 0
     for stage, schema in (
         ("cross_examination", TURN_SCHEMA),
         ("defense", TURN_SCHEMA),
         ("arbiter", ARBITER_SCHEMA),
     ):
-        prior = [
-            {"stage": stage_rows[i]["stage"], "answer_unverified": stage_rows[i]["answer"]}
-            for i in range(len(stage_rows))
-        ]
-        instructions, text = _prompt(stage, packet, prior)
         try:
+            budget = (first_budget if not stage_rows else _budgeted_stage(
+                stage, model, schema, report, dossier, cards, audit, stage_rows
+            ))
+            if budget["retained_seat_ids"] != 64:
+                raise CouncilModelError(
+                    "debate stage lost one or more specialist seats"
+                )
             item, new = _stage_reply(
-                model, instructions, text, schema, api_key, sender,
-                stage, permitted, role_ids, checkpoint_dir, state_context
+                model, budget["instructions"], budget["payload"],
+                schema, api_key, sender, stage, permitted, role_ids,
+                checkpoint_dir, state_context,
             )
         except CouncilModelError as exc:
             raise CouncilModelError(
@@ -486,6 +506,11 @@ def run_debate(report, dossier, *, live=False, owner_confirms_public=False,
                 "no automatic retry or additional model action"
             ) from None
         new_calls += int(new)
+        stage_input_sizes.append({
+            "stage": stage, "request_bytes": budget["request_bytes"],
+            "size_limit_bytes": MAX_REQUEST_BYTES,
+            "profile": budget["profile"], "retained_seat_ids": 64,
+        })
         stage_rows.append({
             "stage": stage,
             "answer": item["answer"],
@@ -501,6 +526,8 @@ def run_debate(report, dossier, *, live=False, owner_confirms_public=False,
         "e11_report_sha256": dossier["report_sha256"],
         "model": model,
         "debate_turns": stage_rows,
+        "request_size_audit": stage_input_sizes,
+        "prompt_compaction_version": PROMPT_COMPACTION_VERSION,
         "model_api_requests_performed": new_calls,
         "model_api_responses_reused": 3 - new_calls,
         "local_public_tools_used": ["card_lookup", "discrepancy_counts"],

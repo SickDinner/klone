@@ -270,11 +270,122 @@ class BridgeTests(unittest.TestCase):
         payload = json.loads(request.data)
         self.assertFalse(payload["store"])
         self.assertEqual(payload["tools"], [])
+        self.assertEqual(payload["reasoning"]["effort"], "none")
         self.assertEqual(payload["text"]["format"]["type"], "json_schema")
         self.assertNotIn("never-print-this-key", json.dumps(payload))
         self.assertEqual(answer["x"], "y")
         self.assertEqual(identity, "res-1")
         self.assertEqual(usage["total_tokens"], 25)
+
+    def test_probe_requires_separate_one_call_owner_approval(self):
+        with patch.dict(os.environ, {
+            "KLONE_COUNCIL72_API_APPROVAL": API_APPROVAL,
+            "KLONE_COUNCIL72_PROBE_APPROVAL": ""
+        }):
+            with self.assertRaisesRegex(PermissionError, "one-request"):
+                run_council(
+                    self.question, self.dossier, probe=True,
+                    owner_confirms_public=True, api_key="mock-key"
+                )
+        with self.assertRaisesRegex(ValueError, "probe OR full"):
+            run_council(self.question, self.dossier, live=True, probe=True)
+
+    def test_mocked_probe_one_ring_eight_seats_no_founder_call(self):
+        calls = []
+        def sender(model, instruction, text, schema, api_key, limit):
+            calls.append(text)
+            self.assertIs(schema, RING_SCHEMA)
+            data = json.loads(text)
+            ids = [item["member_id"] for item in data["eight_distinct_roles"]]
+            return fake_ring(data["ring_id"], ids), {
+                "input_tokens": 150, "output_tokens": 360,
+                "total_tokens": 510,
+            }, "resp-probe"
+        with patch.dict(os.environ, {
+            "KLONE_COUNCIL72_PROBE_APPROVAL": "HYVAKSY_1_GPT_KUTSU"
+        }):
+            result = run_council(
+                self.question, self.dossier, probe=True,
+                owner_confirms_public=True, api_key="mock-key",
+                network_sender=sender
+            )
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(result["model_api_requests_performed"], 1)
+        self.assertEqual(result["mode"], "api_one_ring_probe_completed")
+        self.assertEqual(result["ring_calls"][0]["ring_id"], 1)
+        self.assertEqual(
+            len(result["ring_calls"][0]["eight_seat_assessments"]["seat_assessments"]), 8
+        )
+        self.assertNotIn("founder_synthesis", result)
+        self.assertFalse(result["memory_write"])
+        self.assertEqual(result["council_binding_votes"], 0)
+
+    def test_incomplete_status_reports_only_safe_reason_and_usage(self):
+        from klone import council72_intelligence_bridge as bridge
+        class IncompleteResponse:
+            status = 200
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def read(self, length):
+                return json.dumps({
+                    "status": "incomplete",
+                    "incomplete_details": {"reason": "max_output_tokens"},
+                    "error": None,
+                    "output": [{"type": "message",
+                                "content": [{"type": "output_text",
+                                             "text": "SECRET-MODEL-EXCERPT"}]}],
+                    "usage": {
+                        "input_tokens": 234,
+                        "output_tokens": 1700,
+                        "output_tokens_details": {"reasoning_tokens": 1450}
+                    }
+                }).encode()
+        class Opener:
+            def open(self, req, timeout=None):
+                return IncompleteResponse()
+        with patch.object(
+            bridge.urllib.request, "build_opener",
+            return_value=Opener()
+        ):
+            with self.assertRaisesRegex(CouncilModelError, "reason=max_output_tokens") as caught:
+                _network_response(
+                    "gpt-6-luna", "instruction", "input",
+                    {"type": "object", "properties": {}, "required": [],
+                     "additionalProperties": False}, "mock-key", 3400
+                )
+        message = str(caught.exception)
+        self.assertIn("output_tokens=1700", message)
+        self.assertIn("reasoning_tokens=1450", message)
+        self.assertNotIn("SECRET", message)
+        self.assertNotIn("mock-key", message)
+
+    def test_probed_cli_creates_report_without_network(self):
+        from klone import council72_intelligence_bridge as bridge
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            evidence = root / "e1111.json"
+            out = root / "probe.json"
+            evidence.write_text(json.dumps(self.dossier), encoding="utf-8")
+            def sender(model, instruction, text, schema, api_key, max_output_tokens):
+                data = json.loads(text)
+                return fake_ring(
+                    data["ring_id"],
+                    [x["member_id"] for x in data["eight_distinct_roles"]]
+                ), {"input_tokens": 100, "output_tokens": 200,
+                    "total_tokens": 300}, "mock-response"
+            with patch.object(bridge, "_network_response", side_effect=sender):
+                with patch.dict(os.environ, {
+                    "KLONE_COUNCIL72_PROBE_APPROVAL": "HYVAKSY_1_GPT_KUTSU",
+                    "OPENAI_API_KEY": "mock-key"
+                }):
+                    self.assertEqual(main([
+                        "--evidence", str(evidence),
+                        "--question", self.question, "--output", str(out),
+                        "--probe", "--owner-confirms-public-data"
+                    ]), 0)
+            self.assertEqual(
+                json.loads(out.read_text(encoding="utf-8"))["model_api_requests_performed"], 1
+            )
 
     def test_cli_preview_does_not_call_openai_and_never_overwrites(self):
         temp = tempfile.TemporaryDirectory()

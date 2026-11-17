@@ -705,6 +705,37 @@ class E7E8Tests(unittest.TestCase):
         self.assertEqual(result["sources"]["A"]["text"],a.read_text())
         self.assertEqual(self.core_before,self.core.read_bytes())
 
+    def test_e11_cli_names_missing_local_input_instead_of_unhelpful_missing(self):
+        import contextlib
+        import io
+        pair=review_all(self.core,question="genetiikka")["dossiers"][0]
+        ids=(pair["source_a"]["event_id"],pair["source_b"]["event_id"])
+        manifest=prepare(self.core,*ids)
+        template=self.root/"e11-template-exists.json"
+        template.write_text(json.dumps(manifest))
+        a=self.root/"missing-a.txt"
+        b=self.root/"missing-b.txt"
+        b.write_text("Allowed study excerpt is stored as plain text.")
+        output=self.root/"not-created-e11.json"
+        args=["--klone-db",str(self.core),"--fill",str(template),
+              "--source-a-file",str(a),"--source-b-file",str(b),
+              "--rights-note-a","User-supplied research text A",
+              "--rights-note-b","User-supplied research text B",
+              "--owner-confirms-supplied-text",
+              "--output",str(output)]
+        for target,expected in ((a,"Lahdeteksti A"),(b,"Lahdeteksti B")):
+            if target==b:
+                a.write_text("Allowed excerpt text is present in source A.")
+                b.unlink()
+            stderr=io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                with self.assertRaises(SystemExit):
+                    evidence_main(args)
+            self.assertIn(expected+": missing:",stderr.getvalue())
+            self.assertIn(str(target),stderr.getvalue())
+            self.assertFalse(output.exists())
+        self.assertEqual(self.core_before,self.core.read_bytes())
+
     def test_e11_refuses_oversized_data_and_missing_explicit_consent(self):
         m=self._e11_manifest()
         m["sources"]["B"]["text"]="A"*60001

@@ -410,9 +410,10 @@ def _network_response(model, instructions, text, schema, api_key, max_output_tok
         raise CouncilModelError("malformed model output or invalid JSON") from None
 
 
-def run_council(question, dossier, *, live=False, owner_confirms_public=False,
-                model=MODEL, api_key="", network_sender=None):
-    """Return one preview or one nine-call run; never promote model text to truth."""
+def run_council(question, dossier, *, live=False, probe=False,
+                owner_confirms_public=False, model=MODEL, api_key="",
+                network_sender=None):
+    """Return offline preview, one-call probe or nine-call council run."""
     if type(question) is not str or not 8 <= len(question.strip()) <= MAX_QUESTION_CHARS:
         raise ValueError("research question must be 8..1000 characters")
     if model not in ALLOWED_MODELS:
@@ -424,11 +425,15 @@ def run_council(question, dossier, *, live=False, owner_confirms_public=False,
         _role_prompt(question.strip(), compact, ring, members)
         for ring in board["rings"][:8]
     ]
-    if live and not owner_confirms_public:
+    if live and probe:
+        raise ValueError("choose probe OR full live run, not both")
+    if (live or probe) and not owner_confirms_public:
         raise PermissionError("owner must explicitly confirm public-data API transfer")
     if live and (not api_key or os.environ.get("KLONE_COUNCIL72_API_APPROVAL") != API_APPROVAL):
         raise PermissionError("explicit nine-request live approval and API key required")
-    if not live:
+    if probe and (not api_key or os.environ.get("KLONE_COUNCIL72_PROBE_APPROVAL") != PROBE_APPROVAL):
+        raise PermissionError("explicit one-request probe approval and API key required")
+    if not live and not probe:
         preview = {
             "kind": "klone-council72-intelligence-bridge-v1",
             "schema_version": SCHEMA_VERSION,
@@ -457,10 +462,14 @@ def run_council(question, dossier, *, live=False, owner_confirms_public=False,
 
     sender = network_sender or _network_response
     run = []
-    for ring, pair in zip(board["rings"][:8], prompts):
-        answer, usage, response_id = sender(
-            model, *pair, RING_SCHEMA, api_key, MAX_OUTPUT_TOKENS_RING)
-        _validate_seats(answer, members, ring, allowed_ids)
+    for ring, pair in zip(board["rings"][:1] if probe else board["rings"][:8],
+                          prompts[:1] if probe else prompts):
+        try:
+            answer, usage, response_id = sender(
+                model, *pair, RING_SCHEMA, api_key, MAX_OUTPUT_TOKENS_RING)
+            _validate_seats(answer, members, ring, allowed_ids)
+        except CouncilModelError as exc:
+            raise CouncilModelError(f"ring {ring['id']}: {exc}") from None
         run.append({
             "ring_id": ring["id"],
             "eight_seat_assessments": answer,
@@ -470,13 +479,37 @@ def run_council(question, dossier, *, live=False, owner_confirms_public=False,
             "response_sha256": _fingerprint(answer),
             "model_generated_not_verified": True,
         })
+    if probe:
+        result = {
+            "kind": "klone-council72-intelligence-bridge-v1",
+            "schema_version": SCHEMA_VERSION,
+            "mode": "api_one_ring_probe_completed",
+            "model": model,
+            "model_api_requests_performed": 1,
+            "planned_api_requests": 1,
+            "ring_calls": run,
+            "catalog_sha256": _fingerprint(board),
+            "e11_11_report_sha256": dossier["report_sha256"],
+            "question": question.strip(),
+            "owner_review_required": True,
+            "scientific_truth_verified": False,
+            "council_binding_votes": 0,
+            "memory_write": False,
+            "external_messages_sent": 0,
+            "external_tools_executed": 0,
+        }
+        result["report_sha256"] = _fingerprint(result)
+        return result
     instruction, text = _founder_prompt(
         question.strip(), compact,
         [item["eight_seat_assessments"] for item in run], board, members)
-    answer, usage, response_id = sender(
-        model, instruction, text, FOUNDER_SCHEMA,
-        api_key, MAX_OUTPUT_TOKENS_FOUNDERS)
-    _validate_founders(answer, board["founder_ids"], allowed_ids)
+    try:
+        answer, usage, response_id = sender(
+            model, instruction, text, FOUNDER_SCHEMA,
+            api_key, MAX_OUTPUT_TOKENS_FOUNDERS)
+        _validate_founders(answer, board["founder_ids"], allowed_ids)
+    except CouncilModelError as exc:
+        raise CouncilModelError(f"founder synthesis: {exc}") from None
     result = {
         "kind": "klone-council72-intelligence-bridge-v1",
         "schema_version": SCHEMA_VERSION,
@@ -517,7 +550,9 @@ def main(argv=None):
     parser.add_argument("--question", required=True)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--model", default=MODEL, choices=sorted(ALLOWED_MODELS))
-    parser.add_argument("--live", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--live", action="store_true")
+    mode.add_argument("--probe", action="store_true")
     parser.add_argument("--owner-confirms-public-data", action="store_true")
     args = parser.parse_args(argv)
     try:
@@ -525,7 +560,7 @@ def main(argv=None):
             args.evidence.expanduser(), MAX_MANIFEST_BYTES,
             "Council72 public E11.11 evidence"))
         result = run_council(
-            args.question, evidence, live=args.live,
+            args.question, evidence, live=args.live, probe=args.probe,
             owner_confirms_public=args.owner_confirms_public_data,
             model=args.model,
             api_key=os.environ.get("OPENAI_API_KEY", ""),

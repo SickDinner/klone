@@ -21,6 +21,7 @@ from klone.limbo_doctor import diagnose,_read_health
 from klone.limbo_evidence_review import prepare,review_manifest,fill_template,main as evidence_main
 from klone.limbo_evidence_candidates import suggest, main as candidate_main
 from klone.limbo_evidence_accept import accept_context, main as accept_main
+from klone.limbo_evidence_quality import audit_quality, main as quality_main
 from klone.council72 import catalog
 from klone.repository import KloneRepository
 
@@ -961,6 +962,106 @@ class E7E8Tests(unittest.TestCase):
         self.assertFalse(report["authority"]["scientific_truth_verified"])
         self.assertEqual(report["council_state"]["recorded_votes"],0)
         self.assertEqual(self.core.read_bytes(),before)
+
+    def _e114_reviewed(self):
+        manifest=self._e11_manifest()
+        # These are artificial test texts. They must never become verified papers.
+        title=manifest["sources"]["A"]["title"]
+        manifest["sources"]["A"]["text"]=(
+            title+".\n"
+            "Methods: Sample gene markers were compared across groups.\n"
+            "Tekijöiden mukaan tarkkuus parani vertailussa.\n"
+            "Automaattinen arviointi ei todista tutkimustulosta.\n"
+            "Mitä epävarmuutta mittauksiin liittyy?\n"
+        )
+        proposals=suggest(self.core,manifest,per_source_limit=12)
+        ids=[c["candidate_id"] for c in proposals["candidates"]]
+        selected=accept_context(self.core,manifest,proposals,ids,
+                                owner_confirms_selection=True)
+        ledger=review_manifest(self.core,selected)
+        return manifest,proposals,selected,ledger
+
+    def test_e114_classifies_real_owner_local_context_and_not_source_truth(self):
+        original=self.core.read_bytes()
+        _,proposals,selected,ledger=self._e114_reviewed()
+        quality=audit_quality(self.core,selected,ledger)
+        self.assertEqual(quality["kind"],"klone-e11-4-context-quality-audit")
+        self.assertEqual(quality["context_quote_count"],len(proposals["candidates"]))
+        self.assertEqual(quality["scientifically_verified_quote_count"],0)
+        self.assertEqual(quality["independent_council_reviews"],0)
+        self.assertFalse(quality["memory_write"])
+        self.assertFalse(quality["primary_publication_authenticated"])
+        self.assertFalse(quality["scientific_truth_verified"])
+        counts=quality["counts_by_kind"]
+        self.assertGreaterEqual(counts["publication_title_not_evidence"],1)
+        self.assertGreaterEqual(counts["open_question_not_evidence"],1)
+        self.assertGreaterEqual(counts["editorial_caution_not_evidence"],1)
+        self.assertGreaterEqual(counts["attributed_research_claim_needs_primary_check"],1)
+        self.assertEqual(quality,audit_quality(self.core,selected,ledger))
+        for item in quality["source_quality_flags"]:
+            source=selected["sources"][item["source"]]["text"]
+            self.assertEqual(source[item["char_start"]:item["char_end"]],
+                             item["quote"])
+            self.assertFalse(item["valid_scientific_evidence"])
+            self.assertFalse(item["exact_match_in_original_publication"])
+            self.assertFalse(item["reviewer_completed"])
+        self.assertEqual(original,self.core.read_bytes())
+
+    def test_e114_summary_quality_flag_is_not_publisher_authentication(self):
+        _,proposals,selected,ledger=self._e114_reviewed()
+        selected["sources"]["A"]["usage_rights_note"]=(
+            "Omistajan toimittama lähdeselostus, ei varmennettu kokoteksti")
+        selected["sources"]["B"]["usage_rights_note"]=(
+            "AI-generated summary, source text not independently authenticated")
+        current=review_manifest(self.core,selected)
+        quality=audit_quality(self.core,selected,current)
+        self.assertTrue(quality["source_quality_flags"])
+        for row in quality["source_quality_flags"]:
+            self.assertEqual(row["content_origin"],"owner_declared_summary_unverified")
+            self.assertFalse(row["valid_scientific_evidence"])
+
+    def test_e114_rejects_tampered_ledger_attestation_and_non_context_stance(self):
+        from copy import deepcopy
+        _,proposals,selected,ledger=self._e114_reviewed()
+        changed=deepcopy(ledger)
+        changed["quote_anchors"][0]["quote"]="FORGED QUOTE"
+        with self.assertRaisesRegex(ValueError,"does not match"):
+            audit_quality(self.core,selected,changed)
+        changed=deepcopy(selected)
+        changed["e11_context_selection"]["selection_explicitly_authorized"]=False
+        with self.assertRaisesRegex(ValueError,"selection attestation"):
+            audit_quality(self.core,changed,ledger)
+        changed=deepcopy(selected)
+        changed["annotations"][0]["stance"]="support_candidate"
+        with self.assertRaisesRegex(ValueError,"context only"):
+            audit_quality(self.core,changed,ledger)
+        changed=deepcopy(selected)
+        changed["sources"]["B"]["receipt_sha256"]="0"*64
+        with self.assertRaisesRegex(ValueError,"provenance mismatch"):
+            audit_quality(self.core,changed,ledger)
+        changed=deepcopy(selected)
+        changed["e11_context_selection"]["selected_candidate_ids"]=[]
+        with self.assertRaisesRegex(ValueError,"identity/count"):
+            audit_quality(self.core,changed,ledger)
+
+    def test_e114_cli_creates_private_report_only_once_and_preserves_memory(self):
+        _,proposals,selected,ledger=self._e114_reviewed()
+        manifest_file=self.root/"e114-context.json"
+        ledger_file=self.root/"e114-ledger.json"
+        outfile=self.root/"e114-quality.json"
+        manifest_file.write_text(json.dumps(selected))
+        ledger_file.write_text(json.dumps(ledger))
+        before=self.core.read_bytes()
+        args=["--klone-db",str(self.core),"--selected",str(manifest_file),
+              "--ledger",str(ledger_file),"--output",str(outfile)]
+        self.assertEqual(quality_main(args),0)
+        data=json.loads(outfile.read_text())
+        self.assertGreater(data["context_quote_count"],0)
+        self.assertEqual(data["e11_3_ledger_sha256"],ledger["report_sha256"])
+        self.assertEqual(data["scientifically_verified_quote_count"],0)
+        with self.assertRaises(SystemExit):
+            quality_main(args)
+        self.assertEqual(before,self.core.read_bytes())
 
     def test_e10_readonly_council_workbench_endpoints(self):
         import os

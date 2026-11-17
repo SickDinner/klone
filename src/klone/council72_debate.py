@@ -22,7 +22,7 @@ from .council72_intelligence_bridge import (
     _object, _array_of_strings, _text_schema, _stage_record,
 )
 from .council72_quality_lab import (
-    _load, _validate_bundle, debate_preview, evidence_tool
+    _load, _validate_bundle, quality_assessment, debate_preview, evidence_tool
 )
 from .evidence_io import write_new_report
 from .limbo_council_workbench import _fingerprint
@@ -110,24 +110,33 @@ def _arbiter_check(answer, allowed_cards):
     _text_check(answer["independence_warning"], limit=900)
 
 
-def _compact_issues(preview, audit):
-    # Include varied ring contexts, but never full local Memory Core material.
+def _compact_issues(report, audit):
+    # The adversarial model must actually SEE the original claims it challenges.
+    # Bound every source-derived sentence: ~64 seats, eight ring-level summaries.
     summary = []
-    for row in audit["ring_diagnostics"]:
+    for row, record in zip(audit["ring_diagnostics"], report["ring_calls"]):
+        value = record["eight_seat_assessments"]
         summary.append({
             "ring_id": row["ring_id"],
             "domain": row["domain"],
-            "member_ids": [
-                x["member_id"] for x in audit["role_assessments"]
-                if x["ring_id"] == row["ring_id"]
+            "seat_statements_unverified": [
+                {"member_id": seat["member_id"],
+                 "assigned_task": next(
+                     x["specialist_task"] for x in audit["role_assessments"]
+                     if x["member_id"] == seat["member_id"]
+                 ),
+                 "observation": seat["observation"][:190],
+                 "challenge": seat["challenge"][:150]}
+                for seat in value["seat_assessments"]
             ],
-            "specialist_tasks": [
-                {"member_id": x["member_id"], "task": x["specialist_task"]}
-                for x in audit["role_assessments"]
-                if x["ring_id"] == row["ring_id"]
+            "findings_unverified": [v[:270] for v in value["findings"][:3]],
+            "counterarguments_unverified": [
+                v[:270] for v in value["counterarguments"][:3]
+            ],
+            "open_questions_unverified": [
+                v[:240] for v in value["open_questions"][:3]
             ],
             "cited_source_card_ids": row["cited_cards"],
-            "counterargument_count": row["counterargument_count"],
             "uncertainty": row["uncertainty_note"][:250],
         })
     return summary
@@ -221,9 +230,7 @@ def run_debate(report, dossier, *, live=False, owner_confirms_public=False,
                model=MODEL, api_key="", checkpoint_dir=None,
                network_sender=None):
     cards, board, members = _validate_bundle(report, dossier)
-    audit = __import__(
-        "klone.council72_quality_lab", fromlist=["quality_assessment"]
-    ).quality_assessment(report, dossier)
+    audit = quality_assessment(report, dossier)
     preview = debate_preview(report, dossier)
     if model not in ALLOWED_MODELS:
         raise ValueError("unsupported model")
@@ -254,7 +261,8 @@ def run_debate(report, dossier, *, live=False, owner_confirms_public=False,
         "input_report_sha256": report["report_sha256"],
         "member_ids_allowed": sorted(role_ids),
         "source_card_ids_allowed": sorted(permitted),
-        "ring_context_unverified": _compact_issues(preview, audit),
+        "ring_context_unverified": _compact_issues(report, audit),
+        "founder_synthesis_unverified": audit["founder_synthesis"][:800],
         "founder_disagreements_unverified": [
             v[:350] for v in audit["explicit_founder_disagreements"][:8]
         ],

@@ -66,6 +66,68 @@ oikeellisuutta eikä alkuperäis-PDF:n julkaisija-autenttisuutta.
 Hallintaraporttiin merkitään aina \`owner_review_required\` ja
 \`scientific_truth_verified=false\`.
 
+## 17.11.2026: ensimmäinen oikea live-ajokoe ja korjaus
+
+Androidin ensimmäinen live-ajo pysähtyi ensimmäiseen mallivastaukseen
+\`model response incomplete or failed\`. Varsinainen yhdeksän kutsun
+neuvostoajo ei valmistunut. Vanha ohjelma ei kirjannut vastauksen
+\`status\`-, \`incomplete_details.reason\`- tai tokeninkäyttötietoja,
+joten tarkka syy jäi vahvistamatta.
+
+Todennäköinen mahdollinen selitys on liian pieni
+\`max_output_tokens=1700\` kahdeksalle rakenteiselle jäsenarviolle,
+kun oletusarvoinen päättelytila voi käyttää osan tokenbudjetista.
+**Tätä ei pidä esittää varmistettuna ilman API:n todellista metadataa.**
+
+Korjaus:
+- \`gpt-6-luna\`: \`reasoning.effort=none\`, koska tehtävä on
+  rajattu JSON-muotoisten jäsenhavaintojen generointiin.
+- \`gpt-6.1-sol\` ja \`gpt-6-astra\`: \`reasoning.effort=low\`.
+- \`max_output_tokens=3400\` rinkikutsuille ja perustajasynteesille.
+- Jos Responses API palauttaa kesken jääneen vastauksen,
+  ohjelma tulostaa vain sallitut metatiedot:
+  \`status\`, \`reason\`, rajatun virhekoodin,
+  \`output_tokens\` sekä \`reasoning_tokens\`.
+  Raakavastausta, API-avainta ja tutkimuskatkelmia ei tulosteta.
+- **Yhden kutsun probe:** erillinen hyväksyntä ja vain rinki 1
+  (kahdeksan roolia). Ei automaattisia uudelleenyrityksiä eikä
+  loppujen rinkien tai perustajien kutsua.
+- Vanhoja E11.11-raportteja ja päämuistia ei muuteta.
+
+Aiempi epäonnistunut API-pyyntö voi näkyä laskutuksessa,
+vaikka raporttia ei syntynyt. Älä käynnistä
+yhdeksän kutsun live-ajoa uudelleen ennen yhden kutsun
+probe-kokeen onnistumista.
+
+### Suositeltu Android-järjestys
+
+1. Päivitä haara, suorita täysin maksuton preview.
+2. Tarkista hyväksyttävä julkinen sisältö.
+3. Hyväksy erikseen **yksi maksullinen koekutsu** ja aja probe.
+4. Vasta toimivan probe-raportin jälkeen harkitse täyden
+   yhdeksän kutsun live-ajoa erillisellä hyväksynnällä.
+
+\`\`\`bash
+cd ~/klone-arxiv-e1 || exit 1
+git fetch origin feat/council72-intelligence-bridge-v1-20261117
+git switch --detach FETCH_HEAD
+bash scripts/klone-council72-intelligence-phone.sh preview
+
+# Vain uuden nimenomaisen yhden maksullisen API-kutsun hyväksynnän jälkeen:
+read -r -s -p 'OPENAI_API_KEY: ' OPENAI_API_KEY
+printf '\n'
+export OPENAI_API_KEY
+export KLONE_COUNCIL72_CONFIRM_PUBLIC=VAHVISTAN_JULKISUUDEN
+export KLONE_COUNCIL72_PROBE_APPROVAL=HYVAKSY_1_GPT_KUTSU
+bash scripts/klone-council72-intelligence-phone.sh probe
+unset OPENAI_API_KEY KLONE_COUNCIL72_PROBE_APPROVAL KLONE_COUNCIL72_CONFIRM_PUBLIC
+\`\`\`
+
+Jos probe onnistuu, raporttiin tulee
+\`mode=api_one_ring_probe_completed\`,
+\`model_api_requests_performed=1\`, ja vain ensimmäisen
+ringin kahdeksan jäsenen arvio. Se ei valtuuta täyttä ajoa.
+
 ## Termux — tarkka käyttö
 
 Käytä viimeisintä E11.11-raporttiasi. Tätä tehtävää varten mitään
@@ -77,7 +139,7 @@ cd ~/klone-arxiv-e1 || exit 1
 git fetch origin feat/council72-intelligence-bridge-v1-20261117 || exit 1
 git switch --detach FETCH_HEAD || exit 1
 
-# Ensiksi 10 testiä ja täysin offline-esikatselu:
+# Ensiksi verkottomat regressiotestit ja offline-esikatselu:
 bash scripts/klone-council72-intelligence-phone.sh preview
 \`\`\`
 
@@ -128,7 +190,7 @@ Tämä PR toteuttaa API-adapterin, roolitetut mallikutsut,
 jäsenten ID- ja lähdeviitevalidoinnin, offline-esikatselun,
 jäljitettävät tulos-/kutsutiivisteet, kulutuksen
 token-laskurit ja eksplisiittisen käytön eston oletustilassa.
-V1 sisältää myös 10 verkottomasti mockattua regressiotestiä.
+V1 sisältää verkottomat regressiotestit, myös yhden kutsun probesta ja API:n kesken jääneen vastauksen virhediagnostiikasta.
 
 PR ei sisällä piilotettuja API-avaimia, live-ajoa, avointa
 hakuagenttia, agenttien toimivaltuutta tai Memory Core -muutoksia.

@@ -665,31 +665,62 @@ def run_council(question, dossier, *, live=False, probe=False,
         return preview
 
     sender = network_sender or _network_response
+    context = _checkpoint_context(dossier, board, question, model)
+    seed = (_validated_probe_seed(
+        seed_probe, question, dossier, board, members, allowed_ids,
+        model, prompts[0]
+    ) if seed_probe is not None else None)
+    new_calls = 0
+    reused_calls = 0
     run = []
+
     for ring, pair in zip(board["rings"][:1] if probe else board["rings"][:8],
                           prompts[:1] if probe else prompts):
-        try:
+        ring_id = ring["id"]
+
+        def generate_ring():
+            nonlocal new_calls
+            if not probe and new_calls >= (8 if seed_probe else MAX_REQUESTS):
+                raise CouncilModelError("approved additional API-call cap exceeded")
+            # Count requests *before* sending. An aborted request might be billed.
+            new_calls += 1
             answer, usage, response_id = sender(
-                model, *pair, RING_SCHEMA, api_key, MAX_OUTPUT_TOKENS_RING)
-            _validate_seats(answer, members, ring, allowed_ids)
+                model, *pair, RING_SCHEMA, api_key, MAX_OUTPUT_TOKENS_RING
+            )
+            return {
+                "ring_id": ring_id,
+                "eight_seat_assessments": answer,
+                "api_response_id": response_id,
+                "usage": usage,
+                "request_sha256": _request_digest(*pair),
+                "response_sha256": _fingerprint(answer),
+                "model_generated_not_verified": True,
+            }
+
+        try:
+            item, generated_now = _stage_record(
+                f"ring-{ring_id:02d}", checkpoint_dir, context,
+                lambda row: _valid_ring_record(
+                    row, ring, pair, members, allowed_ids
+                ),
+                generate_ring,
+                seed=seed if ring_id == 1 else None,
+            )
         except CouncilModelError as exc:
-            raise CouncilModelError(f"ring {ring['id']}: {exc}") from None
-        run.append({
-            "ring_id": ring["id"],
-            "eight_seat_assessments": answer,
-            "api_response_id": response_id,
-            "usage": usage,
-            "request_sha256": sha256((pair[0] + "\n" + pair[1]).encode()).hexdigest(),
-            "response_sha256": _fingerprint(answer),
-            "model_generated_not_verified": True,
-        })
+            raise CouncilModelError(
+                f"ring {ring_id}: {exc}; no automatic re-request; "
+                "accepted/received model answers remain as local checkpoints"
+            ) from None
+        reused_calls += (0 if generated_now else 1)
+        run.append(item)
+
     if probe:
         result = {
             "kind": "klone-council72-intelligence-bridge-v1",
             "schema_version": SCHEMA_VERSION,
             "mode": "api_one_ring_probe_completed",
             "model": model,
-            "model_api_requests_performed": 1,
+            "model_api_requests_performed": new_calls,
             "planned_api_requests": 1,
             "ring_calls": run,
             "catalog_sha256": _fingerprint(board),
@@ -704,21 +735,51 @@ def run_council(question, dossier, *, live=False, probe=False,
         }
         result["report_sha256"] = _fingerprint(result)
         return result
-    instruction, text = _founder_prompt(
+
+    pair = _founder_prompt(
         question.strip(), compact,
-        [item["eight_seat_assessments"] for item in run], board, members)
-    try:
+        [item["eight_seat_assessments"] for item in run], board, members
+    )
+
+    def generate_founders():
+        nonlocal new_calls
+        if new_calls >= (8 if seed_probe else MAX_REQUESTS):
+            raise CouncilModelError("approved additional API-call cap exceeded")
+        new_calls += 1
         answer, usage, response_id = sender(
-            model, instruction, text, FOUNDER_SCHEMA,
-            api_key, MAX_OUTPUT_TOKENS_FOUNDERS)
-        _validate_founders(answer, board["founder_ids"], allowed_ids)
+            model, *pair, FOUNDER_SCHEMA, api_key, MAX_OUTPUT_TOKENS_FOUNDERS
+        )
+        return {
+            "founder_synthesis": answer,
+            "founder_api_response_id": response_id,
+            "founder_usage": usage,
+            "founder_request_sha256": _request_digest(*pair),
+            "founder_response_sha256": _fingerprint(answer),
+        }
+
+    try:
+        founder_row, founders_new = _stage_record(
+            "founders", checkpoint_dir, context,
+            lambda row: _valid_founder_record(row, pair, board, allowed_ids),
+            generate_founders,
+        )
     except CouncilModelError as exc:
-        raise CouncilModelError(f"founder synthesis: {exc}") from None
+        raise CouncilModelError(
+            f"founder synthesis: {exc}; no automatic re-request; "
+            "accepted/received answers remain in the checkpoint directory"
+        ) from None
+    reused_calls += (0 if founders_new else 1)
+    answer = founder_row["founder_synthesis"]
+    usage = founder_row["founder_usage"]
+    response_id = founder_row["founder_api_response_id"]
+    instruction, text = pair
     result = {
         "kind": "klone-council72-intelligence-bridge-v1",
         "schema_version": SCHEMA_VERSION,
         "mode": "api_nine_model_calls_completed",
-        "model": model, "model_api_requests_performed": MAX_REQUESTS,
+        "model": model, "model_api_requests_performed": new_calls,
+        "model_api_requests_reused": reused_calls,
+        "model_analyses_total": MAX_REQUESTS,
         "ring_calls": run,
         "founder_synthesis": answer,
         "founder_api_response_id": response_id,

@@ -33,8 +33,8 @@ def _read_source(raw: bytes, label: str) -> str:
         raise ValueError(f"{label}: source must be UTF-8 plain text") from exc
     if not MIN_SOURCE_CHARS <= len(content) <= MAX_SOURCE_CHARS:
         raise ValueError(f"{label}: source text length outside bounds")
-    if ("\\x00" in content or content.lstrip().startswith("%PDF") or
-        re.match(r"\\s*<(?:!doctype\\s+html|html)[\\s>]", content, re.I)):
+    if ("\x00" in content or content.lstrip().startswith("%PDF") or
+        re.match(r"\s*<(?:!doctype\s+html|html)[\s>]", content, re.I)):
         raise ValueError(f"{label}: plain-text source required (not PDF/HTML)")
     return content
 
@@ -43,7 +43,7 @@ def _spans(source: str, quote: str) -> list[dict]:
     if type(quote) is not str or not 12 <= len(quote) <= 400 or not quote.strip():
         raise ValueError("invalid source card quote")
     # Whitespace-insensitive lexical match, not a semantic translation.
-    pattern = re.compile(r"\\s+".join(re.escape(piece) for piece in quote.split()),
+    pattern = re.compile(r"\s+".join(re.escape(piece) for piece in quote.split()),
                          re.IGNORECASE)
     found = []
     for match in pattern.finditer(source):

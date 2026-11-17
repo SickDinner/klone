@@ -1,0 +1,23 @@
+.atlas-filter{display:grid;grid-template-columns:1fr;max-width:520px;margin:12px 0}.atlas-sources{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:10px}
+.atlas-source{border:1px solid #335c66;background:#0d2029;border-radius:12px;padding:12px}
+.atlas-source h3{font-size:.99rem;margin:0 0 6px}.atlas-source p{font-size:.79rem;color:#c3d9d8;margin:0 0 9px}.atlas-source a{overflow-wrap:anywhere;font-size:.81rem}
+.atlas-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin:16px 0}
+.atlas-observation-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:8px;max-height:360px;overflow:auto;margin:12px 0}
+.atlas-observation{padding:11px;background:#10232c;border:1px solid #39575f;border-radius:11px}
+.atlas-observation a{overflow-wrap:anywhere;font-size:.82rem}.atlas-observation b{font-size:.89rem}.atlas-observation p{font-size:.8rem;color:#a8d7d0}
+.atlas-packets{display:grid;gap:13px}.atlas-packet{padding:18px;border:1px solid #49777b;background:linear-gradient(125deg,#15353b,#0c1a23);border-radius:14px}
+.atlas-packet h3{font-size:1.12rem;color:#cceddd}.atlas-packet h4{font-size:.88rem;margin:12px 0 4px}
+.atlas-packet a{display:block;overflow-wrap:anywhere;margin:4px 0;font-size:.8rem}
+.atlas-packet ul{padding-left:20px;margin:8px 0}.atlas-packet li{margin:7px 0;line-height:1.4;font-size:.85rem}
+.atlas-pill{display:inline-block;margin:3px 5px 3px 0;padding:4px 8px;border:1px solid #638685;border-radius:18px;font-size:.72rem}
+.atlas-stats{font-size:.77rem;color:#9ebbb5;margin-top:10px}
+@media (max-width:600px){.atlas-controls{grid-template-columns:1fr}.atlas-sources{grid-template-columns:1fr}}
+
+.atlas-specialist{padding:12px;margin:8px 0;border:1px solid #42686c;background:#0c2229;border-radius:9px}
+.atlas-specialist b{color:#ddf2ef;font-size:.9rem}.atlas-specialist p{font-size:.85rem;line-height:1.45;margin:6px 0}
+.atlas-packet details{margin-top:12px}.atlas-packet summary{cursor:pointer;font-weight:700;color:#9be3d4}
+
+.atlas-memory-changes{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.atlas-memory-card{border:1px solid #466c70;background:#0b2028;border-radius:11px;padding:12px}
+.atlas-memory-card p{font-size:.82rem;color:#bdd6d0}
+.atlas-memory-card a{display:block;margin-top:8px;font-size:.82rem;overflow-wrap:anywhere}

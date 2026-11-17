@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
+<title>KLONE · Limbo Atlas E10</title>
+<link rel="stylesheet" href="/static/limbo-external.css">
+<link rel="stylesheet" href="/static/limbo-atlas.css">
+<script src="/static/limbo-atlas.js" defer></script>
+</head>
+<body>
+<header>
+  <a href="/">KLONE · Mission Control</a>
+  <a href="/limbo-external">Limbo E1</a>
+  <a href="/council72">72-paikkainen neuvosto</a>
+  <span class="tag">E10 · ATLAS / 8 ALAA</span>
+</header>
+<main>
+<section class="hero">
+  <p class="eyebrow">KLONE / LIMBO / MONIALAINEN TUTKIMUS</p>
+  <h1>Ulkomaailman tietovirrat.<br>Kahdeksan erityisalaa.<br>Seitsemän tutkimusrinkiä.</h1>
+  <p>Genetiikka, psykologia, psykiatria, farmakologia, geopolitiikka, filosofia, talous, teknologia ja luonnontieteet kerätään samaan lähdeketjuun. Kahdeksan nykyistä Limbo-agenttia tarkastelevat julkisia havaintoja ja laativat niistä tutkittavia ehdotuksia neuvoston muille ringeille.</p>
+  <div class="statline"><div><b>8</b><span>oikeaa Limbo-agenttia</span></div><div><b>26</b><span>kuratoitua lähdettä</span></div><div><b>7</b><span>vastaanottavaa rinkiä</span></div><div><b>0</b><span>automaattista julkaisua</span></div></div>
+</section>
+<p id="atlas-status" class="status" role="status" aria-live="polite">Ladataan alojen karttaa...</p>
+
+<section class="panel">
+  <h2>1. Agenttien monialainen vastuunjako</h2>
+  <p class="muted">Valitse agentin ala nähdäksesi sen tutkimustehtävät, neuvostoreitin, julkiset lähteet ja kuusi simuloitua välittäjäainemuuttujaa.</p>
+  <div class="atlas-filter">
+    <label for="domain-filter">Tutkimusala</label>
+    <select id="domain-filter"><option value="">Kaikki kahdeksan alaa</option></select>
+  </div>
+  <div class="agent-grid" id="atlas-agents"></div>
+</section>
+
+<section class="panel">
+  <h2>2. Julkiset uutis- ja tutkimuslähteet</h2>
+  <p class="muted">arXiv, Europe PMC, Stanford Encyclopedia of Philosophy ja julkiset RSS-uutisvirrat. Eri lehtien ja tutkimusarkistojen tietoja ei väitetä toisistaan riippumattomaksi näytöksi ilman tarkastusta.</p>
+  <div class="atlas-sources" id="atlas-sources"></div>
+  <p class="muted">Lähdeosoitteita saa avata erikseen. Niitä ei haeta selaimen taustalla eikä niiden julkaisijoihin lähetetä mitään KLONEn nimissä.</p>
+</section>
+
+<section class="panel" id="atlas-research">
+  <h2>3. Tuo tutkimukset ja rakenna neuvoston työjono</h2>
+  <p>Voit tuoda nykyisen arXiv E1 -raporttisi (12 tutkimusta) tai Atlas E2 -raportin. E1-raportin kaksi arXiv-lähdettä muunnetaan E2:n erikoisaloille; lähdesivu ja teksti säilyvät.</p>
+  <div class="toolbar">
+    <label class="file-button">Tuo tutkimus-JSON <input id="atlas-import" type="file" accept="application/json,.json"></label>
+    <button id="atlas-reset" type="button" class="secondary">Tyhjennä istunto</button>
+  </div>
+  <p id="atlas-import-status" class="status" role="status" aria-live="polite">Ei havaintoja.</p>
+  <div class="atlas-observation-list" id="atlas-observations"></div>
+  <h3>Lisää yksi julkinen lähde käsin</h3>
+  <form id="atlas-manual" class="form-stack">
+    <label>Lähde<select id="atlas-source-select"></select></label>
+    <label>Julkaisun HTTPS-linkki<input id="atlas-url" type="url" required maxlength="256"></label>
+    <label>Julkaisun otsikko<input id="atlas-title" required maxlength="240"></label>
+    <label>Tiivistelmä<textarea id="atlas-summary" rows="3" required maxlength="360"></textarea></label>
+    <button type="submit">Lisää tutkimushavainto</button>
+  </form>
+</section>
+
+<section class="panel" id="atlas-memory">
+  <h2>Atlas E3 · pysyvä julkinen tutkimusmuisti</h2>
+  <p>Yksittäinen hakukierros voi nähdä samat julkaisut uudelleen. E3:n erillinen Termuxissa sijaitseva SQLite-arkisto tunnistaa <strong>uudet tutkimusviitteet, muuttuneen julkaisumetadatan ja jo tunnetut viitteet</strong>. Se ei muuta KLONEn yksityistä Memory Corea eikä todenna tutkimusväitteitä oikeiksi.</p>
+  <div class="toolbar">
+    <label class="file-button">Tuo E3-muutostiedosto
+      <input id="atlas-memory-import" type="file" accept="application/json,.json">
+    </label>
+    <button type="button" id="atlas-memory-clear" class="secondary">Tyhjennä muistivertailun näkymä</button>
+  </div>
+  <p id="atlas-memory-status" class="status" role="status" aria-live="polite">Muistiarkiston tilaa ei ole vielä tuotu. Tietoja ei haeta tietokannasta selaimen taustalla.</p>
+  <div id="atlas-memory-changes" class="atlas-memory-changes"></div>
+  <h3>Ota täysi 26 lähteen arkistointi käyttöön</h3>
+  <pre class="code">cd ~/klone-arxiv-e1
+STAMP="$(date +%Y%m%d-%H%M%S)"
+
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_atlas --fetch --all \
+  --memory-db "$HOME/klone-var/atlas-memory.sqlite3" \
+  --memory-delta-output "$HOME/klone-var/atlas-e3-delta-$STAMP.json" \
+  --output "$HOME/klone-var/atlas-e3-briefing-$STAMP.json"</pre>
+  <p class="muted">Nämä komennot suoritetaan vain itse käynnistettyinä. Tallennus säilyttää myös ne kelvolliset julkaisut, jotka eivät mahdu 48 havainnon neuvostoraporttiin. Tuo tämän jälkeen E3-muutostiedosto yllä olevalla painikkeella.</p>
+</section>
+
+<section class="panel" id="atlas-e4-queue">
+  <h2>Atlas E4 · koko tutkimusarkiston työjono</h2>
+  <p>Kaikki E3-arkiston julkaisuviitteet jaetaan enintään 48 havainnon eriin. Erien määrä lasketaan aina senhetkisestä tietokannasta; 148 viitettä muodostaa neljä erää (48 + 48 + 48 + 4). Jokainen tutkimusala saa vuorollaan paikan neuvoston käsittelyjonossa.</p>
+  <div class="toolbar">
+    <label class="file-button">Tuo E4-työjono
+      <input id="atlas-e4-import" type="file" accept="application/json,.json">
+    </label>
+    <button id="atlas-e4-clear" type="button" class="secondary">Tyhjennä jononäkymä</button>
+  </div>
+  <p id="atlas-e4-status" class="status" role="status" aria-live="polite">E4-työjonoa ei ole vielä tuotu.</p>
+  <div class="atlas-controls">
+    <label for="atlas-e4-batch">Valitse neuvoston tutkimuserä
+      <select id="atlas-e4-batch"><option value="">Tuo ensin työjonotiedosto</option></select>
+    </label>
+  </div>
+  <div class="toolbar">
+    <button type="button" id="atlas-e4-load" disabled>Lataa valittu erä neuvoston ideointiin</button>
+  </div>
+  <div id="atlas-e4-info" class="atlas-memory-changes"></div>
+  <p class="muted">Erän lataaminen ei vielä merkitse tutkimusta tehdyksi. Valitse sen jälkeen alta rinki ja tutkimuskysymys ja paina "Luo ja reititä tutkimusluonnokset". Tarkistamatta olevia väitteitä ei julisteta tosiksi.</p>
+  <h3>Vie koko arkiston jono Termuxista</h3>
+  <pre class="code">cd ~/klone-arxiv-e1
+STAMP="$(date +%Y%m%d-%H%M%S)"
+
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_queue \
+  --db "$HOME/klone-var/atlas-memory.sqlite3" \
+  --output "$HOME/klone-var/atlas-e4-queue-$STAMP.json"
+
+cp "$HOME/klone-var/atlas-e4-queue-$STAMP.json" \
+   "$HOME/storage/downloads/KLONE-E4-tyojono.json"</pre>
+</section>
+
+<section class="panel" id="atlas-e5-core">
+  <h2>Atlas E5 · KLONEn älymuisti</h2>
+  <p>Atlas E3:n julkiset julkaisuviitteet voidaan tuoda erikseen KLONEn varsinaiseen Memory Coreen. Niistä syntyy rajattuja, auditoituja ja alkuperäisjulkaisuun jäljitettäviä muistihavaintoja <code>research-room</code>-huoneeseen. Julkaisun väite ei muutu todistetuksi faktaksi.</p>
+  <div class="atlas-controls">
+    <label>Hae omasta KLONE-älymuistista
+      <input id="atlas-e5-query" maxlength="160" placeholder="esim. genomit, muisti, agentit, farmakologia">
+    </label>
+  </div>
+  <div class="toolbar">
+    <button type="button" id="atlas-e5-search">Hae älymuistin tutkimusviitteitä</button>
+    <button type="button" id="atlas-e5-clear" class="secondary">Tyhjennä hakutulokset</button>
+  </div>
+  <p id="atlas-e5-status" class="status" role="status" aria-live="polite">Tutkimusmuistiin ei ole tehty hakua. E5-tuonti on käynnistettävä erikseen omistajan Termux-komennolla.</p>
+  <div id="atlas-e5-results" class="atlas-memory-changes"></div>
+  <h3>Esikatsele ensin, tuo sitten julkiset viitteet</h3>
+  <pre class="code">cd ~/klone-arxiv-e1
+
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_memory_bridge \
+  --atlas-db "$HOME/klone-var/atlas-memory.sqlite3" \
+  --klone-db "$HOME/klone-var/arxiv-e1.db"
+
+# Kun esikatselu näyttää oikean kohdetietokannan:
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_memory_bridge \
+  --atlas-db "$HOME/klone-var/atlas-memory.sqlite3" \
+  --klone-db "$HOME/klone-var/arxiv-e1.db" --commit</pre>
+  <p class="muted">Tämä lisää vain E3-arkiston julkisia lähdemetatietoja omistajan käskystä. Se ei avaa käyttäjän yksityisiä muisteja, muuta suojattuja huoneita tai nosta epävarmoja väitteitä vahvistetuksi tiedoksi. Älymuistin yksittäisen löydön voi avata Memory Coren omassa kontekstinäkymässä.</p>
+</section>
+
+<section class="panel" id="atlas-e6-intelligence">
+  <h2>Atlas E6 · Neuvoston tutkimusäly</h2>
+  <p>Tutkimusäly hakee KLONEn oikean Memory Coren <code>research-room</code>-huoneesta, vertailee aiemmin tallennettuja lähteitä ja muodostaa jokaiselle tieteenalalle uusia testattavia tutkimuskysymyksiä. Se tarkistaa myös mahdolliset vastakkaiset sanamuodot, mutta <strong>ei väitä ristiriitoja todistetuiksi</strong>.</p>
+  <form id="atlas-e6-form" class="form-stack">
+    <label>Tutkittava kysymys tai aihe
+      <input id="atlas-e6-question" required minlength="3" maxlength="160" placeholder="esim. ancestry, memory, artificial intelligence, employment">
+    </label>
+    <div class="atlas-controls">
+      <label>Neuvoston näkökulma
+        <select id="atlas-e6-ring">
+          <option value="">Automaattinen erikoisrinki</option>
+          <option value="2">2 · Merkitys ja luovuus</option>
+          <option value="3">3 · Muisti ja kokemukset</option>
+          <option value="4">4 · Talous ja resurssit</option>
+          <option value="5">5 · Kognitio ja riskit</option>
+          <option value="6">6 · Hypoteesit ja tutkimus</option>
+          <option value="7">7 · Arkkitehtuuri ja testit</option>
+          <option value="8">8 · Evidenssi ja auditointi</option>
+        </select>
+      </label>
+      <label>Käsiteltävien lähteiden enimmäismäärä
+        <select id="atlas-e6-limit">
+          <option value="12">12 viitettä</option>
+          <option value="24" selected>24 viitettä</option>
+          <option value="48">48 viitettä</option>
+        </select>
+      </label>
+    </div>
+    <div class="toolbar">
+      <button id="atlas-e6-analyze" type="submit">Tutki muistista ja luonnostele hypoteesit</button>
+      <button id="atlas-e6-export" type="button" disabled>Lataa tutkimusanalyysi JSON</button>
+    </div>
+  </form>
+  <p id="atlas-e6-status" class="status" role="status" aria-live="polite">Odotetaan tutkimuskysymystä. Ei automaattista verkon lukua tai muistikirjoitusta.</p>
+  <div id="atlas-e6-results" class="atlas-packets"></div>
+  <p class="muted">Tämä versio tekee toistettavaa avainsana- ja lähdevertailua. Ristiriitasignaalit ovat tutkimuskysymyksiä, eivät tekoälyn toteamia tosiasioita. Alkuperäiset tutkimukset, menetelmät ja mahdollinen vertaisarviointi pitää edelleen tarkastaa.</p>
+</section>
+
+<section class="panel" id="atlas-e7-journal">
+  <h2>Atlas E7 · Hypoteesien aikakirja</h2>
+  <p>Uusi omistajan hyväksymä tutkimuspäiväkirja pitää erillään hypoteesin, sen kumoavan ennusteen, muistilähteiden puolto- ja vastaehdokkaat sekä ihmisen arviointimerkinnät. Jokainen merkintä saa uuden tarkistetun version ja tarkisteketjun. Julkaisun tiivistelmä ei yksin todista hypoteesia oikeaksi.</p>
+  <div class="toolbar">
+    <label class="file-button">Tuo E7-päiväkirjan JSON
+      <input id="atlas-e7-import" type="file" accept="application/json,.json">
+    </label>
+    <button type="button" id="atlas-e7-clear" class="secondary">Tyhjennä näkymä</button>
+  </div>
+  <p id="atlas-e7-status" class="status" role="status" aria-live="polite">Tuo E7:n vain luku -vientitiedosto. Selain ei voi muuttaa muistipäiväkirjaa.</p>
+  <div id="atlas-e7-results" class="atlas-memory-changes"></div>
+  <h3>Esikatsele falsifioitava hypoteesi Termuxissa</h3>
+  <pre class="code">cd ~/klone-arxiv-e1
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_hypotheses \
+  --klone-db "$HOME/klone-var/arxiv-e1.db" \
+  --propose --domain genetics \
+  --title "Geneettisten menetelmien vertailu" \
+  --question "Miten eri aineistojen mallit voidaan testata?" \
+  --falsifier "Riippumaton aineisto ei toista havaittua vaikutusta."</pre>
+  <p class="muted">Esikatselu ei kirjoita mitään. Vasta käyttäjän nimenomaisesti lisäämä <code>--commit</code> luo tapahtuman paikalliseen E7-päiväkirjaan, ei pää-KLONEn Memory Coreen.</p>
+</section>
+
+<section class="panel" id="atlas-e8-discovery">
+  <h2>Atlas E8 · Tieteidenvälinen löytötutka</h2>
+  <p>E8 etsii yllättäviä, toisiinsa liittyviä aiheita eri tieteenaloilta ja arvioi, missä lähdekritiikin <strong>evidenssivelka</strong> on suurin. Kahdeksan kriittistä tutkimuslinssiä etsii nollamalleja, sekoittavia tekijöitä, mittausvirheitä ja mahdollisia kumoavia testejä. Pisteet ovat tutkimuksen priorisointia, eivät totuuden todennäköisyyksiä.</p>
+  <form id="atlas-e8-form" class="form-stack">
+    <label>Tutka-aihe
+      <input id="atlas-e8-question" required minlength="3" maxlength="160" placeholder="genetiikka, muisti, työmarkkinat, filosofia">
+    </label>
+    <div class="toolbar">
+      <button type="submit" id="atlas-e8-run">Etsi tieteidenvälisiä tutkimusideoita</button>
+      <button type="button" id="atlas-e8-export" disabled>Lataa tutkimustutkan raportti</button>
+    </div>
+  </form>
+  <p id="atlas-e8-status" class="status" role="status" aria-live="polite">Ei tutkimusajoa. Lähteitä luetaan vain omasta julkisesta research-room-muistista.</p>
+  <div id="atlas-e8-results" class="atlas-packets"></div>
+</section>
+
+<section class="panel">
+  <h2>4. Valitse vastaanottava rinki ja tutkimuskysymys</h2>
+  <p class="muted">Automaattireititys käyttää alan luontevaa neuvostorinkiä. Vaihtoehtoisesti voit ohjata koko havaintojoukon valitsemaasi rinkiin ja pyytää uutta näkökulmaa.</p>
+  <div class="atlas-controls">
+    <label>Vastaanottaja
+      <select id="atlas-ring">
+        <option value="">Automaattinen monialainen reititys</option>
+        <option value="2">2 · Himo: merkitys, luovuus ja tavoitteet</option>
+        <option value="3">3 · Ylensyönti: muisti, aiemmat kokemukset</option>
+        <option value="4">4 · Ahneus: resurssit ja priorisointi</option>
+        <option value="5">5 · Viha: kognitio, kuormitus ja riskit</option>
+        <option value="6">6 · Harhaoppi: tutkimus ja kilpailevat teoriat</option>
+        <option value="7">7 · Väkivalta: arkkitehtuuri ja rajattu toteutus</option>
+        <option value="8">8 · Vilppi: lähdekritiikki ja auditointi</option>
+      </select>
+    </label>
+    <label>Oma tutkimuskysymys (valinnainen)
+      <input id="atlas-question" maxlength="380" placeholder="Mitä näistä voisi hyödyntää KLONEn muistissa?">
+    </label>
+  </div>
+  <div class="toolbar">
+    <button id="atlas-plan" class="primary" type="button">Luo ja reititä tutkimusluonnokset</button>
+    <button id="atlas-export" type="button" disabled>Lataa koko neuvostoraportti</button>
+  </div>
+  <p id="atlas-plan-status" class="status" aria-live="polite">Suunnitelmaa ei ole laadittu.</p>
+  <div id="atlas-packets" class="atlas-packets"></div>
+</section>
+
+<section class="panel">
+  <h2>5. Hae uusia tutkimuksia Termuxissa</h2>
+  <p>Ulkomaailman aineiston haku käynnistyy vain Termuxin <code>--fetch</code>-valinnalla. Voit hakea kaikki 26 lähdettä tai yhden tutkimusalan kerrallaan.</p>
+  <pre class="code">cd ~/klone-arxiv-e1
+
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_atlas \
+  --fetch --domain genetics \
+  --domain mind_medicine \
+  --output "$HOME/klone-var/atlas-genetiikka-psykiatria.json"</pre>
+  <p class="muted">Haku voi kestää useita minuutteja etenkin kaikilla lähteillä. Yhden lähteen estot tai tyhjät vastaukset säilyvät virheraportissa; niitä ei korvata keksityillä tutkimuksilla.</p>
+</section>
+<footer>KLONE Atlas E10 · raportoidut lähteet ≠ vahvistettu tieto · ei yksityisen muistin lukua · ei automaattista someviestintää</footer>
+</main>
+</body>
+</html>

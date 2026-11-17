@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
+<title>KLONE · Limbo External Intelligence</title>
+<link rel="stylesheet" href="/static/limbo-external.css">
+<script src="/static/limbo-external-view.js" defer></script>
+</head>
+<body>
+<header><a href="/">KLONE Mission Control</a><a href="/council72">72-paikkainen neuvosto</a><a href="/limbo-atlas">Atlas E2 · monialainen tutkimus</a><span class="tag">E1 · JULKINEN TUTKIMUS</span></header>
+<main>
+<section class="hero">
+  <p class="eyebrow">KLONE / LIMBO / EXTERNAL INTELLIGENCE NETWORK</p>
+  <h1>Kahdeksan tutkimusagenttia.<br>Yksi jäljitettävä tilannekuva.</h1>
+  <p>Olemassa olevan 72-paikkaisen neuvoston Limbo-viestinviejät tutkivat julkisia lähteitä, kokoavat raportoituja havaintoja ja toimittavat ne omille perustajilleen. Simuloidut neuromodulaattorit eivät anna agenteille ulkoisia toimintaoikeuksia.</p>
+  <div class="statline"><div><b>8</b><span>Limbon agenttia</span></div><div><b>6</b><span>laskennallista modulaattoria</span></div><div><b>0</b><span>automaattista somejulkaisua</span></div></div>
+</section>
+<p id="status" class="status" role="status" aria-live="polite">Haetaan agentteja ja julkisia lähteitä...</p>
+<section class="panel"><h2>Agentit ja sisäinen raportointireitti</h2>
+  <p class="muted">Neuvoston oikeat jäsen-ID:t, erityisalat, perustajakytkennät ja kuusi neuromodulaattoria. Ei kuvitteellisia ulkopuolisia henkilöprofiileja.</p>
+  <div class="agent-grid" id="agents"></div>
+</section>
+<section class="panel"><h2>Julkisten lähteiden havainnot</h2>
+  <p>Havainnon voi lisätä käsin tai tuoda Termuxin julkisista RSS/Atom-lähteistä keräämästä JSON-raportista. Julkaisun väitettä ei hyväksytä todennetuksi pelkän lähdelinkin perusteella.</p>
+  <form id="observation-form" class="form-stack">
+    <label>Julkinen lähde<select id="source-id" required></select></label>
+    <label>Artikkelin HTTPS-osoite<input id="article-url" type="url" autocomplete="off" required placeholder="https://arxiv.org/abs/..."></label>
+    <label>Otsikko<input id="article-title" type="text" required maxlength="240"></label>
+    <label>Lyhyt lähdeyhteenveto<textarea id="article-summary" required maxlength="360" rows="3"></textarea></label>
+    <button type="submit">Lisää havainto istuntoon</button>
+  </form>
+  <div class="toolbar"><label class="file-button">Tuo havainto-JSON <input id="import-file" type="file" accept="application/json,.json"></label><button id="clear-input" type="button" class="secondary">Tyhjennä havainnot</button></div>
+  <p id="observation-status" class="muted">Ei havaintoja. Aineisto pysyy selaimen tämän välilehden muistissa.</p>
+  <div id="observation-list" class="item-list"></div>
+  <label>Tutkimustehtävän tavoite<input id="goal" type="text" maxlength="2000" value="Julkisen maailman havaintojen kriittinen tutkiminen"></label>
+  <button id="preview" type="button" class="primary">Laadi neuvostoraportti</button>
+  <p id="report-status" class="status" aria-live="polite">Raporttia ei ole laadittu.</p>
+  <div id="report" class="report"></div>
+  <div class="toolbar"><button id="export-report" type="button" disabled>Tallenna raportti JSONina</button></div>
+</section>
+<section class="panel"><h2>Lähteistetty yhteydenotto – vain luonnos</h2>
+  <p>Agentti voi kirjoittaa asiantuntijalle tai yhteisölle kysymyksen omalla nimimerkillään. Luonnos kertoo vastaanottajalle, että kirjoittaja on automaattinen tutkimusagentti. Omistajaa tai KLONEn sisäisiä tietoja ei sisällytetä.</p>
+  <form id="draft-form" class="form-stack">
+    <label>Agentti ja aihealue<select id="draft-source"></select></label>
+    <label>Kysymys<input id="draft-question" maxlength="380" required placeholder="Miten lähteen väite on varmennettu?"></label>
+    <button type="submit">Muodosta tarkistettava viestiluonnos</button>
+  </form>
+  <p id="draft-status" class="muted">Mitään viestiä ei lähetetä automaattisesti.</p>
+  <pre id="draft-output"></pre>
+</section>
+<section class="panel"><h2>Julkisen tutkimuksen käynnistäminen Termuxissa</h2>
+  <p>RSS/Atom-lähteiden verkkoluku käynnistyy vain erillisellä <code>--fetch</code>-komennolla. API ja tämän sivun avaus eivät tee verkkohakuja kohdesivustoihin.</p>
+  <pre class="code">cd ~/klone-next
+PYTHONPATH=src .venv/bin/python -m klone.limbo_external \
+  --fetch --source arxiv-ai \
+  --output "$HOME/klone-var/limbo-ai-report.json"</pre>
+  <p class="muted">Lataa tehty JSON raporttiin yllä olevasta ”Tuo havainto-JSON” -valinnasta. Jokainen tuotu lähde säilyy epävarmana, kunnes sille tehdään erillinen lähdetarkistus.</p>
+</section>
+<footer>KLONE Experimental E1 · julkiset lähteet · ei automaattista postausta · ei yksityisen muistin lukua</footer>
+</main>
+</body>
+</html>

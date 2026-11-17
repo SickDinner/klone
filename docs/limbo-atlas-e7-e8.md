@@ -1,0 +1,281 @@
+# KLONE Atlas E7/E8 – hypoteesien aikakirja ja tutkimuksen löytötutka
+
+E1–E6 toivat ulkomaailman julkisten tutkimusten metatietoja oikeaan
+KLONE Memory Coreen. Käyttäjän Android-lokit vahvistivat 16.11.2026:
+- 148 muistilähdettä portin 8000 **päämuistissa** ja portin 8031
+  kehitysmuistissa, julkisessa \`research-room\`-huoneessa;
+- portin 8041 read-only E6-analyysissä 148 viitettä ja genetiikalla
+  24 valittua osumaa, 18 vertailua, 1 neuvostoluonnos;
+- ei automaattisia Memory Core -kirjoituksia E6-lukuhaussa.
+
+**E7 ja E8 ovat uusia kehitysvaiheita, joita ei pidä merkitä puhelimessa
+asennetuiksi ennen tässä dokumentissa annettua erillistä asennusajoa.**
+
+## E7 – hypoteesin geneettinen sukupuu / tutkimuksen aikakirja
+
+\`src/klone/limbo_hypotheses.py\` luo valinnaisen erillisen
+\`~/klone-var/atlas-hypotheses.sqlite3\`-tietokannan.
+
+- Hypoteesilla on nimi, tieteenala, rajattu kysymys ja
+  **falsifioiva eli sen kumoava mitattava koe-ehdotus**.
+- Jokainen tapahtuma (\`proposed\`, \`source_link\`, \`review\`)
+  lisätään omaan, versioituun aikakirjaan; vanhaa merkintää ei
+  ylikirjoiteta.
+- \`source_link\` viittaa todelliseen, nykyiseen KLONEn
+  \`research-room\`-Memory Core -tapahtumaan ja tallentaa
+  lähteen URL:n, artikkelin ID:n, versiotunnisteen, lähde-ID:n ja
+  alkuperäisen \`receipt_sha256\`-tarkisteen.
+- Linkit merkitään \`support_candidate\`, \`counter_candidate\`
+  tai \`context\`; nämä eivät ole vahvistettuja tuloksia.
+- Versiolokissa käytetään determinististä SHA-256-ketjua;
+  aiempi versio merkitään seuraavan tarkisteeseen.
+  **Tämä havaitsee yksinkertaiset jälkikäteen tehdyt muutokset,
+  mutta ei ole ulkoisesti ankkuroitu tai muuttumaton auditloki.**
+- Omistaja voi merkitä työn tilaksi esimerkiksi \`in_review\`,
+  \`needs_replication\`, \`inconclusive\` tai \`retired\`.
+  **\`verified\` tai \`proven\` ei ole sallittu tila** pelkkien
+  lähdetiivistelmien perusteella.
+- Kullakin hypoteesilla on **evidenssivelka**: lähteiden
+  alkuperäisen sisällön tarkastus, metodien analyysi, riippumattoman
+  vastanäytön etsintä ja toistettavuuden varmistaminen.
+- \`expected_revision\` torjuu vanhentuneesta ruudusta tehtävät
+  päällekkäiset kirjoitukset.
+- **Ei selainkirjoituksia eikä automaattista tuontia.**
+  Komentorivin \`--commit\` on pakollinen ennen jokaista kirjoitusta.
+  Yksityiset Memory Core -huoneet eivät ole lähdevalikoimassa.
+
+### Esikatsele uusi hypoteesi
+
+\`\`\`sh
+cd ~/klone-arxiv-e1 || exit 1
+PY="$HOME/klone-next/.venv/bin/python"
+CORE="$HOME/klone/data/klone_mission_control.db"
+JOURNAL="$HOME/klone-var/atlas-hypotheses.sqlite3"
+
+PYTHONPATH="$PWD/src" "$PY" -m klone.limbo_hypotheses \
+  --propose --klone-db "$CORE" --journal-db "$JOURNAL" \
+  --domain genetics \
+  --title "Muinais-DNA:n riippumaton toistettavuus" \
+  --question "Toistuvatko haploryhmäpäätelmät riippumattomassa aineistossa?" \
+  --falsifier "Toisesta aineistosta tehty ennakkorekisteröity koe ei toista päätelmää."
+\`\`\`
+
+Tämä tulostaa \`mode=preview\`. Jos haluat **nimenomaisesti**
+kirjata hypoteesin, suorita sama komento lisävalinnalla \`--commit\`.
+Muutos menee vain erilliseen \`atlas-hypotheses.sqlite3\`-päiväkirjaan.
+Pää-KLONEn Memory Coren olemassa olevia 148 havaintoa ei muokata.
+
+### Liitä todellinen julkinen lähde ja arviointimerkintä
+
+1. Tarkista halutun julkisen Memory Core -muistihavainnon \`event_id\`
+   päämuistin \`http://127.0.0.1:8041/research\`-näkymästä.
+2. Tarkista hypoteesin nykyinen ID ja versio:
+
+\`\`\`sh
+cd ~/klone-arxiv-e1 || exit 1
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_hypotheses \
+  --journal-db "$HOME/klone-var/atlas-hypotheses.sqlite3" \
+  --list \
+  --output "$HOME/klone-var/atlas-e7-list-$(date +%Y%m%d-%H%M%S).json"
+\`\`\`
+
+3. Esikatsele lähteen liittämistä; vaihda \`1\` oikeaksi hypoteesi-ID:ksi,
+   \`123\` oikeaksi lähdemuistin ID:ksi sekä \`1\` tämän hypoteesin
+   viimeisimmäksi versioksi:
+
+\`\`\`sh
+cd ~/klone-arxiv-e1 || exit 1
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_hypotheses \
+  --journal-db "$HOME/klone-var/atlas-hypotheses.sqlite3" \
+  --klone-db "$HOME/klone/data/klone_mission_control.db" \
+  --attach --hypothesis-id 1 --source-event-id 123 \
+  --stance context --expected-revision 1 \
+  --note "Tarkista riippumaton aineisto, menetelmät ja päätelmän rajat."
+\`\`\`
+
+Vasta nimenomaisella \`--commit\`-lisävalinnalla lähdelinkki
+tallennetaan. Tilapäätös kirjataan erikseen \`--review --state
+needs_replication --hypothesis-id 1 --expected-revision N --note
+"Huomiot" --commit\`. Päätös koskee tutkimusprosessin tilaa,
+ei väitteen automaattista totuusarvoa.
+
+## E8 – tieteenalojen väliset heikot signaalit ja evidenssivelka
+
+\`src/klone/limbo_discovery.py\` analysoi vain todellisia julkisia
+Memory Core -havaintoja:
+- Tunnistaa ehdokasyhteyksiä **eri tutkimusalojen** julkaisujen
+  välillä yhteisten termien ja lähdemuistien avulla.
+- Erottaa eri julkaisijaryhmät, mutta **ei kutsu sitä todisteeksi
+  riippumattomista tutkimuksista**.
+- Laskee eksplisiittisen **tutkimisen prioriteetin**, joka suosii
+  puuttuvien tarkistusten täyttämistä – ei väitä tietävänsä
+  hypoteesin todennäköisyyttä.
+- Määrittää kahdeksan kriittistä tutkimusnäkökulmaa:
+  nollahypoteesi, sekoittavat tekijät, mittausvirhe, käänteinen
+  kausaalisuus, lähteiden riippuvuus, mallin rajat, kumoava
+  havainto sekä eettiset ja turvallisuusriskit.
+- **Muistien aikakone** vertaa kahta saman tutkimuskysymyksen
+  E6-JSON-tilannekuvaa ja kertoo uudet, valinnasta pois jääneet
+  ja versioltaan muuttuneet artikkelit. Poissaolo hausta ei ole
+  julkaisun peruminen eikä tutkimusnäytön katoaminen.
+- Ei ulkoisia verkko- tai muistioperaatioita.
+
+\`\`\`sh
+cd ~/klone-arxiv-e1 || exit 1
+STAMP="$(date +%Y%m%d-%H%M%S)"
+PYTHONPATH="$PWD/src" "$HOME/klone-next/.venv/bin/python" \
+  -m klone.limbo_discovery \
+  --klone-db "$HOME/klone/data/klone_mission_control.db" \
+  --question "genetiikka" --limit 48 \
+  --output "$HOME/klone-var/e8-radar-$STAMP.json"
+\`\`\`
+
+## E8.1 – miksi genetiikkahaku antoi nolla tieteidenvälistä yhteyttä?
+
+Androidin E8-ajo 16.11.2026 näytti:
+- `genetiikka` sai 24 suoraa hakutulosviitettä, kaikki alalta `genetics`;
+- lähdeparien tiukka tieteidenvälinen vertailu palautti **0 yhteyttä**;
+- `attention_priority=7` kuvaa puuttuvan tutkimustyön prioriteettia,
+  **ei tieteenalan laatua eikä väitteen todennäköisyyttä**.
+
+Nollatulos ei osoita, ettei tutkimusaloilla olisi yhteyksiä.
+Aiempi tutka etsi pareja vain niistä julkaisuista, jotka jo
+osuivat kyselyn termeihin. Kun kaikki olivat yhtä tieteenalaa,
+vertailuehdokkaita ei voinut syntyä.
+
+E8.1:ssa yhden tieteenalan hauissa tutkitaan **myös muiden alojen
+julkisia Memory Core -havaintoja**. Yhteys vaatii vähintään kaksi
+harvinaisempaa yhteistä termiä, joista yhden on oltava julkaisun
+otsikossa. Tämä on **tutkimusidean minimiehto, ei tieteellinen
+varmennus**. Raporttiin lisättiin:
+
+- `bridge_mode`: `cross_domain_expansion` tai `query_domains`
+- `outside_domain_documents_examined`: todella tarkastettujen
+  muiden alojen muistiartikkeleiden määrä
+- `bridge_documents`: linkit aidosti olemassa oleviin
+  muun tieteenalan julkaisumuisteihin
+- `weak_single_term_leads`: yhden yhteisen termin heikot vihjeet,
+  joita **ei lasketa varsinaisiksi yhteyksiksi**
+- `diagnostics.why_no_pairs` ja
+  `diagnostics.suggested_next_queries`: todellinen selitys ja
+  rajatut jatkohakuehdotukset, jos yhteyksiä ei löydy.
+
+Kaikki 148 aiemmin tuodun lähdehavainnon metatiedot pysyvät
+muuttumattomina; E8.1 on read-only ja erillisen omistajan
+käynnistämän Termux-päivityksen takana.
+
+## E8.2 – näennäisten löytöjen laadunhallinta
+
+Käyttäjän Android E8.1 -ajo laajensi `genetiikka`-haun 24
+suorasta osumasta **124 muiden alojen artikkelin tarkistukseen**
+ja 24 alustavaan vertailuehdokkaaseen. Näissä oli kuitenkin
+ilmeisiä **vääriä positiivisia**: yhteiset sanat
+`however`, `potential`, `remain`, `change`,
+`contributions`, `perspectives`, `theory` ja `work`
+eivät riitä todistamaan mitään yhteisestä tutkimuskohteesta.
+
+E8.2:n laadunvarmistus on nimenomaan hakuehdokkaiden suodatin:
+
+1. Edellä mainitut yleisluonteiset ilmaukset ja muu vastaava
+   raportointisanasto poistetaan vertailun termijoukosta.
+   Tämä **ei muuta** alkuperäisten tutkimushakujen avainsanoja.
+2. Eri taivutusmuodot normalisoidaan **läpinäkyvän pienen sanaston**
+   avulla: esimerkiksi `detecting` + `detection` ovat
+   vain *yksi* käsite, eivät kaksi riippumatonta perustelua.
+3. Vertailussa vaaditaan vähintään kaksi yhteistä erottelevampaa
+   käsitettä ja vähintään yksi käsite, joka näkyy **molempien
+   alkuperäisten julkaisujen otsikoissa**.
+4. `shared_title_concepts` ja `quality_gate` raportoidaan.
+   Työpöydät näyttävät ehdokkaan perustelut suomeksi.
+5. Jos ehdokkaita jää nolla, siitä ei päätellä tieteellisen
+   yhteyden puuttumista. Lähteitä on voitu valita liian vähän
+   tai yhteys voi vaatia synonyymi-, koko tekstin tai datatason
+   tarkastelua.
+
+Tämä on edelleen rajattu **sanastopohjainen tutkimisjärjestys**,
+ei neuroverkon semanttinen haku eikä tieteellisen kausaalisuuden
+varmistin. On parempi saada nolla luotettavasti perusteltua
+ehdokasta kuin 24 tekaistua poikkitieteellistä löydöstä.
+
+Käyttöönotto on sama erikseen omistajan ajama
+`bash scripts/klone-atlas-e7-e8-phone.sh`. Portin 8041
+lukija päivitetään vain, jos vanha `feature_version=E8.1`
+on tunnistettu, ja uuden version tulee olla `E8.2`.
+Porttiin 8000 tai olemassa oleviin 148 julkiseen lähdetietueeseen
+ei kirjoiteta.
+
+## E8.3 – tieteellisten siltakäsitteiden tarkempi normalisointi
+
+Puhelimen E8.2-ajo 16.11.2026 vahvisti, että alkuperäisestä 24
+poikkitieteellisestä sanastoyhteydestä jäi 12. Tuloste paljasti silti
+uusia harhaanjohtavia osumia: `network` ja `networks` oli
+laskettu kahdeksi käsitteeksi, samoin `exploring` ja `under`
+pääsivät läpi raportointisanaston seulan.
+
+E8.3:
+- normalisoi läpinäkyvästi yleiset taivutusmuodot kuten
+  `networks → network`, `graphs → graph`, `agents → agent`;
+- poistaa vertailupisteistä yleissanat `exploring`, `under`,
+  `domains` ja muita epätarkkoja ilmauksia;
+- vaatii edelleen vähintään **kaksi erillistä käsitettä**, joista
+  vähintään yksi esiintyy **molempien julkaisujen otsikoissa**;
+- lisää `justification`-perustelun ja
+  `quality_gate=e8.3-normalized-scientific-terms-v2`-tunnisteen
+  jokaiseen varsinaiseen linkkiehdokkaaseen;
+- pitää heikot yhden termin vihjeet selvästi erillään;
+- ei muuta alkuperäisten lähdejulkaisujen metatietoja,
+  148 tutkimusmuistia, Council72:n hyväksyntärajoja tai
+  omistajan hypoteesipäiväkirjaa.
+
+Tämäkään suodatin ei pysty todistamaan yhteisen menetelmän,
+kausaalisuuden tai riippumattoman toistotutkimuksen olemassaoloa.
+Ehdokasmäärän pieneneminen on laatuseulan *toimintamuutos*, ei
+todiste siitä, että juuri oikeat hypoteesit olisi löydetty.
+
+Käyttöönotto tehdään aiemmalla omistajan ajamalla
+`bash scripts/klone-atlas-e7-e8-phone.sh`-komennolla.
+Se testaa ensin muutokset, käynnistää 8031:n uudelleen ja
+korvaa **vain** eristetyn 8041-lukijan, jos siinä on aiempi
+E8.2-versio. Portin 8000 pääpalvelinta tai sen tietokantaa
+ei muuteta.
+
+## Yksi käyttöönottokomento puhelimessa
+
+\`\`\`sh
+cd ~/klone-arxiv-e1 || exit 1
+git fetch origin feat/limbo-external-intelligence-20261115 || exit 1
+git switch --detach FETCH_HEAD || exit 1
+
+bash scripts/klone-atlas-e7-e8-phone.sh
+\`\`\`
+
+Skripti:
+1. testaa E7:n ja E8:n sekä aiemmat E1–E6-rajat;
+2. päivittää **vain** paikallisen Atlas-palvelimen 8031;
+3. tunnistaa alkuperäisen 8000-pääpalvelimen todellisen tietokannan;
+4. vie E8-löytötutkan raportin Lataukset-kansioon;
+5. muodostaa E7:n hypoteesiesikatselun **ilman kirjoituksia**;
+6. päivittää erillisen 8041-päämuistilukijan E8-versioon
+   tarkistamalla ensin prosessin alkuperän ja tietokantapolun.
+
+**Pääpalvelinta 8000 ei pysäytetä, eikä päämuistiin kirjoiteta.**
+
+### Työpöydät
+
+- \`http://127.0.0.1:8031/limbo-atlas\`: E7-päiväkirjan
+  JSON-tuonti ja interaktiivinen E8-löytötutka.
+- \`http://127.0.0.1:8041/research\`: päämuistin julkinen
+  E6-tutkimusnäkymä ja uusi E8:n evidenssivelkanäkymä.
+
+GitHub PR: \`https://github.com/SickDinner/klone/pull/177\`.
+
+## E9 – tuleva jatko
+
+Käyttäjän erillisen hyväksynnän jälkeen seuraavat vaiheet voisivat
+olla omistajan auditointimerkinnät myös KLONEn Constitution-
+tapahtumina, 72 neuvoston monikierroksinen arviointiprosessi,
+jossa johtopäätökset ovat erillisiä lähdeväitteistä, sekä
+valinnaiset lähderiippuvuuden tarkastukset täysistä julkaisuista
+tekijöiden, aineistotunnisteiden ja preprint-versioiden avulla.

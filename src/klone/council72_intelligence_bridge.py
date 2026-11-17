@@ -286,8 +286,15 @@ def _validate_seats(output, members, ring, allowed):
         if type(seat["member_id"]) is not int or seat["member_id"] not in ring["member_ids"]:
             raise CouncilModelError("wrong member identity")
         for key in ("observation", "challenge"):
-            if type(seat[key]) is not str or not 1 <= len(seat[key].strip()) <= 300:
-                raise CouncilModelError("invalid seat statement")
+            value = seat[key]
+            # A JSON schema guarantees string type, but not its length. Do not
+            # throw away an otherwise valid paid response for 301 characters.
+            if type(value) is not str or not 1 <= len(value.strip()) <= 900:
+                safe_length = len(value) if type(value) is str else "not_string"
+                raise CouncilModelError(
+                    f"invalid seat statement: member_id={seat['member_id']}, "
+                    f"field={key}, chars={safe_length}, allowed=1..900"
+                )
     for key in ("findings", "counterarguments", "open_questions"):
         _validate_strings(output[key])
     _validate_ids(output["evidence_card_ids"], allowed)

@@ -607,7 +607,7 @@ def _stage_record(stage, state_dir, context, validator, generate,
 
 def run_council(question, dossier, *, live=False, probe=False,
                 owner_confirms_public=False, model=MODEL, api_key="",
-                network_sender=None):
+                network_sender=None, seed_probe=None, checkpoint_dir=None):
     """Return offline preview, one-call probe or nine-call council run."""
     if type(question) is not str or not 8 <= len(question.strip()) <= MAX_QUESTION_CHARS:
         raise ValueError("research question must be 8..1000 characters")
@@ -624,11 +624,20 @@ def run_council(question, dossier, *, live=False, probe=False,
         raise ValueError("choose probe OR full live run, not both")
     if (live or probe) and not owner_confirms_public:
         raise PermissionError("owner must explicitly confirm public-data API transfer")
-    if live and (not api_key or os.environ.get("KLONE_COUNCIL72_API_APPROVAL") != API_APPROVAL):
+    if live and seed_probe is None and (not api_key or os.environ.get("KLONE_COUNCIL72_API_APPROVAL") != API_APPROVAL):
         raise PermissionError("explicit nine-request live approval and API key required")
     if probe and (not api_key or os.environ.get("KLONE_COUNCIL72_PROBE_APPROVAL") != PROBE_APPROVAL):
         raise PermissionError("explicit one-request probe approval and API key required")
+    if seed_probe is not None:
+        if not live or checkpoint_dir is None:
+            raise ValueError("probe seed requires live mode and persistent checkpoint dir")
+        if os.environ.get("KLONE_COUNCIL72_RESUME_APPROVAL") != "HYVAKSY_ENINTAAN_8_GPT_KUTSUA":
+            raise PermissionError("explicit at-most-eight new-call resume approval required")
+        if not api_key:
+            raise PermissionError("API key required for resumed new calls")
     if not live and not probe:
+        if checkpoint_dir is not None or seed_probe is not None:
+            raise ValueError("offline preview cannot create or use model checkpoints")
         preview = {
             "kind": "klone-council72-intelligence-bridge-v1",
             "schema_version": SCHEMA_VERSION,

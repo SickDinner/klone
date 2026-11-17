@@ -33,13 +33,14 @@ MAX_EVIDENCE_CARDS = 20
 MAX_SNIPPET_CHARS = 240
 MAX_REQUEST_BYTES = 28_000
 MAX_RESPONSE_BYTES = 256_000
-MAX_OUTPUT_TOKENS_RING = 1700
-MAX_OUTPUT_TOKENS_FOUNDERS = 1600
+MAX_OUTPUT_TOKENS_RING = 3400
+MAX_OUTPUT_TOKENS_FOUNDERS = 3400
 MAX_REQUESTS = 9
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 ARXIV_VERSION = re.compile(r"^\d{4}\.\d{4,5}v\d{1,3}$")
 REF = re.compile(r"^[a-zA-Z0-9_.:-]{1,128}$")
 API_APPROVAL = "HYVAKSY_9_GPT_KUTSUA"
+PROBE_APPROVAL = "HYVAKSY_1_GPT_KUTSU"
 CLASSIFICATION = "public"
 
 
@@ -326,6 +327,9 @@ def _network_response(model, instructions, text, schema, api_key, max_output_tok
         "input": [{"role":"user", "content":text}],
         "tools": [], "store": False,
         "max_output_tokens": max_output_tokens,
+        # A reasoning budget consumes part of the allowed output tokens.
+        # Luna supports "none"; Sol/Astra require at least "low".
+        "reasoning": {"effort": "none" if model == "gpt-6-luna" else "low"},
         "text": {"format": {
             "type":"json_schema", "name":"klone_council72_v1",
             "strict":True, "schema":schema}},
@@ -360,7 +364,27 @@ def _network_response(model, instructions, text, schema, api_key, max_output_tok
     try:
         response = json.loads(raw.decode("utf-8"))
         if response.get("status") != "completed" or response.get("error") is not None:
-            raise CouncilModelError("model response incomplete or failed")
+            # Log only preapproved metadata; never raw model output, prompts,
+            # credentials, error messages or source excerpts.
+            status = response.get("status")
+            status = status if status in ("incomplete", "failed", "cancelled", "queued", "in_progress") else "unknown"
+            details = response.get("incomplete_details")
+            reason = details.get("reason") if type(details) is dict else None
+            reason = reason if reason in ("max_output_tokens", "content_filter", "max_messages", "steered") else "unspecified"
+            err = response.get("error")
+            code = err.get("code") if type(err) is dict else None
+            code = code if code in ("server_error", "rate_limit_exceeded", "invalid_request_error") else "unspecified"
+            usage = response.get("usage")
+            output_tokens = usage.get("output_tokens") if type(usage) is dict else None
+            output_tokens = output_tokens if type(output_tokens) is int and 0 <= output_tokens <= 1_000_000 else "unknown"
+            breakdown = usage.get("output_tokens_details") if type(usage) is dict else None
+            reasoning_tokens = breakdown.get("reasoning_tokens") if type(breakdown) is dict else None
+            reasoning_tokens = reasoning_tokens if type(reasoning_tokens) is int and 0 <= reasoning_tokens <= 1_000_000 else "unknown"
+            raise CouncilModelError(
+                f"model response not completed: status={status}, reason={reason}, "
+                f"code={code}, output_tokens={output_tokens}, reasoning_tokens={reasoning_tokens}; "
+                "no automatic retry (the request may be billed)"
+            )
         content = [
             part["text"]
             for entry in response["output"]

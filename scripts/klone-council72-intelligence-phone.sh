@@ -54,8 +54,12 @@ echo "E11.11 lähde: $(basename "$EVIDENCE")"
 echo "Malli: $MODEL"
 cd "$ROOT"
 echo "=== 10 regressiotestiä, ei verkkokutsuja ==="
-PYTHONPATH="$ROOT/src" "$PY" -m unittest discover -s tests \
-  -p test_council72_intelligence_bridge.py -v
+# Strip ALL paid-call credentials and approval flags from the unittest process.
+# This is a second boundary independent of the test suite's HTTP mocks.
+env -u OPENAI_API_KEY -u KLONE_COUNCIL72_API_APPROVAL \
+    -u KLONE_COUNCIL72_CONFIRM_PUBLIC \
+    PYTHONPATH="$ROOT/src" "$PY" -m unittest discover -s tests \
+    -p test_council72_intelligence_bridge.py -v
 STAMP="$(date +%Y%m%d-%H%M%S)"
 OUTPUT="$HOME/klone-var/e11/council72-intelligence-$MODE-$STAMP-$$.json"
 ARGS=(--evidence "$EVIDENCE" --question "$QUESTION" --output "$OUTPUT"

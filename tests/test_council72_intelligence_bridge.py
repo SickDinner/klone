@@ -564,6 +564,86 @@ class BridgeTests(unittest.TestCase):
                     checkpoint_dir="unused-checkpoints"
                 )
 
+    def test_local_checkpoint_tampering_blocks_network_before_any_request(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "state"
+            ring = self.model["rings"][0]
+            from klone import council72_intelligence_bridge as bridge
+            data = bridge._checkpoint_doc(
+                "ring-01", "accepted",
+                bridge._checkpoint_context(
+                    self.dossier, self.model, self.question, "gpt-6-luna"
+                ),
+                {
+                    "ring_id": 1,
+                    "eight_seat_assessments": fake_ring(1, ring["member_ids"]),
+                    "api_response_id": "mock",
+                    "usage": {
+                        "input_tokens": 10, "output_tokens": 20,
+                        "total_tokens": 30,
+                    },
+                    "request_sha256": "0" * 64,
+                    "response_sha256": "1" * 64,
+                    "model_generated_not_verified": True,
+                }
+            )
+            state.mkdir()
+            file = state / "ring-01-accepted.json"
+            file.write_text(json.dumps(data), encoding="utf-8")
+            # Even if the JSON file itself is parseable, its contents are not
+            # eligible for replay without its original report fingerprint.
+            data["payload"]["api_response_id"] = "forged"
+            file.write_text(json.dumps(data), encoding="utf-8")
+            with patch.dict(os.environ, {
+                "KLONE_COUNCIL72_API_APPROVAL": API_APPROVAL
+            }):
+                with patch(
+                    "klone.council72_intelligence_bridge._network_response",
+                    side_effect=AssertionError("checkpoint bypassed")
+                ):
+                    with self.assertRaisesRegex(
+                        CouncilModelError, "checkpoint ring-01 identity"
+                    ):
+                        run_council(
+                            self.question, self.dossier, live=True,
+                            owner_confirms_public=True, api_key="mock-key",
+                            checkpoint_dir=state
+                        )
+
+    def test_founder_payload_is_bounded_even_for_very_long_accepted_ring_notes(self):
+        from klone.council72_intelligence_bridge import (
+            _founder_prompt, MAX_REQUEST_BYTES
+        )
+        inputs = []
+        for ring in self.model["rings"][:8]:
+            value = fake_ring(ring["id"], ring["member_ids"])
+            for seat in value["seat_assessments"]:
+                seat["observation"] = "x" * 900
+                seat["challenge"] = "y" * 900
+            for key in ("findings", "counterarguments", "open_questions"):
+                value[key] = ["z" * 900] * 8
+            inputs.append(value)
+        instruction, payload = _founder_prompt(
+            self.question, [], inputs, self.model, self.members
+        )
+        data = json.loads(payload)
+        self.assertEqual(len(data["ring_analyses_unverified"]), 8)
+        self.assertEqual(sum(len(x["seat_observations"]) for x in
+                             data["ring_analyses_unverified"]), 64)
+        self.assertTrue(all(
+            len(seat["observation"]) <= 180
+            for ring in data["ring_analyses_unverified"]
+            for seat in ring["seat_observations"]
+        ))
+        self.assertLess(
+            len(json.dumps({
+                "model": "gpt-6-luna", "instructions": instruction,
+                "input": [{"role": "user", "content": payload}],
+                "max_output_tokens": 3400, "tools": [], "store": False
+            }).encode("utf-8")),
+            MAX_REQUEST_BYTES
+        )
+
     def test_cli_preview_does_not_call_openai_and_never_overwrites(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)

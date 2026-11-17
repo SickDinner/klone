@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 import re
 
-from .evidence_io import json_object,read_bounded,write_new_report
+from .evidence_io import EvidenceIOError,json_object,read_bounded,write_new_report
 from .limbo_council_workbench import council_review, _fingerprint
 
 MAX_MANIFEST_BYTES=256*1024
@@ -229,6 +229,14 @@ def fill_template(core_db,template,source_a_bytes,source_b_bytes,
     review_manifest(core_db,result)
     return result
 
+def _read_input(path: Path, limit: int, label: str) -> bytes:
+    """Make a missing/unsafe owner input unambiguous without weakening I/O guards."""
+    try:
+        return read_bounded(path,limit)
+    except EvidenceIOError as exc:
+        raise ValueError(f"{label}: {exc.code}: {path}") from exc
+
+
 def main(argv=None):
     p=argparse.ArgumentParser(description="KLONE E11 offline quoted evidence ledger")
     p.add_argument("--klone-db",type=Path,required=True)
@@ -253,14 +261,14 @@ def main(argv=None):
                 raise ValueError("fill requires two local files and explicit owner confirmation")
             data=fill_template(
                 args.klone_db,
-                json_object(read_bounded(args.fill,MAX_MANIFEST_BYTES)),
-                read_bounded(args.source_a_file,MAX_TEXT_CHARS*4),
-                read_bounded(args.source_b_file,MAX_TEXT_CHARS*4),
+                json_object(_read_input(args.fill,MAX_MANIFEST_BYTES,"E11-pohjatiedosto")),
+                _read_input(args.source_a_file,MAX_TEXT_CHARS*4,"Lahdeteksti A"),
+                _read_input(args.source_b_file,MAX_TEXT_CHARS*4,"Lahdeteksti B"),
                 rights_note_a=args.rights_note_a,
                 rights_note_b=args.rights_note_b)
         else:
             data=review_manifest(args.klone_db,
-                                 json_object(read_bounded(args.review,MAX_MANIFEST_BYTES)))
+                                 json_object(_read_input(args.review,MAX_MANIFEST_BYTES,"E11-tarkistettava manifesti")))
         write_new_report(args.output.expanduser(),
                          json.dumps(data,ensure_ascii=False,indent=2,allow_nan=False)+"\n",
                          Path.cwd().resolve())

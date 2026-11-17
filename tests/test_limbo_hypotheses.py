@@ -22,6 +22,7 @@ from klone.limbo_evidence_review import prepare,review_manifest,fill_template,ma
 from klone.limbo_evidence_candidates import suggest, main as candidate_main
 from klone.limbo_evidence_accept import accept_context, main as accept_main
 from klone.limbo_evidence_quality import audit_quality, main as quality_main
+from klone.limbo_evidence_verification_queue import build_queue,main as queue_main
 from klone.council72 import catalog
 from klone.repository import KloneRepository
 
@@ -1076,6 +1077,98 @@ class E7E8Tests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             quality_main(args)
         self.assertEqual(before,self.core.read_bytes())
+
+    def test_e115_defers_non_evidence_and_creates_dual_pending_council_checks(self):
+        original,proposals,selected,ledger=self._e114_reviewed(summary=True)
+        quality=audit_quality(self.core,selected,ledger,original,proposals)
+        original_bytes=self.core.read_bytes()
+        queue=build_queue(self.core,original,proposals,selected,ledger,quality)
+        self.assertEqual(queue["kind"],"klone-e11-5-primary-source-verification-queue")
+        self.assertEqual(queue["local_context_quotes"],quality["context_quote_count"])
+        expected=sum(count for key,count in quality["counts_by_kind"].items()
+                     if key in (
+                         "attributed_research_claim_needs_primary_check",
+                         "unverified_context_needs_primary_check",
+                     ))
+        self.assertEqual(queue["primary_source_checks_needed"],expected)
+        self.assertEqual(queue["deferred_non_evidence_context_count"],
+                         queue["local_context_quotes"]-expected)
+        self.assertEqual(queue["pending_council_task_proposals"],2*expected)
+        self.assertEqual(queue["completed_council_reviews"],0)
+        self.assertEqual(queue["verified_scientific_results"],0)
+        self.assertFalse(any(queue["authority"].values()))
+        self.assertEqual(
+            queue["e11_4_report_sha256"],quality["report_sha256"])
+        self.assertEqual(queue,build_queue(self.core,original,proposals,
+                                           selected,ledger,quality))
+        canonical={member["id"] for member in catalog()["members"]}
+        for row in queue["queue"]:
+            self.assertEqual(row["status"],"pending_original_publication_verification")
+            self.assertEqual(len(row["verification_tasks"]),2)
+            self.assertEqual(row["verification_tasks"][1]["ring"],8)
+            self.assertEqual(row["verification_tasks"][1]["slot"],1)
+            self.assertTrue(all(x["member_id"] in canonical
+                                and x["status"]=="pending_no_agent_executed"
+                                for x in row["verification_tasks"]))
+            self.assertFalse(row["scientific_result_verified"])
+            self.assertFalse(row["publisher_quote_authenticated"])
+            self.assertFalse(row["review_performed"])
+        for row in queue["deferred"]:
+            self.assertEqual(row["status"],"deferred_non_evidence_context")
+            self.assertEqual(row["verification_tasks"],[])
+            self.assertFalse(row["scientific_result_verified"])
+        self.assertEqual(original_bytes,self.core.read_bytes())
+
+    def test_e115_source_quality_replay_fails_closed_on_tampered_five_inputs(self):
+        from copy import deepcopy
+        original,proposals,selected,ledger=self._e114_reviewed()
+        quality=audit_quality(self.core,selected,ledger,original,proposals)
+        bad_quality=deepcopy(quality)
+        bad_quality["counts_by_kind"]["publication_title_not_evidence"]=100
+        with self.assertRaisesRegex(ValueError,"quality report differs"):
+            build_queue(self.core,original,proposals,selected,ledger,bad_quality)
+        bad_proposals=deepcopy(proposals)
+        bad_proposals["candidates"][0]["proposed_reviewer"]["member_id"]=12345
+        with self.assertRaises(ValueError):
+            build_queue(self.core,original,bad_proposals,selected,ledger,quality)
+        bad_ledger=deepcopy(ledger)
+        bad_ledger["annotation_count"]=999
+        with self.assertRaisesRegex(ValueError,"ledger does not match"):
+            build_queue(self.core,original,proposals,selected,bad_ledger,quality)
+        bad_original=deepcopy(original)
+        bad_original["sources"]["B"]["receipt_sha256"]="0"*64
+        with self.assertRaises(ValueError):
+            build_queue(self.core,bad_original,proposals,selected,ledger,quality)
+        bad_selected=deepcopy(selected)
+        bad_selected["annotations"][0]["stance"]="support_candidate"
+        with self.assertRaises(ValueError):
+            build_queue(self.core,original,proposals,bad_selected,ledger,quality)
+
+    def test_e115_deterministic_cli_exports_without_overwriting_or_memory_mutation(self):
+        original,proposals,selected,ledger=self._e114_reviewed(summary=True)
+        quality=audit_quality(self.core,selected,ledger,original,proposals)
+        inp={}
+        for label,data in (("original",original),("proposals",proposals),
+                           ("selected",selected),("ledger",ledger),
+                           ("quality",quality)):
+            fp=self.root/("e115-"+label+".json")
+            fp.write_text(json.dumps(data))
+            inp[label]=fp
+        output=self.root/"e115-queue.json"
+        args=["--klone-db",str(self.core)]
+        for name,path in inp.items():
+            args.extend(("--"+name,str(path)))
+        args.extend(("--output",str(output)))
+        original_bytes=self.core.read_bytes()
+        self.assertEqual(queue_main(args),0)
+        result=json.loads(output.read_text())
+        self.assertEqual(result["source_event_ids"],quality["source_event_ids"])
+        self.assertEqual(result["verified_scientific_results"],0)
+        self.assertEqual(result["completed_council_reviews"],0)
+        self.assertTrue(result["pending_council_task_proposals"]>0)
+        with self.assertRaises(SystemExit):
+            queue_main(args)
+        self.assertEqual(original_bytes,self.core.read_bytes())
 
     def test_e10_readonly_council_workbench_endpoints(self):
         import os

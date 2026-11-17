@@ -37,6 +37,24 @@ else
 fi
 test -f "$SELECTED" || { echo "Hyväksytty manifesti puuttuu: $SELECTED"; exit 1; }
 test -f "$LEDGER" || { echo "Tarkistettu evidenssiraportti puuttuu: $LEDGER"; exit 1; }
+ORIGINAL="$WORK/e11-taytetty.json"
+test -f "$ORIGINAL" || { echo "Alkuperäinen E11-manifesti puuttuu: $ORIGINAL"; exit 1; }
+PROPOSALS="$("$PY" - "$SELECTED" <<'PY'
+import json,sys
+from pathlib import Path
+selected=json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+digest=selected["e11_context_selection"]["e11_2_report_sha256"]
+directory=Path.home()/"klone-var"/"e11"
+for file in sorted(directory.glob("e11-2-ehdokkaat-*.json")):
+    candidate=json.loads(file.read_text(encoding="utf-8"))
+    if candidate.get("report_sha256")==digest:
+        print(file)
+        break
+else:
+    raise SystemExit("E11.2:n täsmäävää alkuperäistä ehdotusraporttia ei löytynyt")
+PY
+)" || exit 1
+test -f "$PROPOSALS" || { echo "E11.2-ehdotusraportti puuttuu"; exit 1; }
 STAMP="$(date +%Y%m%d-%H%M%S)"
 OUTPUT="$WORK/e11-4-laatuauditointi-$STAMP.json"
 cd "$ROOT"
@@ -45,8 +63,8 @@ PYTHONPATH="$ROOT/src" "$PY" -m unittest discover \
   -s "$ROOT/tests" -p test_limbo_hypotheses.py || exit 1
 echo "=== E11.4: laadunvalvonta – EI tieteellisiä johtopäätöksiä ==="
 PYTHONPATH="$ROOT/src" "$PY" -m klone.limbo_evidence_quality \
-  --klone-db "$DB" --selected "$SELECTED" \
-  --ledger "$LEDGER" --output "$OUTPUT"
+  --klone-db "$DB" --original "$ORIGINAL" --proposals "$PROPOSALS" \
+  --selected "$SELECTED" --ledger "$LEDGER" --output "$OUTPUT"
 "$PY" - "$OUTPUT" <<'PY'
 import json,sys
 from pathlib import Path

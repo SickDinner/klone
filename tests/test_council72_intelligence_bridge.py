@@ -96,6 +96,14 @@ def fake_founders(founder_ids, refs=None):
 
 class BridgeTests(unittest.TestCase):
     def setUp(self):
+        # Never let any unit test reach a real HTTP client, even if the user's
+        # shell contains a valid API key and the full live approval flags.
+        self._block_http = patch(
+            "klone.council72_intelligence_bridge.urllib.request.build_opener",
+            side_effect=AssertionError("unit test attempted a real HTTP request"),
+        )
+        self._block_http.start()
+        self.addCleanup(self._block_http.stop)
         self.dossier = dossier()
         self.question = "Mitä eri tutkimusten metodologiasta voidaan varovasti päätellä?"
         self.model = catalog()
@@ -117,6 +125,7 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(result["report_sha256"], _fingerprint({
             k:v for k,v in result.items() if k != "report_sha256"}))
 
+    @patch.dict(os.environ, {"KLONE_COUNCIL72_API_APPROVAL": ""})
     def test_live_requires_public_owner_confirmation_and_key_and_approval(self):
         with self.assertRaisesRegex(PermissionError, "public-data"):
             run_council(self.question, self.dossier, live=True)

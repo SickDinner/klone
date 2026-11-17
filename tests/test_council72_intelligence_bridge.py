@@ -387,6 +387,183 @@ class BridgeTests(unittest.TestCase):
                 json.loads(out.read_text(encoding="utf-8"))["model_api_requests_performed"], 1
             )
 
+    def test_seat_statement_301_to_900_is_accepted_but_outliers_diagnosed(self):
+        ring = self.model["rings"][0]
+        item = fake_ring(1, ring["member_ids"])
+        item["seat_assessments"][0]["observation"] = "x" * 450
+        _validate_seats(item, self.members, ring, {"card-0"})
+        item["seat_assessments"][0]["observation"] = "PRIVATE-EXCERPT-" + "x" * 900
+        with self.assertRaisesRegex(
+            CouncilModelError, "field=observation, chars=916"
+        ) as caught:
+            _validate_seats(item, self.members, ring, {"card-0"})
+        self.assertNotIn("PRIVATE-EXCERPT", str(caught.exception))
+
+    def test_reuses_existing_paid_probe_and_checkpoints_all_nine_analyses(self):
+        original = self.model
+        question = self.question
+        def sender(model, instruction, text, schema, api_key, max_output_tokens):
+            data = json.loads(text)
+            self.assertEqual(model, "gpt-6-luna")
+            self.assertEqual(api_key, "mock-key")
+            if schema is RING_SCHEMA:
+                return fake_ring(
+                    data["ring_id"],
+                    [x["member_id"] for x in data["eight_distinct_roles"]]
+                ), {"input_tokens": 100, "output_tokens": 300,
+                    "total_tokens": 400}, "reply-ring-" + str(data["ring_id"])
+            return fake_founders(
+                [x["member_id"] for x in data["eight_founders"]]
+            ), {"input_tokens": 500, "output_tokens": 300,
+                "total_tokens": 800}, "reply-founders"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            seed_file = root / "already-paid-probe.json"
+            state_dir = root / "checkpoints"
+            with patch.dict(os.environ, {
+                "KLONE_COUNCIL72_PROBE_APPROVAL": "HYVAKSY_1_GPT_KUTSU"
+            }):
+                probe = run_council(
+                    question, self.dossier, probe=True,
+                    owner_confirms_public=True, api_key="mock-key",
+                    network_sender=sender
+                )
+            seed_file.write_text(
+                json.dumps(probe, ensure_ascii=False), encoding="utf-8"
+            )
+            calls = []
+            def counted(*args):
+                calls.append(args)
+                return sender(*args)
+
+            with patch.dict(os.environ, {
+                "KLONE_COUNCIL72_RESUME_APPROVAL": "HYVAKSY_ENINTAAN_8_GPT_KUTSUA",
+                "KLONE_COUNCIL72_API_APPROVAL": ""
+            }):
+                result = run_council(
+                    question, self.dossier, live=True,
+                    owner_confirms_public=True, api_key="mock-key",
+                    seed_probe=seed_file, checkpoint_dir=state_dir,
+                    network_sender=counted
+                )
+                self.assertEqual(len(calls), 8)
+                self.assertEqual(result["model_api_requests_performed"], 8)
+                self.assertEqual(result["model_api_requests_reused"], 1)
+                self.assertEqual(result["model_analyses_total"], 9)
+                self.assertEqual(
+                    result["ring_calls"][0], probe["ring_calls"][0]
+                )
+                self.assertEqual(
+                    len(list(state_dir.glob("*-accepted.json"))), 9
+                )
+                self.assertEqual(
+                    len(list(state_dir.glob("*-received-unverified.json"))), 8
+                )
+                self.assertEqual(result["founder_synthesis"]["decision"],
+                                 "owner_review_required")
+
+                with patch(
+                    "klone.council72_intelligence_bridge._network_response",
+                    side_effect=AssertionError("re-run tried to bill")
+                ):
+                    again = run_council(
+                        question, self.dossier, live=True,
+                        owner_confirms_public=True, api_key="mock-key",
+                        seed_probe=seed_file, checkpoint_dir=state_dir
+                    )
+                self.assertEqual(again["model_api_requests_performed"], 0)
+                self.assertEqual(again["model_api_requests_reused"], 9)
+                self.assertEqual(again["ring_calls"], result["ring_calls"])
+
+    def test_invalid_paid_ring_response_saved_unverified_and_never_rebilled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / "state"
+            calls = []
+            def sender(model, instruction, text, schema, api_key, max_tokens):
+                data = json.loads(text)
+                calls.append(data["ring_id"])
+                answer = fake_ring(data["ring_id"], [
+                    x["member_id"] for x in data["eight_distinct_roles"]
+                ])
+                if data["ring_id"] == 2:
+                    answer["seat_assessments"][0]["challenge"] = "X" * 910
+                return answer, {
+                    "input_tokens": 200, "output_tokens": 300,
+                    "total_tokens": 500
+                }, "response" + str(data["ring_id"])
+
+            with patch.dict(os.environ, {
+                "KLONE_COUNCIL72_API_APPROVAL": API_APPROVAL
+            }):
+                with self.assertRaisesRegex(
+                    CouncilModelError, "ring 2: invalid seat statement"
+                ):
+                    run_council(
+                        self.question, self.dossier, live=True,
+                        owner_confirms_public=True, api_key="mock-key",
+                        checkpoint_dir=directory, network_sender=sender
+                    )
+                self.assertEqual(calls, [1, 2])
+                self.assertTrue((directory / "ring-01-accepted.json").exists())
+                self.assertTrue((directory / "ring-02-received-unverified.json").exists())
+                self.assertFalse((directory / "ring-02-accepted.json").exists())
+                with patch(
+                    "klone.council72_intelligence_bridge._network_response",
+                    side_effect=AssertionError("unsafe automatic replay")
+                ):
+                    with self.assertRaisesRegex(CouncilModelError, "ring 2"):
+                        run_council(
+                            self.question, self.dossier, live=True,
+                            owner_confirms_public=True, api_key="mock-key",
+                            checkpoint_dir=directory
+                        )
+
+    def test_seed_or_evidence_tampering_blocks_before_any_network(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            fake = {
+                "kind": "klone-council72-intelligence-bridge-v1",
+                "schema_version": 1, "mode": "api_one_ring_probe_completed",
+                "model": "gpt-6-luna",
+                "model_api_requests_performed": 1,
+                "planned_api_requests": 1,
+                "catalog_sha256": _fingerprint(self.model),
+                "e11_11_report_sha256": self.dossier["report_sha256"],
+                "question": self.question,
+                "ring_calls": [],
+                "owner_review_required": True,
+                "scientific_truth_verified": False,
+                "memory_write": False,
+                "council_binding_votes": 0,
+            }
+            fake["report_sha256"] = _fingerprint(fake)
+            path = directory / "fake-probe.json"
+            path.write_text(json.dumps(fake))
+            with patch.dict(os.environ, {
+                "KLONE_COUNCIL72_RESUME_APPROVAL": "HYVAKSY_ENINTAAN_8_GPT_KUTSUA"
+            }):
+                with self.assertRaisesRegex(CouncilModelError, "probe seed"):
+                    run_council(
+                        self.question, self.dossier, live=True,
+                        owner_confirms_public=True, api_key="mock-key",
+                        seed_probe=path, checkpoint_dir=directory / "empty"
+                    )
+            self.assertFalse((directory / "empty").exists())
+
+    def test_resume_requires_eight_call_authorization_not_old_nine(self):
+        with patch.dict(os.environ, {
+            "KLONE_COUNCIL72_API_APPROVAL": API_APPROVAL,
+            "KLONE_COUNCIL72_RESUME_APPROVAL": ""
+        }):
+            with self.assertRaisesRegex(PermissionError, "at-most-eight"):
+                run_council(
+                    self.question, self.dossier, live=True,
+                    owner_confirms_public=True, api_key="mock-key",
+                    seed_probe="nonexistent.json",
+                    checkpoint_dir="unused-checkpoints"
+                )
+
     def test_cli_preview_does_not_call_openai_and_never_overwrites(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)

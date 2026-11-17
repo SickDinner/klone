@@ -963,9 +963,9 @@ class E7E8Tests(unittest.TestCase):
         self.assertEqual(report["council_state"]["recorded_votes"],0)
         self.assertEqual(self.core.read_bytes(),before)
 
-    def _e114_reviewed(self):
+    def _e114_reviewed(self,*,summary=False):
         manifest=self._e11_manifest()
-        # These are artificial test texts. They must never become verified papers.
+        # Artificial fixtures: no actual publication content is authenticated.
         title=manifest["sources"]["A"]["title"]
         manifest["sources"]["A"]["text"]=(
             title+".\n"
@@ -974,6 +974,11 @@ class E7E8Tests(unittest.TestCase):
             "Automaattinen arviointi ei todista tutkimustulosta.\n"
             "Mitä epävarmuutta mittauksiin liittyy?\n"
         )
+        if summary:
+            manifest["sources"]["A"]["usage_rights_note"]=(
+                "Omistajan toimittama lähdeselostus, ei varmennettu kokoteksti")
+            manifest["sources"]["B"]["usage_rights_note"]=(
+                "AI-generated summary, source text not independently authenticated")
         proposals=suggest(self.core,manifest,per_source_limit=12)
         ids=[c["candidate_id"] for c in proposals["candidates"]]
         selected=accept_context(self.core,manifest,proposals,ids,
@@ -982,11 +987,12 @@ class E7E8Tests(unittest.TestCase):
         return manifest,proposals,selected,ledger
 
     def test_e114_classifies_real_owner_local_context_and_not_source_truth(self):
-        original=self.core.read_bytes()
-        _,proposals,selected,ledger=self._e114_reviewed()
-        quality=audit_quality(self.core,selected,ledger)
+        original_bytes=self.core.read_bytes()
+        original,proposals,selected,ledger=self._e114_reviewed()
+        quality=audit_quality(self.core,selected,ledger,original,proposals)
         self.assertEqual(quality["kind"],"klone-e11-4-context-quality-audit")
         self.assertEqual(quality["context_quote_count"],len(proposals["candidates"]))
+        self.assertTrue(quality["e11_2_e11_3_exact_replay_matches"])
         self.assertEqual(quality["scientifically_verified_quote_count"],0)
         self.assertEqual(quality["independent_council_reviews"],0)
         self.assertFalse(quality["memory_write"])
@@ -997,7 +1003,7 @@ class E7E8Tests(unittest.TestCase):
         self.assertGreaterEqual(counts["open_question_not_evidence"],1)
         self.assertGreaterEqual(counts["editorial_caution_not_evidence"],1)
         self.assertGreaterEqual(counts["attributed_research_claim_needs_primary_check"],1)
-        self.assertEqual(quality,audit_quality(self.core,selected,ledger))
+        self.assertEqual(quality,audit_quality(self.core,selected,ledger,original,proposals))
         for item in quality["source_quality_flags"]:
             source=selected["sources"][item["source"]]["text"]
             self.assertEqual(source[item["char_start"]:item["char_end"]],
@@ -1005,16 +1011,11 @@ class E7E8Tests(unittest.TestCase):
             self.assertFalse(item["valid_scientific_evidence"])
             self.assertFalse(item["exact_match_in_original_publication"])
             self.assertFalse(item["reviewer_completed"])
-        self.assertEqual(original,self.core.read_bytes())
+        self.assertEqual(original_bytes,self.core.read_bytes())
 
     def test_e114_summary_quality_flag_is_not_publisher_authentication(self):
-        _,proposals,selected,ledger=self._e114_reviewed()
-        selected["sources"]["A"]["usage_rights_note"]=(
-            "Omistajan toimittama lähdeselostus, ei varmennettu kokoteksti")
-        selected["sources"]["B"]["usage_rights_note"]=(
-            "AI-generated summary, source text not independently authenticated")
-        current=review_manifest(self.core,selected)
-        quality=audit_quality(self.core,selected,current)
+        original,proposals,selected,ledger=self._e114_reviewed(summary=True)
+        quality=audit_quality(self.core,selected,ledger,original,proposals)
         self.assertTrue(quality["source_quality_flags"])
         for row in quality["source_quality_flags"]:
             self.assertEqual(row["content_origin"],"owner_declared_summary_unverified")
@@ -1022,38 +1023,51 @@ class E7E8Tests(unittest.TestCase):
 
     def test_e114_rejects_tampered_ledger_attestation_and_non_context_stance(self):
         from copy import deepcopy
-        _,proposals,selected,ledger=self._e114_reviewed()
+        original,proposals,selected,ledger=self._e114_reviewed()
         changed=deepcopy(ledger)
         changed["quote_anchors"][0]["quote"]="FORGED QUOTE"
         with self.assertRaisesRegex(ValueError,"does not match"):
-            audit_quality(self.core,selected,changed)
+            audit_quality(self.core,selected,changed,original,proposals)
         changed=deepcopy(selected)
         changed["e11_context_selection"]["selection_explicitly_authorized"]=False
         with self.assertRaisesRegex(ValueError,"selection attestation"):
-            audit_quality(self.core,changed,ledger)
+            audit_quality(self.core,changed,ledger,original,proposals)
         changed=deepcopy(selected)
         changed["annotations"][0]["stance"]="support_candidate"
         with self.assertRaisesRegex(ValueError,"context only"):
-            audit_quality(self.core,changed,ledger)
+            audit_quality(self.core,changed,ledger,original,proposals)
         changed=deepcopy(selected)
         changed["sources"]["B"]["receipt_sha256"]="0"*64
-        with self.assertRaisesRegex(ValueError,"provenance mismatch"):
-            audit_quality(self.core,changed,ledger)
+        with self.assertRaisesRegex(ValueError,"does not match"):
+            audit_quality(self.core,changed,ledger,original,proposals)
         changed=deepcopy(selected)
         changed["e11_context_selection"]["selected_candidate_ids"]=[]
         with self.assertRaisesRegex(ValueError,"identity/count"):
-            audit_quality(self.core,changed,ledger)
+            audit_quality(self.core,changed,ledger,original,proposals)
+        forged=deepcopy(proposals)
+        forged["candidates"][0]["quote"]="Counterfeit scientific text."
+        with self.assertRaisesRegex(ValueError,"stale or altered"):
+            audit_quality(self.core,selected,ledger,original,forged)
+        modified_original=deepcopy(original)
+        modified_original["sources"]["A"]["text"]+=" Extra material."
+        with self.assertRaisesRegex(ValueError,"stale or altered"):
+            audit_quality(self.core,selected,ledger,modified_original,proposals)
 
     def test_e114_cli_creates_private_report_only_once_and_preserves_memory(self):
-        _,proposals,selected,ledger=self._e114_reviewed()
+        original,proposals,selected,ledger=self._e114_reviewed()
         manifest_file=self.root/"e114-context.json"
         ledger_file=self.root/"e114-ledger.json"
+        original_file=self.root/"e114-original.json"
+        proposal_file=self.root/"e114-proposals.json"
         outfile=self.root/"e114-quality.json"
         manifest_file.write_text(json.dumps(selected))
         ledger_file.write_text(json.dumps(ledger))
+        original_file.write_text(json.dumps(original))
+        proposal_file.write_text(json.dumps(proposals))
         before=self.core.read_bytes()
         args=["--klone-db",str(self.core),"--selected",str(manifest_file),
-              "--ledger",str(ledger_file),"--output",str(outfile)]
+              "--ledger",str(ledger_file),"--original",str(original_file),
+              "--proposals",str(proposal_file),"--output",str(outfile)]
         self.assertEqual(quality_main(args),0)
         data=json.loads(outfile.read_text())
         self.assertGreater(data["context_quote_count"],0)

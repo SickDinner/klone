@@ -16,10 +16,6 @@ if [ ! -x "$PY" ]; then
   exit 2
 fi
 case "$MAX_MB" in ''|*[!0-9]*) echo "Virheellinen megatavuraja"; exit 2;; esac
-case "$REQUESTS" in ''|*[!0-9]*) echo "Virheellinen pyyntömäärä"; exit 2;; esac
-if [ "$REQUESTS" -gt 12 ] || [ "$REQUESTS" -lt 1 ]; then
-  echo "Yhdellä ajolla enintään 12 Wikimedia-API-pyyntöä"; exit 2
-fi
 mkdir -p "$ATLAS"
 cd "$ROOT"
 echo "=== KLONE KNOWLEDGE ATLAS ==="
@@ -70,6 +66,11 @@ case "$MODE" in
       --question "$QUERY" --output "$OUTPUT"
     ;;
   collect)
+    case "$REQUESTS" in ''|*[!0-9]*)
+      echo "Virheellinen Wikimedia-pyyntömäärä"; exit 2;; esac
+    if [ "$REQUESTS" -gt 12 ] || [ "$REQUESTS" -lt 1 ]; then
+      echo "Enintään 12 Wikimedia-API-pyyntöä / ajo"; exit 2
+    fi
     if [ "${KLONE_WIKIPEDIA_PUBLIC_FETCH_APPROVAL:-}" != \
          "HAE_JULKISIA_WIKIPEDIA_ARTIKKELEITA" ]; then
       echo "Verkkokeräys estetty. Hyväksyntä tarvitaan:"

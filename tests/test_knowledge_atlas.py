@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import bz2
+from hashlib import sha256
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -273,6 +274,25 @@ class KnowledgeAtlasTests(unittest.TestCase):
         self.assertEqual(record["source_count"], 1)
         self.assertEqual(record["matched_sources"][0]["content_kind"],
                          "dump_wikitext")
+
+    def test_verified_official_dump_sha256_checked_before_import(self):
+        xml = ("<?xml version='1.0'?><mediawiki>" +
+               xml_page(90, "Natural sciences") + "</mediawiki>")
+        path = self.root / "verified-export.xml.bz2"
+        path.write_bytes(bz2.compress(xml.encode("utf-8")))
+        expected = sha256(path.read_bytes()).hexdigest()
+        with self.assertRaisesRegex(AtlasError, "SHA256 mismatch"):
+            import_local_dump(self.atlas, path, language="en",
+                              expected_sha256="0" * 64)
+        self.assertEqual(self.atlas.current_count(), 0)
+        result = import_local_dump(self.atlas, path, language="en",
+                                   expected_sha256=expected)
+        self.assertTrue(result["input_file_sha256_verified"])
+        self.assertEqual(result["input_file_sha256"], expected)
+        self.assertEqual(result["articles_inserted"], 1)
+        with self.assertRaisesRegex(AtlasError, "64 hex"):
+            import_local_dump(self.atlas, path, language="en",
+                              expected_sha256="not-a-hash")
 
     def test_doctype_and_entity_xml_are_refused(self):
         evil = self.root / "unsafe.xml"

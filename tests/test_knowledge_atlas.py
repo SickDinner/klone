@@ -79,6 +79,23 @@ class KnowledgeAtlasTests(unittest.TestCase):
         self.assertEqual(self.atlas.state()["distinct_article_count"], 0)
         self.assertEqual(self.atlas.state()["indexed_member_coverage"], 0)
 
+    def test_complete_72_member_coverage_discloses_weak_vs_seeded_links(self):
+        before = self.atlas.member_coverage()
+        self.assertEqual(len(before["member_profiles"]), 72)
+        self.assertEqual(before["members_with_any_article"], 0)
+        self.assertEqual(len(before["members_without_article_links"]), 72)
+        self.atlas.ingest(article(), seed_member=24)
+        self.atlas.ingest(article(page_id=3, title="Topology",
+                                  content="Topology studies connected spaces."))
+        after = self.atlas.member_coverage()
+        member = {x["member_id"]:x for x in after["member_profiles"]}
+        self.assertEqual(member[24]["pages_from_explicit_role_queries"], 1)
+        self.assertEqual(member[24]["pages_from_weak_keyword_hints"], 0)
+        self.assertEqual(member[65]["pages_from_weak_keyword_hints"], 1)
+        self.assertFalse(member[65]["expertise_established_by_count"])
+        self.assertFalse(after["memory_write"])
+        self.assertFalse(after["retrieval_index_not_scientific_verification"] is False)
+
     def test_wikipedia_attribution_and_revision_are_preserved(self):
         self.assertEqual(self.atlas.ingest(article()), "inserted")
         result = self.atlas.search("linguistics", member_id=24)

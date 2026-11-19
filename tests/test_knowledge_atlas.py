@@ -225,7 +225,9 @@ class KnowledgeAtlasTests(unittest.TestCase):
         self.assertEqual(answer["api_requests"], 2)
         self.assertEqual(self.atlas.get_cursor("fi"), 2)
         self.assertEqual(self.atlas.current_count(), 1)
-        self.assertEqual(self.atlas.state()["member_article_links"], 1)
+        # First 32 queries are SHARED foundations, not misattributed
+        # to a specialist just to inflate member coverage.
+        self.assertEqual(self.atlas.state()["member_article_links"], 0)
         self.assertEqual(len(calls), 2)
         asleep.assert_called_once()
         with patch("klone.knowledge_atlas.time.sleep"):

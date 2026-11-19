@@ -347,6 +347,51 @@ class Atlas:
             "license_attribution_required": True,
         }
 
+    def member_coverage(self):
+        """72 deterministic specialist coverage stats; counts are not skills."""
+        counts = {
+            member_id: (total, api_count, hint_count)
+            for member_id, total, api_count, hint_count
+            in self.db.execute("""
+                SELECT member_id,COUNT(*),
+                       SUM(CASE WHEN provenance_reason='api_topic_seed'
+                                THEN 1 ELSE 0 END),
+                       SUM(CASE WHEN provenance_reason='lexical_topic_hint'
+                                THEN 1 ELSE 0 END)
+                FROM role_articles GROUP BY member_id
+            """)
+        }
+        members = []
+        for role in profiles():
+            member_id = role["member_id"]
+            total, api, hint = counts.get(member_id, (0, 0, 0))
+            members.append({
+                "member_id": member_id,
+                "ring_id": role["ring_id"],
+                "name": role["name"],
+                "task": role["canonical_task"],
+                "expertise_topics": role["expertise_topics"],
+                "linked_public_pages": total,
+                "pages_from_explicit_role_queries": api,
+                "pages_from_weak_keyword_hints": hint,
+                "expertise_established_by_count": False,
+            })
+        return {
+            "kind": "klone-atlas-72-coverage-v1",
+            "unique_articles": self.current_count(),
+            "member_profiles": members,
+            "members_with_any_article": sum(
+                1 for m in members if m["linked_public_pages"] > 0
+            ),
+            "members_without_article_links": [
+                m["member_id"] for m in members
+                if not m["linked_public_pages"]
+            ],
+            "retrieval_index_not_scientific_verification": True,
+            "model_api_requests": 0,
+            "memory_write": False,
+        }
+
     def search(self, question: str, *, member_id: int | None = None,
                language: str | None = None, limit=8):
         _check_positive_int(limit, 30, "search limit")
@@ -669,6 +714,7 @@ def main(argv=None):
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("plan")
     sub.add_parser("status")
+    sub.add_parser("coverage")
     look = sub.add_parser("search")
     look.add_argument("query")
     look.add_argument("--member-id", type=int)
@@ -695,6 +741,8 @@ def main(argv=None):
         with Atlas(args.root, max_mb=args.max_mb) as atlas:
             if args.command == "status":
                 output = atlas.state()
+            elif args.command == "coverage":
+                output = atlas.member_coverage()
             elif args.command == "search":
                 output = atlas.search(
                     args.query, member_id=args.member_id,

@@ -62,6 +62,32 @@ def get_status():
         return value
 
 
+@router.get("/coverage")
+def get_coverage():
+    if not (DEFAULT_ROOT / "wikipedia.sqlite3").is_file():
+        return {
+            "kind": "klone-atlas-72-coverage-v1",
+            "unique_articles": 0,
+            "member_profiles": [
+                {"member_id": p["member_id"], "ring_id": p["ring_id"],
+                 "name": p["name"], "task": p["canonical_task"],
+                 "expertise_topics": p["expertise_topics"],
+                 "linked_public_pages": 0,
+                 "pages_from_explicit_role_queries": 0,
+                 "pages_from_weak_keyword_hints": 0,
+                 "expertise_established_by_count": False}
+                for p in profiles()
+            ],
+            "members_with_any_article": 0,
+            "members_without_article_links": list(range(1, 73)),
+            "retrieval_index_not_scientific_verification": True,
+            "model_api_requests": 0,
+            "memory_write": False,
+        }
+    with _installed_atlas() as atlas:
+        return atlas.member_coverage()
+
+
 @router.get("/search")
 def get_search(q: str = Query(min_length=2, max_length=250),
                member_id: int | None = None,

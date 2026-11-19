@@ -12,6 +12,7 @@ import bz2
 from contextlib import closing
 from datetime import datetime, timezone
 import gzip
+import hmac
 from hashlib import sha256
 import io
 import json
@@ -583,7 +584,8 @@ def _parse_xml_page(page, language):
 
 
 def import_local_dump(atlas, filepath: Path, *, language: str,
-                      max_pages: int = 500, skip_pages: int = 0):
+                      max_pages: int = 500, skip_pages: int = 0,
+                      expected_sha256: str | None = None):
     _project_url(language)
     _check_positive_int(max_pages, 20_000, "dump import page count")
     if type(skip_pages) is not int or not 0 <= skip_pages <= 50_000_000:
@@ -591,6 +593,19 @@ def import_local_dump(atlas, filepath: Path, *, language: str,
     path = checked_path(Path(filepath).expanduser().absolute())
     if not path.is_file() or path.suffix not in (".xml", ".bz2", ".gz"):
         raise AtlasError("require local Wikimedia XML, XML.bz2 or XML.gz")
+    verified_digest = None
+    if expected_sha256 is not None:
+        if type(expected_sha256) is not str or not re.fullmatch(
+                "[0-9a-fA-F]{64}", expected_sha256):
+            raise AtlasError("expected SHA256 must contain exactly 64 hex characters")
+        digest = sha256()
+        with open(path, "rb") as source:
+            for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                digest.update(chunk)
+        verified_digest = digest.hexdigest()
+        if not hmac.compare_digest(
+                verified_digest, expected_sha256.lower()):
+            raise AtlasError("dump SHA256 mismatch; refusing import")
     opener = bz2.open if path.suffix == ".bz2" else (
         gzip.open if path.suffix == ".gz" else open
     )
@@ -598,7 +613,9 @@ def import_local_dump(atlas, filepath: Path, *, language: str,
              "skipped_at_start": skip_pages,
              "articles_inserted": 0, "articles_updated": 0,
              "articles_unchanged": 0, "excluded_large_or_invalid": 0,
-             "input_filename": path.name, "input_file_sha256_verified": False,
+             "input_filename": path.name,
+             "input_file_sha256_verified": verified_digest is not None,
+             "input_file_sha256": verified_digest,
              "source_format": "raw XML wikitext, not plaintext",
              "stopped_at_scan_offset": skip_pages}
     with opener(path, "rb") as handle:
@@ -670,6 +687,7 @@ def main(argv=None):
     d.add_argument("--language", choices=LANGUAGES, required=True)
     d.add_argument("--max-pages", type=int, default=500)
     d.add_argument("--skip-pages", type=int, default=0)
+    d.add_argument("--expected-sha256")
     args = parser.parse_args(argv)
     try:
         if args.command == "plan":
@@ -702,7 +720,8 @@ def main(argv=None):
             else:
                 output = import_local_dump(
                     atlas, args.input, language=args.language,
-                    max_pages=args.max_pages, skip_pages=args.skip_pages
+                    max_pages=args.max_pages, skip_pages=args.skip_pages,
+                    expected_sha256=args.expected_sha256
                 )
                 output["atlas_after"] = atlas.state()
         return _json_out(output)

@@ -123,7 +123,9 @@ def _fts_tokens(query):
     if not words:
         raise AtlasError("search query has no indexable terms")
     # Quoted FTS tokens avoid SQL injection, MATCH operators and wildcards.
-    return " OR ".join('"' + w.replace('"', '') + '"' for w in words)
+    # Require all question terms: Wikipedia evidence should not be diluted
+    # by articles matching only common words ("scientific" OR "method").
+    return " AND ".join('"' + w.replace('"', '') + '"' for w in words)
 
 
 def _safe_root(root: Path):
@@ -377,6 +379,7 @@ class Atlas:
                    ) + ") ")
             # Without FTS, fallback only reliably searches TITLES, not compressed bodies.
             sql = sql.replace(" OR CAST(a.body_zip AS TEXT) LIKE ?", "")
+            sql = sql.replace(" OR a.title LIKE ?", " AND a.title LIKE ?")
             params.extend("%" + word + "%" for word in terms)
         if language is not None:
             sql += "AND a.language=? "

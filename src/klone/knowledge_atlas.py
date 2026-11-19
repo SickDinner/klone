@@ -503,13 +503,14 @@ def _api_pages(payload, language):
         if (not isinstance(revs, list) or not revs or
                 type(revs[0]) is not dict):
             continue
-        if not p.get("extract", "").strip():
+        extract = p.get("extract")
+        if type(extract) is not str or not extract.strip():
             continue
         r = revs[0]
         try:
             article = _prepared_article(
                 language, p["pageid"], p["title"],
-                r["revid"], r["timestamp"], p["extract"],
+                r["revid"], r["timestamp"], extract,
                 "api_plaintext_extract",
             )
         except (KeyError, AtlasError):

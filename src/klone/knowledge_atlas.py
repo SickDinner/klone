@@ -67,11 +67,16 @@ def _project_url(language: str) -> str:
     return f"https://{language}.wikipedia.org"
 
 
-def _page_attribution(language: str, page_id: int, rev_id: int) -> dict:
+def _page_attribution(language: str, page_id: int, rev_id: int,
+                      title: str) -> dict:
     host = _project_url(language)
     return {
         "revision_permalink": f"{host}/w/index.php?oldid={rev_id}",
-        "contributors_history": f"{host}/w/index.php?title=Special:History&pageid={page_id}",
+        "contributors_history": (
+            f"{host}/w/index.php?title="
+            + urllib.parse.quote(title.replace(" ", "_"), safe="")
+            + "&action=history"
+        ),
         "license_name": LICENSE,
         "license_url": LICENSE_URL,
     }
@@ -113,7 +118,8 @@ def _prepared_article(language, page_id, title, revision_id, revision_at,
         "stored_sha256": _sha(clipped),
         "original_bytes": original_bytes,
     }
-    record.update(_page_attribution(language, page_id, revision_id))
+    record.update(_page_attribution(language, page_id, revision_id,
+                                    record["title"]))
     return record
 
 

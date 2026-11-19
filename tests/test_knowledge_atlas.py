@@ -7,6 +7,8 @@ from copy import deepcopy
 import json
 from pathlib import Path
 import sqlite3
+import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -348,6 +350,26 @@ class KnowledgeAtlasTests(unittest.TestCase):
             self.atlas.ingest(article(), seed_member=73)
         with self.assertRaisesRegex(AtlasError, "search limit"):
             self.atlas.search("linguistics", limit=31)
+
+    def test_termux_script_syntax_and_separate_command_argument_rules(self):
+        path = Path(__file__).resolve().parents[1] / (
+            "scripts/klone-knowledge-atlas-phone.sh"
+        )
+        script = path.read_text(encoding="utf-8")
+        self.assertIn("  collect)", script)
+        self.assertIn("  import-dump)", script)
+        self.assertIn("  ring)", script)
+        self.assertIn("  coverage)", script)
+        # Request-count check must not accidentally treat a dump language
+        # or a ring question as an integer at script entry.
+        self.assertNotIn('case "$REQUESTS" in',
+                         script.split("case \"$MODE\" in")[0])
+        if shutil.which("bash"):
+            syntax = subprocess.run(
+                ["bash", "-n", str(path)],
+                capture_output=True, text=True, check=False
+            )
+            self.assertEqual(syntax.returncode, 0, syntax.stderr)
 
     def test_search_finds_titles_and_reports_empty_outcome(self):
         self.atlas.ingest(article(title="Quantum mechanics",

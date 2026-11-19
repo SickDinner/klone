@@ -41,6 +41,10 @@ case "$MODE" in
     PYTHONPATH="$ROOT/src" "$PY" -m klone.knowledge_atlas \
       --root "$ATLAS" --max-mb "$MAX_MB" status
     ;;
+  coverage)
+    PYTHONPATH="$ROOT/src" "$PY" -m klone.knowledge_atlas \
+      --root "$ATLAS" --max-mb "$MAX_MB" coverage
+    ;;
   member)
     MEMBER="${2:-24}"
     PYTHONPATH="$ROOT/src" "$PY" -m klone.knowledge_atlas \
@@ -96,7 +100,7 @@ case "$MODE" in
       "${ARGS[@]}"
     ;;
   *)
-    echo "Käyttö: bash scripts/klone-knowledge-atlas-phone.sh [test|plan|status|member|search|ring|collect|import-dump]"
+    echo "Käyttö: bash scripts/klone-knowledge-atlas-phone.sh [test|plan|status|coverage|member|search|ring|collect|import-dump]"
     exit 2
     ;;
 esac

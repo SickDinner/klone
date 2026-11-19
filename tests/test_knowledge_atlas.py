@@ -103,7 +103,7 @@ class KnowledgeAtlasTests(unittest.TestCase):
         found = result["matched_sources"][0]
         self.assertEqual(found["revision_id"], 100)
         self.assertIn("oldid=100", found["source_url"])
-        self.assertIn("Special:History&pageid=1", found["attribution_url"])
+        self.assertIn("title=Linguistics&action=history", found["attribution_url"])
         self.assertIn("CC BY-SA", found["license_name"])
         self.assertIn("creative", found["license_url"])
         self.assertEqual(found["content_kind"], "api_plaintext_extract")

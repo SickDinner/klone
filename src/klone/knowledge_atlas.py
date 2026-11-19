@@ -30,7 +30,7 @@ from .council72 import catalog
 from .evidence_io import checked_path
 from .knowledge_atlas_topics import (
     LANGUAGES, PHASES, ROLE_TOPICS, SHARED_FOUNDATIONS,
-    TARGET_UNIQUE_ARTICLES, plan, profiles,
+    TARGET_UNIQUE_ARTICLES, discovery_seeds, plan, profiles,
 )
 
 ATLAS_KIND = "klone-wikimedia-knowledge-atlas-v1"
@@ -240,7 +240,10 @@ class Atlas:
             is_new = row is None
             if is_new and self.current_count() >= MAX_ARTICLES_HARD:
                 raise AtlasError("hard cap on distinct articles reached")
-            if self.disk_bytes() + (len(article["content"].encode("utf-8")) * 4) > self.max_bytes:
+            if (row is None or article["revision_id"] != row["revision_id"]) and (
+                self.disk_bytes() + len(article["content"].encode("utf-8")) * 4
+                > self.max_bytes
+            ):
                 raise AtlasError("atlas disk budget exceeded; no additional page stored")
             if row is not None and article["revision_id"] == row["revision_id"]:
                 status = "unchanged"
@@ -513,8 +516,7 @@ def collect(atlas: Atlas, *, language: str, requests: int,
         raise AtlasError("polite delay must be at least 1.5 seconds")
     if sender is None:
         sender = _mediawiki_request
-    seeds = [(p["member_id"], topic) for p in profiles()
-             for topic in p["expertise_topics"]]
+    seeds = discovery_seeds(language)
     start = atlas.get_cursor(language)
     outcomes = {"api_requests": 0, "articles_inserted": 0,
                 "articles_updated": 0, "articles_unchanged": 0,
@@ -539,6 +541,7 @@ def collect(atlas: Atlas, *, language: str, requests: int,
         atlas.save_cursor(language, (ix + 1) % len(seeds))
         outcomes["source_queries"].append({
             "member_id": member_id, "topic": topic,
+            "seed_kind": "shared_foundation" if member_id is None else "specialist",
             "articles_returned": len(articles)
         })
         if i < requests - 1:

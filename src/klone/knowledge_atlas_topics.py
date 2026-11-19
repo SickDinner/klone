@@ -110,6 +110,32 @@ SHARED_FOUNDATIONS = (
     "Logic", "Information science",
 )
 
+# Foundational Finnish topic seeds for the first phone-sized API batches.
+# Other languages use their original English query until a native translation
+# is explicitly curated; avoid automatically inventing localized titles.
+FINNISH_FOUNDATIONS = (
+    "Tieteen historia", "Matematiikka", "Fysiikka", "Kemia",
+    "Biologia", "Ekologia", "Maantiede", "Maailmanhistoria",
+    "Filosofia", "Taloustiede", "Valtio-oppi", "Oikeustiede",
+    "Kielitiede", "Kirjallisuus", "Taidehistoria", "Lääketiede",
+    "Tietojenkäsittelytiede", "Tilastotiede", "Tieteellinen menetelmä",
+    "Etiikka", "Teknologia", "Antropologia", "Arkeologia", "Musiikki",
+    "Geotieteet", "Tähtitiede", "Genetiikka", "Neurotiede",
+    "Insinööritieteet", "Psykologia", "Logiikka", "Informaatiotiede",
+)
+
+def discovery_seeds(language: str):
+    if language not in LANGUAGES:
+        raise ValueError("unsupported language")
+    foundations = (FINNISH_FOUNDATIONS if language == "fi"
+                   else SHARED_FOUNDATIONS)
+    if len(foundations) != len(SHARED_FOUNDATIONS):
+        raise ValueError("foundation translation map is incomplete")
+    return [(None, topic) for topic in foundations] + [
+        (role["member_id"], topic) for role in profiles()
+        for topic in role["expertise_topics"]
+    ]
+
 LANGUAGES = ("fi", "en", "sv", "no", "da", "is", "de", "fr", "es")
 TARGET_UNIQUE_ARTICLES = 72_000
 PHASES = (2_000, 12_000, 30_000, TARGET_UNIQUE_ARTICLES)
@@ -152,6 +178,8 @@ def plan() -> dict:
         "total_role_profiles": 72,
         "topic_queries_per_member": 3,
         "topic_queries_total": 216,
+        "shared_foundation_queries": 32,
+        "unique_discovery_seed_queries": 248,
         "no_articles_downloaded_by_plan": True,
         "memory_write": False,
         "model_api_requests": 0,

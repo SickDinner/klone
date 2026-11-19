@@ -56,6 +56,7 @@ git switch --detach FETCH_HEAD || exit 1
 
 bash scripts/klone-knowledge-atlas-phone.sh test
 bash scripts/klone-knowledge-atlas-phone.sh status
+bash scripts/klone-knowledge-atlas-phone.sh coverage
 bash scripts/klone-knowledge-atlas-phone.sh member 24
 ~~~
 
@@ -106,10 +107,12 @@ Viralliset osoitteet:
 - https://wikitech.wikimedia.org/wiki/MediaWiki_Content_File_Exports
 
 Tarkista ladattavan dumpin jakelijan SHA256SUMS.
-V1:n paikallinen XML-tuonti ei vielä automaattisesti
-vahvista tiedoston alkuperän allekirjoitusta tai SHA-summaa.
-Eri tiedostojen tuontia ei pidä merkitä todistetusti
-Wikimediasta saaduksi, ellei tarkistusta ole suoritettu.
+V1:n paikallinen XML-tuonti voi nyt haluttaessa varmistaa
+koko pakatun tiedoston SHA-256-tiivisteen ennen tuontia,
+kun virallinen SHA256SUMS-arvo annetaan kuudentena argumenttina.
+Hashin vertailu ei yksin todista, mistä vertailuarvo saatiin.
+Eri tiedostojen tuontia ei pidä merkitä Wikimedian alkuperäksi,
+ellei vertailuarvon lähdettäkin ole tarkistettu.
 
 Tuetut paikalliset tiedostot: XML, XML.gz ja XML.bz2.
 Tuonti käyttää virtaavaa XML-jäsennintä ja vie vain
@@ -123,7 +126,8 @@ tarkistetusta pienestä dump-osiosta:
 
 ~~~bash
 bash scripts/klone-knowledge-atlas-phone.sh import-dump \
-  "$HOME/storage/downloads/wiki-part.xml.bz2" en 2000 0
+  "$HOME/storage/downloads/wiki-part.xml.bz2" en 2000 0 \
+  "OMA_VIRALLISESTA_SHA256SUMS_LISTASTA_TARKISTETTU_64_MERKIN_TIIVISTE"
 ~~~
 
 Seuraava osa voidaan tuoda offset-arvolla 2000,
@@ -155,6 +159,7 @@ niille löydetyt rajatut tekstikatkelmat lähdelinkkeineen.
 
 Uusina API-reitteinä:
 - /api/knowledge-atlas/status
+- /api/knowledge-atlas/coverage
 - /api/knowledge-atlas/plan
 - /api/knowledge-atlas/members
 - /api/knowledge-atlas/members/{member_id}

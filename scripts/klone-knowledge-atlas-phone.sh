@@ -84,11 +84,16 @@ case "$MODE" in
     LANGUAGE="${3:-en}"
     LIMIT="${4:-500}"
     SKIP="${5:-0}"
+    EXPECTED_SHA="${6:-}"
     echo "=== VAIN PAIKALLINEN WIKIMEDIA XML, EI VERKKOA ==="
+    ARGS=(--input "$FILE" --language "$LANGUAGE"
+      --max-pages "$LIMIT" --skip-pages "$SKIP")
+    if [ -n "$EXPECTED_SHA" ]; then
+      ARGS+=(--expected-sha256 "$EXPECTED_SHA")
+    fi
     PYTHONPATH="$ROOT/src" "$PY" -m klone.knowledge_atlas \
       --root "$ATLAS" --max-mb "$MAX_MB" import-dump \
-      --input "$FILE" --language "$LANGUAGE" \
-      --max-pages "$LIMIT" --skip-pages "$SKIP"
+      "${ARGS[@]}"
     ;;
   *)
     echo "Käyttö: bash scripts/klone-knowledge-atlas-phone.sh [test|plan|status|member|search|ring|collect|import-dump]"

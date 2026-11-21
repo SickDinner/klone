@@ -366,7 +366,8 @@ class KnowledgeAtlasTests(unittest.TestCase):
                          script.split("case \"$MODE\" in")[0])
         if shutil.which("bash"):
             syntax = subprocess.run(
-                ["bash", "-n", str(path)],
+                ["bash", "-n", path.name],
+                cwd=path.parent,
                 capture_output=True, text=True, check=False
             )
             self.assertEqual(syntax.returncode, 0, syntax.stderr)

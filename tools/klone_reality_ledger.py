@@ -34,8 +34,9 @@ CAPABILITIES = (
     ("security", "Egress / approval policy", ("src/klone/egress_policy.py", "src/klone/approval_policy.py"), ("tests/test_security_foundation_policy.py",)),
     ("limbo", "Limbo Atlas research", ("src/klone/limbo_atlas.py",), ("tests/test_limbo_atlas.py",)),
     ("council_llm", "Council72 LLM bridge", ("src/klone/council72_intelligence_bridge.py",), ("tests/test_council72_intelligence_bridge.py",)),
+    ("council_quality", "Council72 quality / debate", ("src/klone/council72_quality_lab.py", "src/klone/council72_debate.py"), ("tests/test_council72_quality_debate.py",)),
     ("knowledge_atlas", "Knowledge Atlas / Wikipedia", ("src/klone/knowledge_atlas.py",), ("tests/test_knowledge_atlas.py",)),
-    ("noki", "Noki companion", ("src/klone/static/noki.html",), ("tests/test_noki.py",)),
+    ("noki", "Noki companion", ("src/klone/static/noki.html",), ("tests/test_noki_companion.py",)),
 )
 
 # Only these exact loopback endpoints may be probed, and only on explicit opt-in.

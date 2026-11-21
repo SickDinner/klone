@@ -226,6 +226,7 @@ def as_html(report: dict) -> str:
 
 
 def _write_new(root: Path, destination: Path, content: str) -> None:
+    root = root.expanduser().resolve()
     destination = destination.expanduser()
     resolved = destination.resolve()
     if resolved == root or root in resolved.parents:

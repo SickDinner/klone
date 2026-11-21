@@ -59,8 +59,8 @@ To inspect a **different checkout** without switching its branch:
 python tools/klone_reality_ledger.py --root "$HOME/klone-arxiv-e1"
 ~~~
 
-The script checks 17 capability groups, including Core, Memory, Hypervisor,
-Research, Council72, the optional LLM bridge, Limbo, Knowledge Atlas, Noki,
+The script checks 18 capability groups, including Core, Memory, Hypervisor,
+Research, Council72, its optional LLM bridge and Quality/Debate Lab, Limbo, Knowledge Atlas, Noki,
 Cognition, Art, Genomics and Evidence. It reads version declarations, looks at
 Git HEAD/branch/cleanliness and flags possible tracked runtime artifacts by
 filename. It does **not** open the artifacts or inspect their content.

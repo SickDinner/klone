@@ -70,8 +70,16 @@ def audit(payload: object, main_branch: str = "main") -> dict:
         else:
             dependencies[n] = []
             unresolved.append(n)
+    # Unknown upstream branches contaminate all their descendants.
+    unknown_chain = set(unresolved)
+    while True:
+        following = {n for n, deps in dependencies.items()
+                     if any(parent in unknown_chain for parent in deps)}
+        if following <= unknown_chain:
+            break
+        unknown_chain.update(following)
     # Topological order is a review sequence, NEVER permission to merge.
-    remaining = {n: set(d) for n, d in dependencies.items() if n not in unresolved}
+    remaining = {n: set(d) for n, d in dependencies.items() if n not in unknown_chain}
     sequence = []
     while remaining:
         ready = sorted(n for n, deps in remaining.items() if not deps and n not in sequence)
@@ -88,8 +96,12 @@ def audit(payload: object, main_branch: str = "main") -> dict:
         record = by_number[n]
         if n in unresolved:
             status = "unknown_base"
+        elif n in unknown_chain:
+            status = "blocked_unknown_upstream"
         elif n in blocked:
             status = "cycle_or_blocked_by_cycle"
+        elif dependencies[n]:
+            status = "blocked_by_open_dependency"
         elif record["draft"]:
             status = "draft_review_only"
         else:
@@ -97,7 +109,8 @@ def audit(payload: object, main_branch: str = "main") -> dict:
         items.append({"number": n, "head": record["head"], "base": record["base"],
                       "depends_on": dependencies[n], "status": status})
     return {"schema_version": 1, "kind": "klone-pr-dependency-audit",
-            "source_trust": "unverified_offline_snapshot", "automatic_merge_authority": False,
+            "source_trust": "unverified_offline_snapshot", "snapshot_completeness": "unknown",
+            "automatic_merge_authority": False,
             "ci_verified": False, "android_verified": False, "deployment_approved": False,
             "open_count": len(records), "direct_main_count": sum(r["base"] == main_branch for r in records),
             "review_order_not_merge_permission": sequence,
@@ -120,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
         parser.exit(2, f"KLONE PR audit refused input: {exc}\n")
     if args.text:
-        print(f"Avoimia PR:iä {report['open_count']}; suoraan mainiin {report['direct_main_count']}.")
+        print(f"Snapshotissa avoimia PR:iä {report['open_count']}; suoraan mainiin {report['direct_main_count']}.")
         print("Tarkastusjärjestys (EI yhdistämislupa):", ", ".join("#"+str(n) for n in report["review_order_not_merge_permission"]) or "ei tiedossa")
         print("Tuntematon pohjahaara:", report["unresolved_base_prs"])
         print("Syklinen/estynyt riippuvuus:", report["cycle_or_blocked_prs"])

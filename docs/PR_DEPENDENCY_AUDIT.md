@@ -32,7 +32,8 @@ rajoituksia, eikä tässä avata yksityisiä PR-tietoja tai käytetä GitHub-tok
 5. Arvioi muutosehdotus ihmisen toimesta ja muuta pohjahaara/tee merge vasta erillisen päätöksen jälkeen.
 
 Kehityshaaran koodin olemassaolo, CI:n vihreys, Androidin terveystarkistus ja
-hyväksytty käyttöönotto ovat **neljä eri asiaa**. Tämä työkalu tarkistaa vain
+hyväksytty käyttöönotto ovat **neljä eri asiaa**. Otos voi olla GitHubin sivutuksen vuoksi vajaa; tarkista tarvittaessa muut sivut.
+Tämä työkalu tarkistaa vain
 ensimmäisen vaatiman *riippuvuusrakenteen*; jäljelle jäävät kolme ovat
 aina false/tuntemattomia raportissa, kunnes ne tutkitaan erikseen.
 

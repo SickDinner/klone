@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import sqlite3
 import shutil
+import os
 import subprocess
 import tempfile
 import unittest
@@ -364,7 +365,10 @@ class KnowledgeAtlasTests(unittest.TestCase):
         # or a ring question as an integer at script entry.
         self.assertNotIn('case "$REQUESTS" in',
                          script.split("case \"$MODE\" in")[0])
-        if shutil.which("bash"):
+        # This script targets POSIX/Termux. Git Bash on Windows may be on PATH
+        # but does not reliably support this stdin syntax-check invocation.
+        # Linux CI still executes the real bash -n syntax check.
+        if os.name != "nt" and shutil.which("bash"):
             syntax = subprocess.run(
                 ["bash", "-n"],
                 input=script,

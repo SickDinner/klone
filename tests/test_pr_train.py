@@ -27,6 +27,8 @@ class TrainTests(unittest.TestCase):
         self.assertEqual(r["open_count"], 5)
         self.assertEqual(r["direct_main_count"], 2)
         self.assertEqual(r["pull_requests"][2]["depends_on"], [181])
+        self.assertEqual(r["pull_requests"][2]["status"], "blocked_by_open_dependency")
+        self.assertEqual(r["snapshot_completeness"], "unknown")
         self.assertFalse(r["automatic_merge_authority"])
         self.assertFalse(r["android_verified"])
 
@@ -35,6 +37,13 @@ class TrainTests(unittest.TestCase):
         self.assertEqual(r["unresolved_base_prs"], [18])
         self.assertEqual(r["review_order_not_merge_permission"], [])
         self.assertEqual(r["pull_requests"][0]["status"], "unknown_base")
+
+    def test_unknown_upstream_blocks_descendants_without_false_cycle(self):
+        r = mod.audit([pr(7, "a", "missing"), pr(8, "b", "a")])
+        self.assertEqual(r["unresolved_base_prs"], [7])
+        self.assertEqual(r["cycle_or_blocked_prs"], [])
+        self.assertEqual(r["pull_requests"][1]["status"], "blocked_unknown_upstream")
+        self.assertEqual(r["review_order_not_merge_permission"], [])
 
     def test_cycle_is_not_a_review_order(self):
         r = mod.audit([pr(1, "a", "b"), pr(2, "b", "a"), pr(3, "c", "a")])

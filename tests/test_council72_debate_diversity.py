@@ -103,6 +103,41 @@ class DebateDiversityAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "argument"):
             audit.analyze(fixhash(r))
 
+    def test_same_research_issues_with_different_wording(self):
+        r = report()
+        r["debate_turns"][0]["answer"]["arguments"][0]["falsification_test"] = (
+            "Varmista PDF-tekstikerroksesta sama arXiv-versio ja sanatarkka osuma."
+        )
+        r["debate_turns"][1]["answer"]["arguments"][0]["falsification_test"] = (
+            "Tutki sivukuvista versiovastaavuus ja katkelman täsmällinen vastine."
+        )
+        result = audit.analyze(fixhash(r))
+        self.assertEqual(result["issue_axis_overlap_jaccard"], 1.0)
+        self.assertEqual(len(result["shared_issue_axes"]), 3)
+        self.assertIn("shared_issue_axes_candidate", result["screening_flags"])
+        self.assertLess(result["falsification_test_similarity_max_per_cross_argument"][0], 0.6)
+
+    def test_different_research_issue_axes(self):
+        r = report()
+        r["debate_turns"][0]["answer"]["arguments"][0]["falsification_test"] = (
+            "Varmista sama julkaisuversio ennen jatkotarkistusta."
+        )
+        r["debate_turns"][1]["answer"]["arguments"][0]["falsification_test"] = (
+            "Arvioi RMSE-mittari ja tutkimusmenetelmän laskennan oikeellisuus."
+        )
+        result = audit.analyze(fixhash(r))
+        self.assertEqual(result["issue_axis_overlap_jaccard"], 0.0)
+        self.assertIn("numeric_context", result["unmatched_defender_issue_axes"])
+        self.assertNotIn("shared_issue_axes_candidate", result["screening_flags"])
+
+    def test_no_known_issue_cues_is_unknown_not_diverse(self):
+        result = audit.analyze(report())
+        self.assertEqual(result["cross_examiner_issue_axes"], [])
+        self.assertEqual(result["defender_issue_axes"], [])
+        self.assertEqual(result["issue_axis_overlap_jaccard"], 0.0)
+        self.assertNotIn("shared_issue_axes_candidate", result["screening_flags"])
+        self.assertFalse(result["independent_models_verified"])
+
     def test_determinism(self):
         r = report()
         self.assertEqual(audit.analyze(r), audit.analyze(deepcopy(r)))

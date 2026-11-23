@@ -44,3 +44,23 @@ Sanastollinen samankaltaisuus ei ole semanttinen eikä tieteellinen arvio.
 
 Tämä muutos perustuu PR #182:n kokeelliseen debate-v2-raporttimuotoon.
 Se EI ole valmis uusi väittelymoottori eikä riippumattomuusvalidointi.
+
+## V1.1 – aineiston osoittaman puutteen lisämittari
+
+Käyttäjän oikeassa 19.11. tallennetussa väittelyssä roolien ja lähdekorttien
+joukkopäällekkäisyys oli 1,0 / 1,0, mutta falsifiointitestien sanastolliset
+Jaccard-arvot olivat vain [0.143, 0.294, 0.2]. Tämä osoittaa, että pelkkä
+sanatason vertailu ei riitä tunnistamaan samasta tutkimusongelmasta puhumista.
+
+Lisätty erillinen, dokumentoitu **aiheakselien sääntöpohjainen heuristiikka**:
+lähteen versio, PDF-poiminta/sivukuvat, tekstivastineet, numeroiden konteksti,
+tutkimusmenetelmät ja yleistettävyys. Molempien vuorojen selityksistä
+johdetaan näiden kuuden rajatun aiheen joukko, päällekkäisyys ja puolustajan
+uudet aiheakselit. Jos samat tutkimusaiheet toistuvat eri sanamuodoin, arvio
+voi merkitä `shared_issue_axes_candidate` vaikka sana-Jaccard jäisi pieneksi.
+
+Nämä ovat **hakusanoihin perustuvia ehdokkaita**, eivät semanttisia
+totuusluokituksia, tiedevertailua tai varmuuslupauksia. Tyhjä aihejoukko
+tarkoittaa tunnistamatta jääneitä aiheita, ei riippumattomuutta.
+
+GitHubin CI ja Android-ajot tarkistetaan täsmälleen uusimmalla commitilla.

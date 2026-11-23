@@ -196,3 +196,14 @@ def council_draft(request: DraftRequest):
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/cross-review")
+def council_cross_review(proposal: CouncilProposal):
+    """Compare existing 72 opinions in two orthogonal, advisory-only lenses."""
+    from .council72_cross_review import cross_review
+
+    try:
+        return cross_review(deliberate(proposal.model_dump()))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc

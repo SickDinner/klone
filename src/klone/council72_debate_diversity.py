@@ -19,6 +19,26 @@ STOP = frozenset(("että", "tämä", "tämän", "pitää", "täytyy", "sekä", "
 WORDS = re.compile(r"[^\W\d_]{4,}", re.UNICODE)
 MAX_FILE = 3_000_000
 
+# Finnish/English topical screening cues; these are not semantic inference.
+# Generic words such as "PDF" or "source" are deliberately not sufficient.
+ISSUE_STEMS = {
+    "source_version_identity": ("versio", "version", "arxiv-version", "tietueen"),
+    "pdf_extraction_or_page_image": ("tekstikerro", "sivukuv", "poimin", "extraction", "extract"),
+    "quote_or_meaning_match": ("sanatark", "vastine", "tekstivastaav", "osuma", "katkelma", "parafraas", "exact match"),
+    "numeric_context": ("rmse", "lukuarv", "numeroväit", "numeroarv", "mittari", "metriik"),
+    "scientific_methods": ("menetelm", "laskennan", "tuloksen pätev", "methodolog", "validit", "replicat"),
+    "scope_or_generalization": ("yleist", "kattav", "otoksen edustav", "generaliz", "sampling"),
+}
+
+
+def _issue_axes(arg):
+    # Word-stem markers only; never label an issue "resolved" from a keyword.
+    combined = " ".join(arg[k] for k in (
+        "claim", "challenge_or_defense", "falsification_test")).casefold()
+    return {axis for axis, stems in ISSUE_STEMS.items()
+            if any(stem in combined for stem in stems)}
+
+
 
 def _fingerprint(value):
     raw = json.dumps(value, sort_keys=True, ensure_ascii=False,
@@ -118,6 +138,9 @@ def analyze(report):
                    for test in final_tests]
     role_overlap = _jaccard(set(left_roles), set(right_roles))
     card_overlap = _jaccard(left_sources, right_sources)
+    left_axes = set().union(*(_issue_axes(a) for a in left_args))
+    right_axes = set().union(*(_issue_axes(a) for a in right_args))
+    issue_overlap = _jaccard(left_axes, right_axes)
     flags = []
     if role_overlap == 1.0:
         flags.append("same_focal_role_set")
@@ -125,6 +148,8 @@ def analyze(report):
         flags.append("high_focal_role_overlap")
     if card_overlap == 1.0 and left_sources:
         flags.append("same_source_card_set")
+    if issue_overlap >= 0.75 and len(left_axes & right_axes) >= 2:
+        flags.append("shared_issue_axes_candidate")
     if any(x >= 0.6 for x in similarities):
         flags.append("similar_falsification_tests_candidate")
     if any(x >= 0.6 for x in arbiter_sim):
@@ -146,10 +171,15 @@ def analyze(report):
         "defender_source_cards": len(right_sources),
         "shared_source_cards": len(left_sources & right_sources),
         "source_card_overlap_jaccard": card_overlap,
+        "cross_examiner_issue_axes": sorted(left_axes),
+        "defender_issue_axes": sorted(right_axes),
+        "shared_issue_axes": sorted(left_axes & right_axes),
+        "issue_axis_overlap_jaccard": issue_overlap,
+        "unmatched_defender_issue_axes": sorted(right_axes - left_axes),
         "falsification_test_similarity_max_per_cross_argument": similarities,
         "arbiter_test_similarity_max_to_prior": arbiter_sim,
         "screening_flags": flags,
-        "interpretation": "Lexical similarities are candidate repetitions only; differences do not prove independent scientific reasoning."
+        "interpretation": "Word stems and topical axes are screening heuristics, not semantic proof; dissimilar words or topics do not prove independent scientific reasoning."
     }
 
 
@@ -170,6 +200,10 @@ def main(argv=None):
         print("Jaetut asiantuntijaroolit:", result["shared_role_ids"])
         print("Roolien Jaccard-päällekkäisyys:", result["role_overlap_jaccard"])
         print("Lähdekorttien päällekkäisyys:", result["source_card_overlap_jaccard"])
+        print("Aiheakselit, haastaja:", ", ".join(result["cross_examiner_issue_axes"]) or "ei tunnistettu")
+        print("Aiheakselit, puolustaja:", ", ".join(result["defender_issue_axes"]) or "ei tunnistettu")
+        print("Aiheakseleiden Jaccard:", result["issue_axis_overlap_jaccard"])
+        print("Puolustajan uudet aiheakselit:", result["unmatched_defender_issue_axes"])
         print("Koeteltavien testien sanastolliset samankaltaisuudet:",
               result["falsification_test_similarity_max_per_cross_argument"])
         print("Ratkaisijan jatkotestien samankaltaisuudet:",

@@ -15,6 +15,10 @@
 - Siirtoformaatti on tiukka, rajoitettu, kanoninen JSON; duplikaattiavaimet torjutaan. Esitarkistus ei salli hyväksyntä-, julkaisu-, aktivointi- eikä verkko-operaatioita.
 - Poistetun *screened*-tapahtuman voi havaita toisinaan jo replay-tietueiden lukumääräerosta; poistetun hylkäystapahtuman havainto edellyttää aiemmin ulos ankkuroidun tarkistuspisteen vertaamista.
 
+### Testiympäristön riippuvuudet
+
+V2.5:n Ed25519-testit tarvitsevat `cryptography`-kirjaston. GitHubin koko regressiosarja asentaa `.[test]`; lisäsimme sen testiriippuvuuksiin (sama `cryptography>=44,<51` kuin jo olemassa olevassa `.[evidence]`-lisäosassa). Tuotannon perusasennukseen ei lisätä automaattista hyväksyntätoimintoa. Käytettäessä v2.5-moduulia ilman testiriippuvuuksia valitaan erikseen `.[evidence]`.
+
 ### Turvarajoitukset
 
 Tämä PR **ei** toteuta ulkopuolista ankkurirekisteriä tai sen atomista CAS-päivitystä; se ei takaa uusimman tarkistuspisteen hallintaa, avaimen yksinoikeutta, laitteen identiteettiä, erillisiä käyttöjärjestelmätunnuksia, suojattua IPC-palvelua eikä automaattista tuotantoon siirtoa. Vanha aito allekirjoitettu tarkistuspiste voi hyväksytyksi tulla, jos hyökkääjä samalla korvaa sekä tarkistetun DB:n **että** väitetyn ulkoisen odotetun tiivisteen. Vain erikseen suojattu, rollback-resistant uusin ankkuri ja palvelun muu eristys voivat estää tämän. Ed25519-signaturen aitous ei yksin vahvista tapahtumalokin täydellisyyttä tai kronologiaa.

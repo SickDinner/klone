@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+from contextlib import closing
 from pathlib import Path
 import secrets
 import socket
@@ -251,7 +252,9 @@ class AdmissionV24Tests(unittest.TestCase):
         self.assertFalse(any(t.is_alive() for t in ts))
         self.assertEqual(errs, [])
         self.assertCountEqual(clients, ["screened", "denied"])
-        with sqlite3.connect(self.path) as check:
+        # sqlite3.Connection.__exit__ commits/rolls back; it does NOT close.
+        # Windows cannot unlink the temporary DB if this handle survives.
+        with closing(sqlite3.connect(self.path)) as check:
             self.assertEqual(check.execute("SELECT count(*) FROM approval_v24_ingress_seen")
                              .fetchone()[0], 1)
             self.assertEqual(check.execute("SELECT count(*) FROM approval_v24_ingress_audit")

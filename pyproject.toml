@@ -21,6 +21,7 @@ evidence = [
 ]
 test = [
   "httpx>=0.27,<1",
+  "cryptography>=44,<51",
 ]
 
 [project.scripts]

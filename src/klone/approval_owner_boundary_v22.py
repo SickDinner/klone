@@ -22,7 +22,8 @@ class OwnerIsolationUnavailable(PermissionError):
 
 def kernel_peer_uid(conn: socket.socket) -> int:
     """Read kernel-supplied AF_UNIX credentials; fail closed everywhere else."""
-    if not isinstance(conn, socket.socket) or conn.family != socket.AF_UNIX:
+    unix_family = getattr(socket, "AF_UNIX", None)
+    if unix_family is None or not isinstance(conn, socket.socket) or conn.family != unix_family:
         raise OwnerIsolationUnavailable("unix_peer_credentials_required")
     if not hasattr(socket, "SO_PEERCRED"):
         raise OwnerIsolationUnavailable("peer_credentials_unsupported")
@@ -45,6 +46,8 @@ def require_isolated_approval_owner(conn: socket.socket, db_path: str | Path) ->
     verification, source attestation, audit, and securely held secrets.
     """
     peer_uid = kernel_peer_uid(conn)
+    if not hasattr(os, "geteuid"):
+        raise OwnerIsolationUnavailable("service_uid_unsupported")
     owner_uid = os.geteuid()
     if peer_uid == owner_uid:
         raise OwnerIsolationUnavailable("same_uid_not_isolated")

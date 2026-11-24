@@ -13,6 +13,11 @@ from klone.approval_owner_boundary_v22 import (
 
 class OwnerBoundaryV22Tests(unittest.TestCase):
     def setUp(self):
+        # Unix peer credentials and POSIX owners are unavailable on Windows.
+        # Skip only the POSIX-specific fixtures, not portable fail-closed tests.
+        if not (hasattr(socket, "AF_UNIX") and hasattr(socket, "SO_PEERCRED")
+                and hasattr(socket, "socketpair") and hasattr(os, "geteuid")):
+            self.skipTest("requires Linux/Android SO_PEERCRED and geteuid")
         self.tmp = tempfile.TemporaryDirectory(prefix="klone-v22-uid-")
         self.addCleanup(self.tmp.cleanup)
         self.dir = Path(self.tmp.name)
@@ -29,10 +34,6 @@ class OwnerBoundaryV22Tests(unittest.TestCase):
         self.assertEqual(kernel_peer_uid(self.sock), os.geteuid())
         with self.assertRaisesRegex(OwnerIsolationUnavailable, "same_uid_not_isolated"):
             require_isolated_approval_owner(self.sock, self.db)
-
-    def test_non_unix_socket_denied(self):
-        with self.assertRaises(OwnerIsolationUnavailable):
-            kernel_peer_uid(object())
 
     def test_reject_world_readable_database(self):
         os.chmod(self.db, 0o644)
@@ -70,6 +71,17 @@ class OwnerBoundaryV22Tests(unittest.TestCase):
         # MOCK ONLY. This is not a successful real privilege-separation test.
         with patch("klone.approval_owner_boundary_v22.kernel_peer_uid", return_value=os.geteuid()+1):
             self.assertIsNone(require_isolated_approval_owner(self.sock, self.db))
+
+class OwnerBoundaryPortableTests(unittest.TestCase):
+    """These fail-closed invariants must run on Windows too."""
+
+    def test_non_unix_socket_denied(self):
+        with self.assertRaises(OwnerIsolationUnavailable):
+            kernel_peer_uid(object())
+        # This is a real socket, not a missing/invalid Python object.
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as inet:
+            with self.assertRaises(OwnerIsolationUnavailable):
+                kernel_peer_uid(inet)
 
     def test_no_approval_or_publish_api(self):
         import klone.approval_owner_boundary_v22 as m

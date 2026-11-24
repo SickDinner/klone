@@ -99,15 +99,16 @@ class SQLiteReceiptBridgeTests(unittest.TestCase):
 
     def test_missing_or_changed_target_denied(self):
         self.insert()
-        self.db.execute("UPDATE approval_proposals SET target_version='v2'")
-        with self.assertRaises(sqlite3.IntegrityError):
-            self.approve()
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "evidence_subject_binding_immutable"):
+            self.db.execute("UPDATE approval_proposals SET target_version='v2'")
+        self.assertEqual(self.db.execute("SELECT target_version FROM approval_proposals").fetchone()[0], "v1")
 
     def test_patch_hash_changed_denied(self):
         self.insert()
-        self.db.execute("UPDATE approval_proposals SET patch_sha256=?", ("a"*64,))
-        with self.assertRaises(sqlite3.IntegrityError):
-            self.approve()
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "evidence_subject_binding_immutable"):
+            self.db.execute("UPDATE approval_proposals SET patch_sha256=?", ("a"*64,))
+        self.assertEqual(self.db.execute("SELECT patch_sha256 FROM approval_proposals").fetchone()[0],
+                         self.subject["draft_sha256"])
 
     def test_expired_receipt_denied(self):
         self.insert()
@@ -128,11 +129,51 @@ class SQLiteReceiptBridgeTests(unittest.TestCase):
         with self.assertRaises(sqlite3.IntegrityError):
             self.approve()
 
+    def test_binding_fields_locked_even_before_approval(self):
+        original = self.db.execute(
+            "SELECT proposal_id, room_id, target_version, patch_sha256 "
+            "FROM approval_proposals WHERE proposal_id='p1'"
+        ).fetchone()
+        for column, value in (
+            ("proposal_id", "p2"),
+            ("room_id", "restricted-room"),
+            ("target_version", "v2"),
+            ("patch_sha256", "f"*64),
+        ):
+            with self.subTest(field=column):
+                with self.assertRaisesRegex(sqlite3.IntegrityError, "evidence_subject_binding_immutable"):
+                    self.db.execute(f"UPDATE approval_proposals SET {column}=? WHERE proposal_id='p1'", (value,))
+                self.assertEqual(self.db.execute(
+                    "SELECT proposal_id, room_id, target_version, patch_sha256 FROM approval_proposals"
+                ).fetchone(), original)
+
+    def test_binding_fields_locked_after_approval(self):
+        self.insert()
+        self.approve()
+        before = self.db.execute(
+            "SELECT proposal_id, room_id, target_version, patch_sha256, state "
+            "FROM approval_proposals WHERE proposal_id='p1'"
+        ).fetchone()
+        for column, value in (
+            ("proposal_id", "p2"),
+            ("room_id", "restricted-room"),
+            ("target_version", "v2"),
+            ("patch_sha256", "f"*64),
+        ):
+            with self.subTest(field=column):
+                with self.assertRaisesRegex(sqlite3.IntegrityError, "evidence_subject_binding_immutable"):
+                    self.db.execute(f"UPDATE approval_proposals SET {column}=? WHERE proposal_id='p1'", (value,))
+                self.assertEqual(self.db.execute(
+                    "SELECT proposal_id, room_id, target_version, patch_sha256, state "
+                    "FROM approval_proposals"
+                ).fetchone(), before)
+
     def test_bad_room_denied(self):
         self.insert()
-        self.db.execute("UPDATE approval_proposals SET room_id='restricted-room'")
-        with self.assertRaises(sqlite3.IntegrityError):
-            self.approve()
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "evidence_subject_binding_immutable"):
+            self.db.execute("UPDATE approval_proposals SET room_id='restricted-room'")
+        self.assertEqual(self.db.execute("SELECT room_id FROM approval_proposals").fetchone()[0],
+                         "public-room")
 
 
 if __name__ == "__main__":

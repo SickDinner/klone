@@ -77,6 +77,20 @@ class EvidenceApprovalBridge:
             BEGIN
                 SELECT RAISE(ABORT, 'evidence_receipt_immutable');
             END;
+            -- Proposal subject bindings are immutable from creation through
+            -- approval. Edits require creating a new proposal, never mutating
+            -- a previously signed subject. The ApprovalJournal changes only
+            -- state and approver_id during legitimate transitions.
+            CREATE TRIGGER evidence_guard_binding_immutable_v11
+            BEFORE UPDATE OF proposal_id,room_id,target_version,patch_sha256
+            ON approval_proposals
+            WHEN NEW.proposal_id IS NOT OLD.proposal_id
+              OR NEW.room_id IS NOT OLD.room_id
+              OR NEW.target_version IS NOT OLD.target_version
+              OR NEW.patch_sha256 IS NOT OLD.patch_sha256
+            BEGIN
+                SELECT RAISE(ABORT,'evidence_subject_binding_immutable');
+            END;
             CREATE TRIGGER evidence_guard_approve_v11
             BEFORE UPDATE OF state ON approval_proposals
             WHEN NEW.state='approved'

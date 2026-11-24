@@ -23,3 +23,10 @@ export PYTHONPATH="$PWD/src" PYTHONDONTWRITEBYTECODE=1
 ```
 
 Expected: **18 new tests** (12 SQLite + 6 real approval gateway), plus the existing **21 receipt tests**, if local files and code are as expected. The 6 integration tests are not claimed as completed until run in the user's KLONE environment.
+
+## Post-review hardening (v1.2)
+
+- Add a fail-closed SQLite trigger that prevents updates to the proposal ID, room ID, target version, or patch hash **at any lifecycle stage**, including after approval. Amending any of these values requires a newly proposed, re-signed draft.
+- Add regression tests for edits before and after approval. Existing negative mutation tests now require immediate rejection instead of merely a failed later approval.
+- This is **not** a general SQLite trust boundary: callers with write access can still directly change `state` if a valid receipt exists, bypassing actor authorization, or modify triggers/functions with sufficient database access. The owner identity and signed assertion must be enforced at a trusted gateway / isolated write service.
+- The trusted provider still must return current authoritative inputs. Cross-process file races, scientific source authenticity, reviewer independence, and production migration remain unresolved.

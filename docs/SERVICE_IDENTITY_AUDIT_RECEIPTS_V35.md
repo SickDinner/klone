@@ -4,6 +4,8 @@
 
 The verifier accepts a narrowly defined receipt signed with Ed25519 by an
 observer whose public key is supplied through a trusted, out-of-band key ring.
+Each key-ring entry binds the key ID to both its public key and its exact issuer
+name, preventing one trusted key from claiming another observer's identity.
 The service identity claim is bound to a fresh caller nonce, a service ID, a
 40-character application commit, a local loopback listener, a process ID and
 start-time token, owner UID, executable and command digests, and observer ID.
@@ -22,6 +24,10 @@ is checked independently.
 - Callers must generate unpredictable nonces, keep the public-key registry
   under trusted configuration, rotate/revoke keys operationally, and define
   retention for audit material.
+- The supplied audit chain proves signatures and links among the receipts it
+  contains; it does not prove that no events were omitted or that the chain was
+  never truncated. Completeness needs an independently retained final digest
+  or another trusted external checkpoint.
 - The existing v3.2/v3.4 local health probe remains unauthenticated unless a
   caller explicitly verifies a receipt with this API. HTTP 200 alone is not
   identity evidence.

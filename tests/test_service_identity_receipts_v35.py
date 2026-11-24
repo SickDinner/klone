@@ -10,7 +10,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from klone.service_identity_receipts_v35 import (
-    ReceiptError, canonical_json, parse_receipt_json, receipt_sha256,
+    ReceiptError, TrustedObserverKey, canonical_json, parse_receipt_json, receipt_sha256,
     verify_audit_chain, verify_audit_receipt, verify_service_identity_receipt,
 )
 
@@ -23,7 +23,7 @@ PUBLIC = PRIVATE.public_key().public_bytes(
     encoding=serialization.Encoding.Raw,
     format=serialization.PublicFormat.Raw,
 )
-KEYS = {"test-observer-1": PUBLIC}
+KEYS = {"test-observer-1": TrustedObserverKey("termux-observer", PUBLIC)}
 
 
 def signed(receipt_type, subject, *, nonce=NONCE, issued_at=NOW, ttl=120,
@@ -91,6 +91,15 @@ class ServiceIdentityReceiptV35Tests(unittest.TestCase):
         receipt = signed("service_identity", identity_subject())
         receipt["body"]["key_id"] = "attacker-key"
         with self.assertRaisesRegex(ReceiptError, "untrusted_key_id"):
+            verified_identity(receipt)
+
+    def test_trusted_key_cannot_claim_another_issuer_name(self):
+        receipt = signed("service_identity", identity_subject())
+        receipt["body"]["issuer"] = "different-observer"
+        receipt["signature"] = base64.urlsafe_b64encode(
+            PRIVATE.sign(canonical_json(receipt["body"]))
+        ).decode().rstrip("=")
+        with self.assertRaisesRegex(ReceiptError, "untrusted_issuer"):
             verified_identity(receipt)
 
     def test_nonce_replay_is_rejected(self):

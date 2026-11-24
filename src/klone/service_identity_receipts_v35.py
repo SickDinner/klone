@@ -53,6 +53,14 @@ class ReceiptError(ValueError):
 
 
 @dataclass(frozen=True)
+class TrustedObserverKey:
+    """Out-of-band binding between one key ID, issuer name, and public key."""
+
+    issuer: str
+    public_key: object
+
+
+@dataclass(frozen=True)
 class VerifiedServiceIdentity:
     """Authenticated observer claims; not a live process handle or authority."""
 
@@ -172,6 +180,13 @@ def _verify_signature(body: dict, signature: str, trusted_public_keys: Mapping[s
     key_id = body["key_id"]
     if key_id not in trusted_public_keys:
         raise ReceiptError("untrusted_key_id")
+    trusted = trusted_public_keys[key_id]
+    if not isinstance(trusted, TrustedObserverKey):
+        raise ReceiptError("invalid_trusted_key_entry")
+    if type(trusted.issuer) is not str or not _TOKEN.fullmatch(trusted.issuer):
+        raise ReceiptError("invalid_trusted_issuer")
+    if body["issuer"] != trusted.issuer:
+        raise ReceiptError("untrusted_issuer")
     if type(signature) is not str or not re.fullmatch(r"[A-Za-z0-9_-]{86}", signature):
         raise ReceiptError("invalid_signature_encoding")
     try:
@@ -184,7 +199,7 @@ def _verify_signature(body: dict, signature: str, trusted_public_keys: Mapping[s
             signature_bytes).decode("ascii").rstrip("=") != signature:
         raise ReceiptError("invalid_signature_encoding")
     try:
-        _public_key(trusted_public_keys[key_id]).verify(
+        _public_key(trusted.public_key).verify(
             signature_bytes, canonical_json(body),
         )
     except ReceiptError:

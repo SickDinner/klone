@@ -27,16 +27,37 @@ ISSUE_STEMS = {
     "quote_or_meaning_match": ("sanatark", "vastine", "tekstivastaav", "osuma", "katkelma", "parafraas", "exact match"),
     "numeric_context": ("rmse", "lukuarv", "numeroväit", "numeroarv", "mittari", "metriik"),
     "scientific_methods": ("menetelm", "laskennan", "tuloksen pätev", "methodolog", "validit", "replicat"),
-    "scope_or_generalization": ("yleist", "kattav", "otoksen edustav", "generaliz", "sampling"),
+    "scope_or_generalization": ("yleist", "otoksen edustav", "generaliz", "sampling"),
+    "inspection_coverage": ("kattav", "coverage"),
 }
 
 
-def _issue_axes(arg):
-    # Word-stem markers only; never label an issue "resolved" from a keyword.
-    combined = " ".join(arg[k] for k in (
-        "claim", "challenge_or_defense", "falsification_test")).casefold()
+def _axes_in_text(text):
+    # Keyword coverage is not semantic entailment or factual grounding.
+    value = text.casefold()
     return {axis for axis, stems in ISSUE_STEMS.items()
-            if any(stem in combined for stem in stems)}
+            if any(stem in value for stem in stems)}
+
+
+def _issue_axes(arg):
+    return set().union(*(_axes_in_text(arg[field]) for field in
+                         ("claim", "challenge_or_defense", "falsification_test")))
+
+
+def _axis_evidence(arguments):
+    """Show which bounded argument fields contain each screening cue.
+
+    Card IDs are references cited by the argument, not validated evidence.
+    """
+    evidence = {}
+    for idx, arg in enumerate(arguments, 1):
+        for field in ("claim", "challenge_or_defense", "falsification_test"):
+            for axis in sorted(_axes_in_text(arg[field])):
+                evidence.setdefault(axis, []).append({
+                    "argument_index": idx, "field": field,
+                    "source_card_ids": list(arg["source_card_ids"])
+                })
+    return {axis: evidence[axis] for axis in sorted(evidence)}
 
 
 
@@ -138,8 +159,15 @@ def analyze(report):
                    for test in final_tests]
     role_overlap = _jaccard(set(left_roles), set(right_roles))
     card_overlap = _jaccard(left_sources, right_sources)
-    left_axes = set().union(*(_issue_axes(a) for a in left_args))
-    right_axes = set().union(*(_issue_axes(a) for a in right_args))
+    left_axis_evidence = _axis_evidence(left_args)
+    right_axis_evidence = _axis_evidence(right_args)
+    left_axes = set(left_axis_evidence)
+    right_axes = set(right_axis_evidence)
+    right_new_axes = sorted(right_axes - left_axes)
+    right_test_axes = set().union(*(_axes_in_text(a["falsification_test"])
+                                     for a in right_args))
+    right_new_axes_in_tests = sorted(set(right_new_axes) & right_test_axes)
+    right_new_axes_outside_tests = sorted(set(right_new_axes) - right_test_axes)
     issue_overlap = _jaccard(left_axes, right_axes)
     flags = []
     if role_overlap == 1.0:
@@ -175,11 +203,15 @@ def analyze(report):
         "defender_issue_axes": sorted(right_axes),
         "shared_issue_axes": sorted(left_axes & right_axes),
         "issue_axis_overlap_jaccard": issue_overlap,
-        "unmatched_defender_issue_axes": sorted(right_axes - left_axes),
+        "unmatched_defender_issue_axes": right_new_axes,
+        "cross_examiner_axis_evidence": left_axis_evidence,
+        "defender_axis_evidence": right_axis_evidence,
+        "defender_new_axes_in_falsification_tests": right_new_axes_in_tests,
+        "defender_new_axes_only_outside_falsification_tests": right_new_axes_outside_tests,
         "falsification_test_similarity_max_per_cross_argument": similarities,
         "arbiter_test_similarity_max_to_prior": arbiter_sim,
         "screening_flags": flags,
-        "interpretation": "Word stems and topical axes are screening heuristics, not semantic proof; dissimilar words or topics do not prove independent scientific reasoning."
+        "interpretation": "Word-stem issue axes and field locations are screening hints, not semantic proof, scientific validation, or evidence that a mentioned axis has a falsifiable test. Input self-hash is not publisher authentication."
     }
 
 
@@ -204,6 +236,14 @@ def main(argv=None):
         print("Aiheakselit, puolustaja:", ", ".join(result["defender_issue_axes"]) or "ei tunnistettu")
         print("Aiheakseleiden Jaccard:", result["issue_axis_overlap_jaccard"])
         print("Puolustajan uudet aiheakselit:", result["unmatched_defender_issue_axes"])
+        print("Uudet aiheakselit myös puolustajan testiehdotuksissa:",
+              result["defender_new_axes_in_falsification_tests"])
+        print("Uudet aiheakselit vain väitteessä/perustelussa:",
+              result["defender_new_axes_only_outside_falsification_tests"])
+        for axis in result["unmatched_defender_issue_axes"]:
+            refs = result["defender_axis_evidence"][axis]
+            print("Aiheen sijainnit", axis + ":",
+                  ", ".join(f"argumentti {ref['argument_index']} / {ref['field']}" for ref in refs))
         print("Koeteltavien testien sanastolliset samankaltaisuudet:",
               result["falsification_test_similarity_max_per_cross_argument"])
         print("Ratkaisijan jatkotestien samankaltaisuudet:",

@@ -35,6 +35,7 @@ class EvidenceApprovalBridge:
         secret: bytes,
         trusted_provider: Callable[[str], dict],
         clock: Callable[[], int],
+        attach_existing: bool = False,
     ) -> None:
         if not isinstance(connection, sqlite3.Connection):
             raise TypeError("sqlite_connection_required")
@@ -44,6 +45,8 @@ class EvidenceApprovalBridge:
             raise ValueError("protected_signing_key_required")
         if not callable(trusted_provider) or not callable(clock):
             raise ValueError("trusted_context_required")
+        if type(attach_existing) is not bool:
+            raise ValueError("invalid_attach_mode")
         self._provider = trusted_provider
         self._clock = clock
         self._secret = secret
@@ -60,6 +63,28 @@ class EvidenceApprovalBridge:
         connection.create_function(
             "klone_receipt_guard_v11", 5, self._verify_callback,
         )
+        if attach_existing:
+            # A second connection/process must register its own SQL callback,
+            # but it must not recreate or silently replace the existing schema.
+            expected = {
+                "evidence_guard_no_update_v11",
+                "evidence_guard_no_delete_v11",
+                "evidence_guard_binding_immutable_v11",
+                "evidence_guard_approve_v11",
+                "evidence_guard_activation_v11",
+            }
+            existing = {row[0] for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='trigger'"
+            )}
+            columns = {row[1] for row in connection.execute(
+                "PRAGMA table_info(evidence_guard_receipts_v11)"
+            )}
+            if not expected.issubset(existing) or not {
+                "proposal_id", "receipt_json"
+            }.issubset(columns):
+                raise ValueError("existing_evidence_bridge_incomplete")
+            return
+
         # Schema changes intentionally separate from approval transactions.
         # The name is scoped to the lab; never run against production SQLite.
         connection.executescript("""

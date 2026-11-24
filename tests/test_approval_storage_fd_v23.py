@@ -1,6 +1,8 @@
 """Offline, isolated fd-anchored inspection tests; no production DB used."""
 from __future__ import annotations
 
+from contextlib import closing
+
 import os
 from pathlib import Path
 import stat
@@ -204,16 +206,18 @@ class StorageV23PosixTests(unittest.TestCase):
 
     def test_snapshot_does_not_prevent_same_uid_raw_sqlite_update(self):
         # Red-team finding: fds are inspection snapshots, NOT a DB write ACL.
+        # sqlite3.Connection.__exit__ commits/rolls back but does not close;
+        # explicit closing is required for all three temporary test connections.
         import sqlite3
         self.db.unlink()
-        with sqlite3.connect(self.db) as db:
+        with closing(sqlite3.connect(self.db)) as db, db:
             db.execute("CREATE TABLE proposals (state TEXT)")
             db.execute("INSERT INTO proposals VALUES ('awaiting_approval')")
         os.chmod(self.db, 0o600)
         with self.verified() as snap:
-            with sqlite3.connect(self.db) as writer:
+            with closing(sqlite3.connect(self.db)) as writer, writer:
                 writer.execute("UPDATE proposals SET state='approved'")
-            with sqlite3.connect(self.db) as reader:
+            with closing(sqlite3.connect(self.db)) as reader, reader:
                 self.assertEqual(reader.execute("SELECT state FROM proposals").fetchone()[0],
                                  "approved")
             # Even if unchanged, its inode is writable by the SAME UID.

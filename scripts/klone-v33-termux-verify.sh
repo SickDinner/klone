@@ -37,16 +37,33 @@ print("ED25519: OK", flush=True)
 loader = unittest.defaultTestLoader
 runner = unittest.TextTestRunner(verbosity=1)
 focused = loader.discover("tests", pattern="test_mission_control_dashboard_v33.py")
-print("V3.3 TESTEJÄ:", focused.countTestCases(), flush=True)
-if focused.countTestCases() != 34:
+focused_count = focused.countTestCases()
+print("V3.3 TESTEJÄ:", focused_count, flush=True)
+if focused_count != 34:
     raise SystemExit("v33_new_test_count_mismatch")
 r = runner.run(focused)
 if not r.wasSuccessful() or r.skipped:
     raise SystemExit(1)
+
 all_tests = loader.discover("tests", pattern="test_*.py")
-print("KOKO KLONE TESTEJÄ:", all_tests.countTestCases(), flush=True)
-if all_tests.countTestCases() != 1541:
-    raise SystemExit("full_suite_count_mismatch")
+
+def iter_cases(suite):
+    for item in suite:
+        if isinstance(item, unittest.TestSuite):
+            yield from iter_cases(item)
+        else:
+            yield item
+
+cases = list(iter_cases(all_tests))
+ids = [case.id() for case in cases]
+duplicates = sorted({test_id for test_id in ids if ids.count(test_id) > 1})
+print("KOKO KLONE TESTEJÄ:", len(cases), flush=True)
+print("YKSIKÄSITTEISIÄ TESTITUNNISTEITA:", len(set(ids)), flush=True)
+if not cases or len(cases) < focused_count:
+    raise SystemExit("full_suite_discovery_incomplete")
+if duplicates:
+    print("DUPLIKAATIT TESTITUNNISTEET:", duplicates, flush=True)
+    raise SystemExit("duplicate_test_discovery")
 r = runner.run(all_tests)
 print("OHITETTUJA:", len(r.skipped), flush=True)
 raise SystemExit(0 if r.wasSuccessful() and len(r.skipped) <= 2 else 1)
@@ -54,8 +71,9 @@ PY
 RC=$?
 set -e
 printf '=== KLONE V3.3 ===\n'
-grep -E '^CRYPTOGRAPHY:|^ED25519:|^V3.3 TESTEJÄ:|^KOKO KLONE TESTEJÄ:|^Ran [0-9]+ tests|^OK|^FAILED|^OHITETTUJA:' "$LOG" || true
+grep -E '^CRYPTOGRAPHY:|^ED25519:|^V3.3 TESTEJÄ:|^KOKO KLONE TESTEJÄ:|^YKSIKÄSITTEISIÄ TESTITUNNISTEITA:|^Ran [0-9]+ tests|^OK|^FAILED|^OHITETTUJA:|^DUPLIKAATIT TESTITUNNISTEET:' "$LOG" || true
 printf 'PALUUKOODI: %s\nLOKI: %s\n' "$RC" "$LOG"
 git status --short
 if [ "$RC" -ne 0 ]; then tail -n 70 "$LOG"; fi
 exit "$RC"
+PY

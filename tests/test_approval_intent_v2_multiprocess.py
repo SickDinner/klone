@@ -5,8 +5,8 @@ provide same-UID isolation, production credentials or authenticated IPC.
 """
 import hmac
 import json
-import multiprocessing
-import queue
+import subprocess
+import sys
 import secrets
 import sqlite3
 import tempfile
@@ -35,15 +35,18 @@ def _signed_actor(key, epoch, age, actor_id, role):
     return SignedActorAssertion(body, hmac.new(key, body, sha256).hexdigest())
 
 
-def _worker(index, operation, reason, path, keys, inputs, epoch,
-            actor_age, signed_intent, ready, go, results):
+def _worker(request):
+    """One independent Python interpreter; all input comes over stdin."""
+    index = request["index"]
+    path = request["path"]
+    keys = {name: bytes.fromhex(value) for name, value in request["keys"].items()}
+    inputs = request["inputs"]
+    epoch = request["epoch"]
     db = None
     try:
         db = sqlite3.connect(path, isolation_level=None, timeout=25)
         db.execute("PRAGMA busy_timeout=25000")
         journal = ApprovalJournal(db)
-        # Every connection must register its own SQLite function; the shared
-        # file schema must not be recreated by these child processes.
         EvidenceApprovalBridge(
             db, secret=keys["receipt"], attach_existing=True,
             trusted_provider=lambda pid: inputs if pid == inputs["proposal_id"] else None,
@@ -58,29 +61,34 @@ def _worker(index, operation, reason, path, keys, inputs, epoch,
             gateway=gateway, intent_secret=keys["intent"],
             clock=lambda: datetime.fromtimestamp(epoch, timezone.utc),
         )
-        ready.put((index, "ready"))
-        if not go.wait(35):
-            results.put((index, "error", "start_timeout"))
-            return
-        actor = _signed_actor(keys["actor"], epoch, actor_age, "owner", "owner")
-        signed = SignedDraftIntent(*signed_intent)
+        # Ready and start markers are non-secret. IPC does not use sem_open,
+        # _multiprocessing, POSIX shared memory or signals from the host.
+        Path(request["ready_file"]).write_text("ready", encoding="ascii")
+        deadline = time.monotonic() + 35
+        while not Path(request["start_file"]).exists():
+            if time.monotonic() > deadline:
+                return (index, "error", "start_timeout")
+            time.sleep(0.02)
+        actor = _signed_actor(keys["actor"], epoch, request["actor_age"], "owner", "owner")
+        signed = SignedDraftIntent(
+            bytes.fromhex(request["intent_payload_hex"]), request["intent_signature"]
+        )
         try:
-            if operation == "approve_draft":
+            if request["operation"] == "approve_draft":
                 result = service.approve_draft(inputs["proposal_id"], key_id="lab",
                                                actor_assertion=actor, intent=signed)
-                results.put((index, "approved", result.state))
-            elif operation == "revoke_draft":
-                service.revoke_draft(inputs["proposal_id"], reason=reason, key_id="lab",
-                                     actor_assertion=actor, intent=signed)
-                results.put((index, "revoked", "ok"))
-            else:
-                results.put((index, "error", "unknown_lab_operation"))
+                return (index, "approved", result.state)
+            if request["operation"] == "revoke_draft":
+                service.revoke_draft(inputs["proposal_id"], reason=request["reason"],
+                                     key_id="lab", actor_assertion=actor, intent=signed)
+                return (index, "revoked", "ok")
+            return (index, "error", "unknown_lab_operation")
         except (PermissionError, ValueError) as exc:
-            results.put((index, "denied", type(exc).__name__))
+            return (index, "denied", type(exc).__name__)
         except BaseException as exc:
-            results.put((index, "error", f"{type(exc).__name__}: {exc}"))
+            return (index, "error", f"{type(exc).__name__}: {exc}")
     except BaseException as exc:
-        ready.put((index, "failed", f"{type(exc).__name__}: {exc}"))
+        return (index, "error", f"{type(exc).__name__}: {exc}")
     finally:
         if db is not None:
             db.close()
@@ -147,40 +155,63 @@ class SeparateProcessApprovalTests(unittest.TestCase):
         return payload, hmac.new(self.keys["intent"], payload, sha256).hexdigest()
 
     def _run(self, operations):
-        ctx = multiprocessing.get_context("spawn")
-        ready, results = ctx.Queue(), ctx.Queue()
-        go = ctx.Event()
-        workers = []
+        # subprocess + stdin pipes: avoids Android/Termux _multiprocessing
+        # and SemLock issues, while launching true independent processes.
+        start_flag = Path(self.tmp.name) / f"start-{secrets.token_hex(6)}"
+        processes = []
         try:
             for i, (operation, reason) in enumerate(operations):
-                p = ctx.Process(target=_worker, args=(
-                    i, operation, reason, self.path, self.keys, self.inputs,
-                    self.epoch, 10 + i, self._intent(operation, reason),
-                    ready, go, results,
-                ))
-                p.start()
-                workers.append(p)
-            startup = []
-            for _ in workers:
-                startup.append(ready.get(timeout=45))
-            self.assertEqual(len(startup), len(workers))
-            self.assertTrue(all(item[1] == "ready" for item in startup), startup)
-            go.set()
-            done = [results.get(timeout=45) for _ in workers]
-            for p in workers:
-                p.join(timeout=10)
-            self.assertTrue(all(p.exitcode == 0 for p in workers),
-                            [(p.pid, p.exitcode) for p in workers])
+                intent_payload, intent_signature = self._intent(operation, reason)
+                ready_flag = Path(self.tmp.name) / f"ready-{secrets.token_hex(6)}-{i}"
+                request = {
+                    "index": i, "path": self.path, "epoch": self.epoch,
+                    "keys": {k: v.hex() for k, v in self.keys.items()},
+                    "inputs": self.inputs, "actor_age": 10 + i,
+                    "operation": operation, "reason": reason,
+                    "intent_payload_hex": intent_payload.hex(),
+                    "intent_signature": intent_signature,
+                    "ready_file": str(ready_flag), "start_file": str(start_flag),
+                }
+                child = subprocess.Popen(
+                    [sys.executable, str(Path(__file__).resolve()), "--worker"],
+                    stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE, text=True,
+                )
+                processes.append((child, ready_flag))
+                # Ephemeral test secrets are sent only via this child stdin,
+                # not command-line arguments or persistent JSON files.
+                child.stdin.write(json.dumps(request))
+                child.stdin.close()
+                child.stdin = None
+            deadline = time.monotonic() + 45
+            while not all(marker.exists() for _, marker in processes):
+                exits = [(p.pid, p.returncode) for p, _ in processes if p.poll() is not None]
+                if exits:
+                    raise AssertionError(f"child exited before ready: {exits}")
+                if time.monotonic() > deadline:
+                    raise AssertionError("workers did not become ready")
+                time.sleep(0.03)
+            start_flag.touch()
+            done = []
+            for p, _ in processes:
+                stdout, stderr = p.communicate(timeout=45)
+                self.assertEqual(p.returncode, 0, (p.pid, stderr, stdout))
+                try:
+                    done.append(json.loads(stdout.strip()))
+                except ValueError:
+                    self.fail(f"invalid child result: {p.pid} {stdout!r} {stderr!r}")
             self.assertFalse(any(row[1] == "error" for row in done), done)
             return done
         finally:
-            go.set()
-            for p in workers:
-                if p.is_alive():
-                    p.terminate()
-                    p.join(timeout=5)
-            ready.close()
-            results.close()
+            start_flag.touch()
+            for p, _ in processes:
+                if p.poll() is None:
+                    p.kill()
+                try:
+                    p.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    p.kill()
+                    p.wait(timeout=5)
 
     def _database(self):
         return sqlite3.connect(self.path, isolation_level=None, timeout=10)
@@ -217,4 +248,8 @@ class SeparateProcessApprovalTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 2 and sys.argv[1] == "--worker":
+        result = _worker(json.load(sys.stdin))
+        print(json.dumps(result))
+        sys.exit(0 if result[1] != "error" else 1)
     unittest.main()

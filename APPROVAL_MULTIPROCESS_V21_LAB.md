@@ -10,10 +10,10 @@ This is a **test-only connection protocol**, not an authentication boundary. A c
 
 ## Tests
 
-- `test_evidence_approval_bridge_attach.py` runs with only `klone.evidence_receipt` and `klone.evidence_approval_bridge` available: missing schema fails closed; second SQLite connection registers its own callback; a child **OS process** opens its own connection and exercises the receipt + subject lock.
-- `test_approval_intent_v2_multiprocess.py` needs the full KLONE approval modules: eight independent spawned Python processes each open their own file-backed SQLite connection and call the real `BoundDraftApprovalService` through `AtomicApprovalGateway` and Evidence Bridge. Expect exactly one approval event and one accepted signed intent, seven denied attempts. A second scenario commits revocation in one process and verifies that another process cannot approve afterward.
+- `test_evidence_approval_bridge_attach.py` runs with only `klone.evidence_receipt` and `klone.evidence_approval_bridge` available: missing schema fails closed; second SQLite connection registers its own callback; a child **OS subprocess** opens its own connection and exercises the receipt + subject lock.
+- `test_approval_intent_v2_multiprocess.py` needs the full KLONE approval modules: eight independently launched Python subprocesses each open their own file-backed SQLite connection and call the real `BoundDraftApprovalService` through `AtomicApprovalGateway` and Evidence Bridge. Expect exactly one approval event and one accepted signed intent, seven denied attempts. A second scenario commits revocation in one process and verifies that another process cannot approve afterward.
 
-Both kinds of test share generated keys *with test processes only*, which is not a production key isolation model. They do not test an attacker with full filesystem write privileges or a durable trust-service boundary. Nor do they show that a signed assertion was issued by a real human.
+Both kinds of test share generated keys *with test processes only* through stdin pipes, which is not a production key isolation model. The tests avoid `multiprocessing.Queue` / `Event` because some Termux Python 3.13 builds lack the required `_multiprocessing` extension; readiness uses non-secret files in a temporary directory and OS subprocesses. They do not test an attacker with full filesystem write privileges or a durable trust-service boundary. Nor do they show that a signed assertion was issued by a real human.
 
 ## Manual test in a fresh Termux worktree
 

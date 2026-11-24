@@ -1,5 +1,7 @@
 """File-backed SQLite attacher regression tests; no production DB is touched."""
-import multiprocessing
+import json
+import subprocess
+import sys
 import secrets
 import sqlite3
 import tempfile
@@ -23,7 +25,7 @@ def _source_records():
                 dossier=dossier, debate=debate)
 
 
-def _attached_worker(path, secret, inputs, output):
+def _attached_worker(path, secret, inputs):
     """Independent child process + its own DB connection and SQLite callback."""
     db = None
     try:
@@ -44,9 +46,9 @@ def _attached_worker(path, secret, inputs, output):
                    "WHERE proposal_id=? AND state='awaiting_approval'",
                    (inputs["proposal_id"],))
         state = db.execute("SELECT state FROM approval_proposals").fetchone()[0]
-        output.put(("ok", immutable, state))
+        return ("ok", immutable, state)
     except BaseException as exc:
-        output.put(("error", type(exc).__name__, str(exc)))
+        return ("error", type(exc).__name__, str(exc))
     finally:
         if db is not None:
             db.close()
@@ -104,25 +106,25 @@ class EvidenceBridgeAttachTests(unittest.TestCase):
         bridge.insert_signed_receipt(self.inputs["proposal_id"], sign(
             subject, secret=self.secret, issued_at=1000, ttl=120,
         ))
-        ctx = multiprocessing.get_context("spawn")
-        queue = ctx.Queue()
-        worker = ctx.Process(target=_attached_worker,
-                             args=(self.path, self.secret, self.inputs, queue))
-        worker.start()
-        try:
-            status = queue.get(timeout=30)
-            worker.join(timeout=10)
-            self.assertEqual(worker.exitcode, 0)
-            self.assertEqual(status, ("ok", True, "approved"))
-            self.assertEqual(self.db.execute(
-                "SELECT state FROM approval_proposals"
-            ).fetchone()[0], "approved")
-        finally:
-            if worker.is_alive():
-                worker.terminate()
-                worker.join(timeout=5)
-            queue.close()
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()), "--worker"],
+            input=json.dumps({"path": self.path, "secret": self.secret.hex(),
+                              "inputs": self.inputs}),
+            text=True, capture_output=True, timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout), ["ok", True, "approved"])
+        self.assertEqual(self.db.execute(
+            "SELECT state FROM approval_proposals"
+        ).fetchone()[0], "approved")
+
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 2 and sys.argv[1] == "--worker":
+        request = json.load(sys.stdin)
+        response = _attached_worker(request["path"], bytes.fromhex(request["secret"]),
+                                    request["inputs"])
+        print(json.dumps(response))
+        sys.exit(0 if response[0] == "ok" else 1)
     unittest.main()

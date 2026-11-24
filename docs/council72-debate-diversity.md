@@ -64,3 +64,51 @@ totuusluokituksia, tiedevertailua tai varmuuslupauksia. Tyhjä aihejoukko
 tarkoittaa tunnistamatta jääneitä aiheita, ei riippumattomuutta.
 
 GitHubin CI ja Android-ajot tarkistetaan täsmälleen uusimmalla commitilla.
+
+
+## V1.2 – maininnan ja koeteltavan testin erottaminen
+
+Android-lokissa 24.11.2026 edellinen v1.1 hyväksyttiin paikallisesti:
+**11 testiä / 11 OK**, commit `4b59006`. Alkuperäisen raportin
+aiheakselien Jaccard oli 0,833. Tämä koskee vain v1.1:tä.
+
+V1.2 korjaa kaksiselitteisen `kattav*`-hakusanan: PDF:n
+tarkistuksen **kattavuus** (`inspection_coverage`) ei sellaisenaan
+tarkoita tutkimustulosten **yleistettävyyttä**
+(`scope_or_generalization`). Luokittelu on edelleen varovainen
+sääntöpohjainen seulonta, ei semanttinen totuusarvio.
+
+Uusi tuloste näyttää myös:
+
+- `cross_examiner_axis_evidence` ja `defender_axis_evidence`:
+  argumentin numeron, kentän (väite, perustelu, falsifiointitesti)
+  ja siinä mainitut lähdekorttitunnukset kunkin aihehakusanan kohdalla.
+  Tunnukset eivät vahvista aineiston aitoutta.
+- `defender_new_axes_in_falsification_tests`: puolustajan uusi aihe
+  **mainitaan** myös testiehdotuksessa.
+- `defender_new_axes_only_outside_falsification_tests`: aihe esiintyy
+  ainoastaan väitteessä tai perustelussa, ei ehdotetussa testissä.
+
+Huomaa raja: testiehdotuksessa esiintyvä aihehakusana ei todista,
+että testi olisi toteutettavissa, uusi tai aidosti falsifioiva.
+
+### Android / Termux – uuden version tarkistus
+
+Käytä **uutta erillistä hakemistoa**, koska aiempi testattu worktree
+on lukittu commitille `4b59006`:
+
+~~~sh
+cd ~/klone-next || exit 1
+git fetch origin feat/council72-debate-diversity-audit-20261124
+git worktree add --detach "$HOME/klone-council72-diversity-v12" FETCH_HEAD
+cd "$HOME/klone-council72-diversity-v12" || exit 1
+git rev-parse --short HEAD
+~/klone-next/.venv/bin/python -m unittest discover -s tests \
+  -p 'test_council72_debate_diversity.py' -v
+~/klone-next/.venv/bin/python src/klone/council72_debate_diversity.py \
+  "$HOME/klone-var/e11/council72-quality-debate-live-20261119-121640-21516.json" --text
+~~~
+
+Tässä kehitysvaiheessa on **14 määriteltyä kohdennettua testiä**.
+CI ja Android-hyväksyntä tulee todeta täsmälleen testatun commitin
+perusteella. Mitään GPT-avainta tai maksettua keskustelukutsua ei tarvita.

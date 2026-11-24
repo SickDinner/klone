@@ -311,12 +311,32 @@ def verify_service_identity_receipt(
 
 def verify_audit_receipt(
     receipt: Mapping, *, trusted_public_keys: Mapping[str, object],
-    identity: VerifiedServiceIdentity, expected_nonce: str, now: int,
-    max_age: int = 300,
+    identity_receipt: Mapping, expected_service_id: str,
+    expected_commit_sha: str, expected_nonce: str, now: int, max_age: int = 300,
 ) -> dict:
-    """Verify an audit event and bind its actor to a verified identity receipt."""
-    if not isinstance(identity, VerifiedServiceIdentity):
-        raise ReceiptError("verified_service_identity_required")
+    """Verify an audit event and reverify its signed actor identity receipt.
+
+    Do not accept a caller-constructed VerifiedServiceIdentity instance as
+    proof: Python objects are forgeable. The signed receipt and trust store are
+    checked again on every public audit verification call.
+    """
+    identity = verify_service_identity_receipt(
+        identity_receipt, trusted_public_keys=trusted_public_keys,
+        expected_nonce=expected_nonce, expected_service_id=expected_service_id,
+        expected_commit_sha=expected_commit_sha, now=now, max_age=max_age,
+    )
+    return _verify_audit_event(
+        receipt, trusted_public_keys=trusted_public_keys, identity=identity,
+        expected_nonce=expected_nonce, now=now, max_age=max_age,
+    )
+
+
+def _verify_audit_event(
+    receipt: Mapping, *, trusted_public_keys: Mapping[str, object],
+    identity: VerifiedServiceIdentity, expected_nonce: str, now: int,
+    max_age: int,
+) -> dict:
+    """Internal checker; identity must come from verify_service_identity_receipt."""
     if type(now) is not int or now > identity.expires_at:
         raise ReceiptError("service_identity_expired")
     body = _validate_body(receipt, trusted_public_keys=trusted_public_keys,
@@ -360,17 +380,22 @@ def verify_audit_receipt(
 
 def verify_audit_chain(
     receipts: Sequence[Mapping], *, trusted_public_keys: Mapping[str, object],
-    identity: VerifiedServiceIdentity, expected_nonce: str, now: int,
-    max_age: int = 300,
+    identity_receipt: Mapping, expected_service_id: str,
+    expected_commit_sha: str, expected_nonce: str, now: int, max_age: int = 300,
 ) -> list[dict]:
     """Verify a bounded ordered chain; every link is signed and identity-bound."""
     if type(receipts) not in (list, tuple) or not 1 <= len(receipts) <= 1000:
         raise ReceiptError("invalid_audit_chain_length")
+    identity = verify_service_identity_receipt(
+        identity_receipt, trusted_public_keys=trusted_public_keys,
+        expected_nonce=expected_nonce, expected_service_id=expected_service_id,
+        expected_commit_sha=expected_commit_sha, now=now, max_age=max_age,
+    )
     verified = []
     previous = "0" * 64
     last_event_time = -1
     for receipt in receipts:
-        event = verify_audit_receipt(
+        event = _verify_audit_event(
             receipt, trusted_public_keys=trusted_public_keys, identity=identity,
             expected_nonce=expected_nonce, now=now, max_age=max_age,
         )

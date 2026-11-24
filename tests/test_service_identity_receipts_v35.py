@@ -156,18 +156,21 @@ class ServiceIdentityReceiptV35Tests(unittest.TestCase):
         identity = verified_identity(identity_receipt)
         receipt = signed("audit_event", audit_subject(identity))
         event = verify_audit_receipt(
-            receipt, trusted_public_keys=KEYS, identity=identity,
+            receipt, trusted_public_keys=KEYS, identity_receipt=identity_receipt,
+            expected_service_id="main-api", expected_commit_sha=COMMIT,
             expected_nonce=NONCE, now=NOW,
         )
         self.assertEqual(event["actor_service_id"], "main-api")
         self.assertEqual(event["action"], "health.read")
 
     def test_audit_event_from_different_identity_is_rejected(self):
-        identity = verified_identity()
+        identity_receipt = signed("service_identity", identity_subject())
+        identity = verified_identity(identity_receipt)
         receipt = signed("audit_event", audit_subject(identity, actor_service_id="chat-ui"))
         with self.assertRaisesRegex(ReceiptError, "audit_actor_mismatch"):
             verify_audit_receipt(
-                receipt, trusted_public_keys=KEYS, identity=identity,
+                receipt, trusted_public_keys=KEYS, identity_receipt=identity_receipt,
+                expected_service_id="main-api", expected_commit_sha=COMMIT,
                 expected_nonce=NONCE, now=NOW,
             )
 
@@ -178,18 +181,37 @@ class ServiceIdentityReceiptV35Tests(unittest.TestCase):
         ))
         with self.assertRaisesRegex(ReceiptError, "audit_identity_receipt_mismatch"):
             verify_audit_receipt(
-                receipt, trusted_public_keys=KEYS, identity=identity,
+                receipt, trusted_public_keys=KEYS,
+                identity_receipt=signed("service_identity", identity_subject()),
+                expected_service_id="main-api", expected_commit_sha=COMMIT,
+                expected_nonce=NONCE, now=NOW,
+            )
+
+    def test_audit_verifier_rechecks_original_signed_identity(self):
+        identity_receipt = signed("service_identity", identity_subject())
+        identity = verified_identity(identity_receipt)
+        audit = signed("audit_event", audit_subject(identity))
+        tampered_identity = copy.deepcopy(identity_receipt)
+        tampered_identity["body"]["subject"]["pid"] += 1
+        with self.assertRaisesRegex(ReceiptError, "signature_invalid"):
+            verify_audit_receipt(
+                audit, trusted_public_keys=KEYS,
+                identity_receipt=tampered_identity,
+                expected_service_id="main-api", expected_commit_sha=COMMIT,
                 expected_nonce=NONCE, now=NOW,
             )
 
     def test_ordered_audit_chain_verifies_and_detects_broken_link(self):
-        identity = verified_identity()
+        identity_receipt = signed("service_identity", identity_subject())
+        identity = verified_identity(identity_receipt)
         first = signed("audit_event", audit_subject(identity, event_time=NOW))
         second = signed("audit_event", audit_subject(
             identity, previous=receipt_sha256(first), event_time=NOW + 1,
         ), issued_at=NOW + 1)
         result = verify_audit_chain(
-            [first, second], trusted_public_keys=KEYS, identity=identity,
+            [first, second], trusted_public_keys=KEYS,
+            identity_receipt=identity_receipt,
+            expected_service_id="main-api", expected_commit_sha=COMMIT,
             expected_nonce=NONCE, now=NOW + 1,
         )
         self.assertEqual(len(result), 2)
@@ -200,7 +222,9 @@ class ServiceIdentityReceiptV35Tests(unittest.TestCase):
         ).decode().rstrip("=")
         with self.assertRaisesRegex(ReceiptError, "audit_chain_broken"):
             verify_audit_chain(
-                [first, broken], trusted_public_keys=KEYS, identity=identity,
+                [first, broken], trusted_public_keys=KEYS,
+                identity_receipt=identity_receipt,
+                expected_service_id="main-api", expected_commit_sha=COMMIT,
                 expected_nonce=NONCE, now=NOW + 1,
             )
 

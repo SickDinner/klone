@@ -10,6 +10,8 @@ The service identity claim is bound to a fresh caller nonce, a service ID, a
 40-character application commit, a local loopback listener, a process ID and
 start-time token, owner UID, executable and command digests, and observer ID.
 The audit receipt binds an event to the exact verified identity receipt.
+Public audit verification rechecks that original signed identity receipt; it
+does not trust a caller-created Python identity object.
 Ordered audit events form a SHA-256-linked sequence, and every event signature
 is checked independently.
 

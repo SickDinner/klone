@@ -138,6 +138,44 @@ class DebateDiversityAuditTests(unittest.TestCase):
         self.assertNotIn("shared_issue_axes_candidate", result["screening_flags"])
         self.assertFalse(result["independent_models_verified"])
 
+    def test_document_coverage_is_not_results_generalization(self):
+        r = report()
+        arg = r["debate_turns"][1]["answer"]["arguments"][0]
+        arg["claim"] = "PDF:n tekstikerroksen kattavuus on epävarma."
+        arg["falsification_test"] = "Tarkasta koko dokumentin kattavuus sivukuvista."
+        result = audit.analyze(fixhash(r))
+        self.assertIn("inspection_coverage", result["unmatched_defender_issue_axes"])
+        self.assertNotIn("scope_or_generalization", result["defender_issue_axes"])
+        self.assertIn("inspection_coverage", result["defender_new_axes_in_falsification_tests"])
+        hits = result["defender_axis_evidence"]["inspection_coverage"]
+        self.assertEqual({h["field"] for h in hits}, {"claim", "falsification_test"})
+
+    def test_generalization_only_in_claim_is_not_a_new_test(self):
+        r = report()
+        arg = r["debate_turns"][1]["answer"]["arguments"][0]
+        arg["claim"] = "Tuloksia ei saa yleistää aineiston ulkopuolelle."
+        arg["falsification_test"] = "Tarkista kyseinen Atom-tiivistelmä."
+        result = audit.analyze(fixhash(r))
+        self.assertIn("scope_or_generalization", result["unmatched_defender_issue_axes"])
+        self.assertIn("scope_or_generalization",
+                      result["defender_new_axes_only_outside_falsification_tests"])
+        self.assertNotIn("scope_or_generalization",
+                         result["defender_new_axes_in_falsification_tests"])
+        self.assertEqual(result["defender_axis_evidence"]["scope_or_generalization"], [
+            {"argument_index": 1, "field": "claim", "source_card_ids": ["card1"]}
+        ])
+
+    def test_new_topic_in_test_is_traced_to_falsification(self):
+        r = report()
+        arg = r["debate_turns"][1]["answer"]["arguments"][0]
+        arg["falsification_test"] = "Tarkasta RMSE-mittarin arvo alkuperäisestä taulukosta."
+        result = audit.analyze(fixhash(r))
+        self.assertIn("numeric_context", result["defender_new_axes_in_falsification_tests"])
+        self.assertIn("falsification_test", {
+            loc["field"] for loc in result["defender_axis_evidence"]["numeric_context"]
+        })
+        self.assertFalse(result["independent_models_verified"])
+
     def test_determinism(self):
         r = report()
         self.assertEqual(audit.analyze(r), audit.analyze(deepcopy(r)))

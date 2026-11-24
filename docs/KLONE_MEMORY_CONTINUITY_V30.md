@@ -101,3 +101,13 @@ PYTHONPATH=src python -m unittest discover -s tests -p 'test_*.py'
 The new tests use only Python's standard library. Python >=3.11.
 This PR must remain draft until cross-platform CI and Android/Termux run
 against the *exact new commit*. Existing PRs and `main` are untouched.
+
+## Council72 adapter (review only)
+
+`council72_memory_review_v30.public_memory_continuity_observation()`
+recalculates the report from the supplied snapshots and produces a bounded
+public-room observation compatible with Council72's `validate_step`. The
+stance is **always `unknown`**; contradictions raise a risk signal but do not
+manufacture evidence, add independent sources or cast a vote. Real Council72
+schema integration is exercised only where its dependencies are available.
+The adapter performs **no room reads, tasks, votes, authority or memory writes**.

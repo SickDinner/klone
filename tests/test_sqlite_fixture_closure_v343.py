@@ -7,10 +7,11 @@ No live database, production path, service or authorization is involved.
 from __future__ import annotations
 
 import sqlite3
+import sys
 import unittest
 from unittest.mock import patch
 
-from test_approval_storage_fd_v23 import StorageV23PosixTests, _SUPPORTED
+import test_approval_storage_fd_v23 as storage_tests
 
 
 class _TrackedConnection(sqlite3.Connection):
@@ -21,9 +22,13 @@ class _TrackedConnection(sqlite3.Connection):
         super().close()
 
 
-@unittest.skipUnless(_SUPPORTED, "requires Linux/Android fd isolation test support")
+@unittest.skipUnless(storage_tests._SUPPORTED, "requires Linux/Android fd isolation test support")
 class SQLiteFixtureClosureV343Tests(unittest.TestCase):
     def test_red_team_fixture_closes_all_three_sqlite_connections(self):
+        # Prevent unittest from discovering imported TestCase classes a second time.
+        self.assertEqual(
+            unittest.defaultTestLoader.loadTestsFromModule(
+                sys.modules[__name__]).countTestCases(), 1)
         original_connect = sqlite3.connect
         opened = []
 
@@ -37,7 +42,7 @@ class SQLiteFixtureClosureV343Tests(unittest.TestCase):
         # This reruns the original assertion: same-UID raw SQLite writes remain
         # possible despite descriptor-anchored inspection. Only fixture
         # connection lifecycle changes, not the authorization semantics.
-        fixture = StorageV23PosixTests(
+        fixture = storage_tests.StorageV23PosixTests(
             "test_snapshot_does_not_prevent_same_uid_raw_sqlite_update")
         result = unittest.TestResult()
         with patch("sqlite3.connect", side_effect=tracked_connect):

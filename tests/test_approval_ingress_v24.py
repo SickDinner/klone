@@ -225,15 +225,13 @@ class AdmissionV24Tests(unittest.TestCase):
             conn = sqlite3.connect(self.path, isolation_level=None, timeout=10)
             try:
                 ledger = V24AuditLedger(conn, secret=self.secret, clock=lambda: 1000)
-                with (patch("klone.approval_ingress_v24.kernel_peer_uid", return_value=3002),
-                      patch("klone.approval_ingress_v24._owner_uid", return_value=3001)):
-                    barrier.wait(timeout=5)
-                    try:
-                        result = screen_draft_envelope(object(), self.payload,
-                                                       ledger=ledger, allowed_peer_uids=self.allow)
-                        state = "screened" if result else "error"
-                    except AdmissionDenied:
-                        state = "denied"
+                barrier.wait(timeout=5)
+                try:
+                    result = screen_draft_envelope(object(), self.payload,
+                                                   ledger=ledger, allowed_peer_uids=self.allow)
+                    state = "screened" if result else "error"
+                except AdmissionDenied:
+                    state = "denied"
                 with lock:
                     clients.append(state)
             except BaseException as exc:
@@ -243,8 +241,13 @@ class AdmissionV24Tests(unittest.TestCase):
                 conn.close()
 
         ts = [threading.Thread(target=worker) for _ in range(2)]
-        for t in ts: t.start()
-        for t in ts: t.join(timeout=12)
+        # Keep the synthetic kernel/owner identity patches active for the
+        # ENTIRE race. Per-thread mock.patch mutates module globals and races
+        # during context exit, so it is not valid for a deterministic test.
+        with (patch("klone.approval_ingress_v24.kernel_peer_uid", return_value=3002),
+              patch("klone.approval_ingress_v24._owner_uid", return_value=3001)):
+            for t in ts: t.start()
+            for t in ts: t.join(timeout=12)
         self.assertFalse(any(t.is_alive() for t in ts))
         self.assertEqual(errs, [])
         self.assertCountEqual(clients, ["screened", "denied"])

@@ -50,13 +50,13 @@ def _directory(fd: int, *, uid: int, immediate: bool) -> None:
     info = os.fstat(fd)
     if not stat.S_ISDIR(info.st_mode):
         raise StorageIsolationUnavailable("not_a_directory")
-    if stat.S_IMODE(info.st_mode) & 0o022:
-        # Writable ancestors permit pathname replacement by another identity.
-        raise StorageIsolationUnavailable("writable_ancestor")
     if immediate and (info.st_uid != uid or
                       stat.S_IMODE(info.st_mode) & 0o077 or
                       stat.S_IMODE(info.st_mode) & 0o700 != 0o700):
         raise StorageIsolationUnavailable("private_directory_required")
+    if stat.S_IMODE(info.st_mode) & 0o022:
+        # Writable ancestors permit pathname replacement by another identity.
+        raise StorageIsolationUnavailable("writable_ancestor")
 
 
 def _file(fd: int, *, uid: int) -> tuple[int, int]:
@@ -121,19 +121,9 @@ class VerifiedStorageSnapshot:
         self.close()
 
 
-def inspect_private_approval_storage(db_path: str | Path) -> VerifiedStorageSnapshot:
-    """Fail-closed fd-based inspection of a *lab* SQLite database and sidecars.
-
-    Every path component is opened relative to the preceding directory fd
-    with O_NOFOLLOW; this avoids check-then-open races for the inspection.
-    Both the database and each existing WAL/SHM/journal file are opened with
-    O_NOFOLLOW and inspected via fstat, retaining all descriptors until close.
-
-    It does NOT authorize a client, connect SQLite or open a write capability.
-    SQLite's pathname-based open is NOT protected by this snapshot alone.
-    """
+def _inspect_parts(parts: tuple[str, ...], *, trusted_root_fd: int | None) -> VerifiedStorageSnapshot:
+    """Inspect below root or an explicitly trusted private directory fd."""
     _requirements()
-    parts = _parts(db_path)
     uid = os.geteuid()
     dir_flags = os.O_PATH | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
     file_flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC
@@ -142,8 +132,13 @@ def inspect_private_approval_storage(db_path: str | Path) -> VerifiedStorageSnap
     sidecars: dict[str, tuple[int, tuple[int, int]]] = {}
     transferred = False
     try:
-        parent_fd = os.open("/", dir_flags)
-        _directory(parent_fd, uid=uid, immediate=False)
+        if trusted_root_fd is None:
+            parent_fd = os.open("/", dir_flags)
+            _directory(parent_fd, uid=uid, immediate=False)
+        else:
+            # Keep caller's capability alive; close only our owned duplicate.
+            parent_fd = os.dup(trusted_root_fd)
+            _directory(parent_fd, uid=uid, immediate=True)
         for segment in parts[:-1]:
             child = os.open(segment, dir_flags, dir_fd=parent_fd)
             os.close(parent_fd)
@@ -183,3 +178,48 @@ def inspect_private_approval_storage(db_path: str | Path) -> VerifiedStorageSnap
                         os.close(fd)
                     except OSError:
                         pass
+
+
+def _relative_parts(relative_db_path: str | Path) -> tuple[str, ...]:
+    """Only literal components below a caller-held trusted directory fd."""
+    if not isinstance(relative_db_path, (str, Path)):
+        raise StorageIsolationUnavailable("relative_db_path_required")
+    raw = str(relative_db_path)
+    if (not raw or raw.startswith("/") or len(raw) > 4096 or "\x00" in raw
+            or raw.endswith("/") or "//" in raw):
+        raise StorageIsolationUnavailable("relative_db_path_required")
+    parts = tuple(raw.split("/"))
+    if any(p in ("", ".", "..") for p in parts):
+        raise StorageIsolationUnavailable("unsafe_path_component")
+    return parts
+
+
+def inspect_private_approval_storage(db_path: str | Path) -> VerifiedStorageSnapshot:
+    """Strict absolute-path walker; refuses writable ancestors from filesystem root.
+
+    No special case is made for Android's system-managed /data ancestors.
+    Use the capability-anchored variant with a trusted private directory fd
+    when the root-to-home path cannot satisfy this conservative policy.
+    """
+    _requirements()
+    return _inspect_parts(_parts(db_path), trusted_root_fd=None)
+
+
+def inspect_private_approval_storage_at(
+    trusted_root_fd: int, relative_db_path: str | Path,
+) -> VerifiedStorageSnapshot:
+    """Inspect a DB relative to an independently provisioned *trusted* dirfd.
+
+    The trusted host must obtain/protect this directory capability itself,
+    never accept an fd from an untrusted client. The fd must identify a private
+    directory owned by the effective service UID. Symlink, writable nested
+    ancestor, database and SQLite sidecar checks remain fail-closed.
+
+    A verified snapshot does not grant authorization, prevent same-UID writes,
+    or bind sqlite3.connect(path) to the inspected fd.
+    """
+    _requirements()
+    if type(trusted_root_fd) is not int or trusted_root_fd < 0:
+        raise StorageIsolationUnavailable("trusted_root_fd_required")
+    parts = _relative_parts(relative_db_path)
+    return _inspect_parts(parts, trusted_root_fd=trusted_root_fd)

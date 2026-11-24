@@ -64,3 +64,27 @@ preserves the prior inode while a subsequent path-based open could differ.
 3. Review trusted writer identity and an OS-managed privileged IPC boundary.
 4. Add property-based/fuzz testing for unsafe paths and mixed sidecar states,
    measured on actual relevant platforms, without claiming production safety.
+
+## Termux regression fix: explicit trusted-root directory capability
+
+The initial Android run failed eight test cases and one assertion because
+an absolute-path inspection starts at `/`, where Android's system-managed
+`/data` ancestor may be group-writable (not writable by the Termux app UID).
+We deliberately **did not waive the ancestor permissions check** in the
+absolute-path walker.
+
+`inspect_private_approval_storage_at(trusted_root_fd, relative_db_path)`
+accepts an already-open, service-owned, mode-0700 private directory fd from the
+**trusted service host**. It refuses relative `..`, symlinks, public/nested
+writable directories, weak database and sidecar permissions; it checks each
+object using descriptor-relative operations. Caller retains ownership of the
+original fd. Never pass an untrusted client-supplied fd or treat the snapshot
+as authority to connect SQLite. Its security assumption is that the service
+host obtained the directory capability from OS-managed app-private storage;
+this lab does not independently attest Android's parent chain or its SELinux
+policy.
+
+The test fixture uses its own new temporary directory fd instead of scanning
+the entire Android `/data` chain. The `os.link` hardlink test is skipped only
+on Python builds lacking that API; `_file()` still denies files having more
+than one hardlink. Linux CI retains that test.

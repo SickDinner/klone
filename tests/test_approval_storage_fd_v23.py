@@ -13,7 +13,9 @@ from klone.approval_storage_fd_v23 import (
     StorageIsolationUnavailable,
     VerifiedStorageSnapshot,
     inspect_private_approval_storage,
+    inspect_private_approval_storage_at,
     _parts,
+    _relative_parts,
 )
 
 
@@ -54,9 +56,28 @@ class StorageV23PosixTests(unittest.TestCase):
         self.db.write_bytes(b"LAB-ONLY DATABASE FIXTURE")
         os.chmod(self.root, 0o700)
         os.chmod(self.db, 0o600)
+        # A trusted host retains a capability to its private application root.
+        # Android /data group ownership is checked by the OS, not by
+        # re-walking that system-managed prefix from '/'.
+        flags = os.O_PATH | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+        self.root_fd = os.open(self.root, flags)
+        self.addCleanup(os.close, self.root_fd)
 
     def verified(self):
-        return inspect_private_approval_storage(self.db)
+        return inspect_private_approval_storage_at(self.root_fd, self.db.name)
+
+    def test_trusted_root_fd_remains_caller_owned(self):
+        with self.verified() as snap:
+            self.assertEqual(snap.database_inode[1], self.db.stat().st_ino)
+        # Snapshot closes its duplicate, never the caller's root capability.
+        self.assertTrue(stat.S_ISDIR(os.fstat(self.root_fd).st_mode))
+
+    def test_untrusted_fd_denied(self):
+        for fd in (-1, None, True):
+            with self.subTest(fd=fd), self.assertRaises(StorageIsolationUnavailable):
+                inspect_private_approval_storage_at(fd, self.db.name)
+        with self.assertRaises(StorageIsolationUnavailable):
+            inspect_private_approval_storage_at(self.root_fd, "../approval.sqlite3")
 
     def test_private_file_and_no_sidecars(self):
         with self.verified() as snap:
@@ -98,7 +119,7 @@ class StorageV23PosixTests(unittest.TestCase):
         os.chmod(db, 0o600)
         link.symlink_to(inner, target_is_directory=True)
         with self.assertRaises(StorageIsolationUnavailable):
-            inspect_private_approval_storage(link / "db.sqlite3")
+            inspect_private_approval_storage_at(self.root_fd, "alias/db.sqlite3")
 
     def test_private_directory_required(self):
         os.chmod(self.root, 0o755)
@@ -115,7 +136,7 @@ class StorageV23PosixTests(unittest.TestCase):
         db.write_bytes(b"fixture")
         os.chmod(db, 0o600)
         with self.assertRaisesRegex(StorageIsolationUnavailable, "writable_ancestor"):
-            inspect_private_approval_storage(db)
+            inspect_private_approval_storage_at(self.root_fd, "other_writable/private/approval.sqlite3")
 
     def test_database_public_permissions_denied(self):
         for mode in (0o644, 0o666, 0o400):
@@ -145,6 +166,8 @@ class StorageV23PosixTests(unittest.TestCase):
             self.verified()
 
     def test_hardlinked_database_denied(self):
+        if not hasattr(os, "link"):
+            self.skipTest("os.link is not available on this Python build")
         other = self.root / "hardlink.db"
         os.link(self.db, other)
         with self.assertRaises(StorageIsolationUnavailable):

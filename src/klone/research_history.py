@@ -50,31 +50,68 @@ def build_history(entries: list) -> dict:
 def render_history_html(report: dict) -> str:
     def cell(value):
         return "<td>" + escape(str(value)) + "</td>"
+
+    def detail(label, value, extra_class=""):
+        return ("<div><dt>" + escape(label) + "</dt><dd" + extra_class + ">"
+                + escape(str(value)) + "</dd></div>")
+
     rows = []
+    cards = []
     for row in report["entries"]:
         observation = row["observation"]
+        missing = "Not recorded"
         values = [row["label"], row["commit"]]
         if observation is None:
-            values += ["Not recorded"] + ["Not recorded"] * 5
+            status = missing
+            passed = failed = errors = skipped = duration = subtests = warnings = missing
         else:
             counts = observation["counts"]
-            values += [observation["status"], counts["passed"],
-                       counts["failed"], counts["errors"], counts["skipped"],
-                       observation["duration_seconds"]]
+            status = observation["status"]
+            passed, failed, errors, skipped = (counts[k] for k in
+                                                ("passed", "failed", "errors", "skipped"))
+            duration = observation["duration_seconds"]
+            subtests, warnings = counts["subtests_passed"], counts["warnings"]
+        values += [status, passed, failed, errors, skipped, duration, subtests, warnings]
         rows.append("<tr>" + "".join(cell(x) for x in values) + "</tr>")
+        cards.append(
+            "<article class='observation'><h2>" + escape(row["label"]) + "</h2>"
+            "<p class='status'>" + escape(status.replace("_", " ")) + "</p>"
+            "<dl class='metrics'>"
+            + "".join(detail(label, value) for label, value in (
+                ("Passed", passed), ("Subtests passed", subtests), ("Failed", failed),
+                ("Errors", errors), ("Skipped", skipped), ("Warnings", warnings),
+                ("Duration (s)", duration)))
+            + "</dl><dl class='commit'>" + detail("Claimed commit", row["commit"])
+            + "</dl></article>"
+        )
     limitations = "".join("<li>" + escape(x) + "</li>" for x in report["limitations"])
     headings = ("Label", "Claimed commit", "Status", "Passed", "Failed",
-                "Errors", "Skipped", "Duration (s)")
+                "Errors", "Skipped", "Duration (s)", "Subtests passed", "Warnings")
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
         "<title>KLONE research history</title><style>"
-        "body{font:16px system-ui,sans-serif;margin:2rem auto;max-width:75rem;padding:0 1rem}"
-        ".table-wrap{overflow-x:auto}table{border-collapse:collapse;width:100%}"
-        "th,td{text-align:left;padding:.6rem;border-bottom:1px solid #888;"
-        "overflow-wrap:anywhere}td:nth-child(2){max-width:20rem}"
+        ":root{color-scheme:light dark}*{box-sizing:border-box}"
+        "body{font:16px/1.5 system-ui,sans-serif;margin:1.25rem auto;max-width:85rem;padding:0 1rem}"
+        "h1{font-size:clamp(1.5rem,5vw,2.25rem);line-height:1.2}h2{font-size:1.15rem;margin:0}"
+        "li+li{margin-top:.35rem}ul{padding-left:1.3rem}"
+        ".observations{display:grid;gap:1rem}.observation{min-width:0;padding:1rem;"
+        "border:1px solid #888;border-radius:.75rem;overflow-wrap:break-word}"
+        ".status{margin:.4rem 0 1rem;font-weight:600}"
+        ".metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;margin:0}"
+        ".metrics>div{min-width:0;border-top:1px solid #888;padding-top:.4rem}"
+        "dt{font-size:.85rem}dd{margin:0;font-size:1.15rem;font-weight:600;font-variant-numeric:tabular-nums}"
+        ".commit{margin:1rem 0 0}.commit dd{font: .85rem/1.5 monospace;overflow-wrap:anywhere}"
+        ".table-wrap{display:none;overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:74rem}"
+        "th,td{text-align:left;padding:.6rem;border-bottom:1px solid #888}"
+        "th,td:nth-child(n+4){white-space:nowrap}td:nth-child(2){font-family:monospace}"
+        "@media(min-width:64rem){.observations{display:none}.table-wrap{display:block}}"
+        "@media(max-width:20rem){.metrics{grid-template-columns:1fr}}"
         "</style></head><body><main><h1>KLONE research history</h1>"
-        "<ul>" + limitations + "</ul><div class='table-wrap'>"
+        "<ul>" + limitations + "</ul>"
+        "<section class='observations' aria-label='Supplied observations in input order'>"
+        + "".join(cards) + "</section>"
+        "<div class='table-wrap'>"
         "<table><caption>Supplied observations in input order</caption><thead><tr>"
         + "".join("<th scope='col'>" + x + "</th>" for x in headings)
         + "</tr></thead><tbody>" + "".join(rows)

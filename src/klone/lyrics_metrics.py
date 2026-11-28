@@ -18,6 +18,24 @@ _SECTION = re.compile(r"^\[([^\[\]]{1,80})\]$")
 _WORD = re.compile(r"[^\W_]+(?:['’][^\W_]+)*", re.UNICODE)
 
 
+def moving_average_ttr(words: list[str], window: int) -> float | None:
+    """Mean lexical diversity of fixed-size overlapping token windows."""
+    if type(window) is not int or window <= 0:
+        raise ValueError("Window must be a positive integer")
+    if len(words) < window:
+        return None
+    counts = Counter(words[:window])
+    total_unique = len(counts)
+    for i in range(window, len(words)):
+        old, new = words[i - window], words[i]
+        counts[old] -= 1
+        if counts[old] == 0:
+            del counts[old]
+        counts[new] += 1
+        total_unique += len(counts)
+    return round(total_unique / (window * (len(words) - window + 1)), 8)
+
+
 def analyze_lyrics(text: str) -> dict:
     if not isinstance(text, str):
         raise ValueError("Expected text")
@@ -32,6 +50,9 @@ def analyze_lyrics(text: str) -> dict:
     body = []
     words = []
     normalized_lines = []
+    line_word_counts = []
+    adjacent_initial_matches = 0
+    adjacent_word_pairs = 0
 
     def flush():
         if body or label != "unlabeled":
@@ -52,7 +73,13 @@ def analyze_lyrics(text: str) -> dict:
             body = []
             continue
         body.append(line)
-        words.extend(word.casefold() for word in _WORD.findall(line))
+        tokens = [word.casefold() for word in _WORD.findall(line)]
+        words.extend(tokens)
+        line_word_counts.append(len(tokens))
+        for first, second in zip(tokens, tokens[1:]):
+            if first[0].isalpha() and second[0].isalpha():
+                adjacent_word_pairs += 1
+                adjacent_initial_matches += int(first[0] == second[0])
         normalized_lines.append(" ".join(line.casefold().split()))
     flush()
     frequencies = Counter(normalized_lines)
@@ -66,10 +93,17 @@ def analyze_lyrics(text: str) -> dict:
         "type_token_ratio": round(len(set(words)) / len(words), 8) if words else None,
         "repeated_line_occurrences": sum(v - 1 for v in frequencies.values()),
         "sections": sections,
+        "mattr": {str(window): moving_average_ttr(words, window)
+                  for window in (10, 25, 50)},
+        "line_word_counts": line_word_counts,
+        "adjacent_initial_matches": adjacent_initial_matches,
+        "adjacent_word_pairs": adjacent_word_pairs,
         "limitations": [
             "Descriptive text counts, not artistic quality or author profiling.",
             "Type-token ratio depends on text length; no language-specific lemmatization.",
             "Repeated lines use case and whitespace normalization, not semantic equivalence.",
+            "MATTR compares fixed token windows; null means insufficient tokens.",
+            "Initial-letter matches are orthographic, not validated phonetic alliteration.",
         ],
     }
 

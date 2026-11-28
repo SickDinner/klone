@@ -13,7 +13,8 @@ The audit receipt binds an event to the exact verified identity receipt.
 Public audit verification rechecks that original signed identity receipt; it
 does not trust a caller-created Python identity object.
 Ordered audit events form a SHA-256-linked sequence, and every event signature
-is checked independently.
+is checked independently. A verified chain rejects repeated event IDs and
+receipt IDs within that chain.
 
 ## Trust limits
 

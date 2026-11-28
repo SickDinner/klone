@@ -47,6 +47,14 @@ def render_song_html(report: dict) -> str:
     body = table("Lyrics", [(key, lyrics[key]) for key in (
         "line_count", "word_count", "unique_word_count",
         "type_token_ratio", "repeated_line_occurrences")])
+    body += table("Lexical diversity (MATTR)", [
+        (key + " tokens", value if value is not None else "Insufficient tokens")
+        for key, value in lyrics["mattr"].items()
+    ])
+    body += table("Orthographic patterns", [
+        ("Adjacent initial-letter matches", lyrics["adjacent_initial_matches"]),
+        ("Eligible adjacent word pairs", lyrics["adjacent_word_pairs"]),
+    ])
     body += table("Sections", [(section["label"],
                                 f"{section['line_count']} lines, {section['word_count']} words")
                                for section in lyrics["sections"]])

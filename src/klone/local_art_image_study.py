@@ -60,7 +60,7 @@ def analyze_image(path):
         white = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
         rgb = Image.alpha_composite(white, rgba).convert("RGB")
         rgb.thumbnail((ANALYSIS_SIDE, ANALYSIS_SIDE), Image.Resampling.BOX)
-    pixels = list(rgb.getdata())
+    pixels = list(rgb.get_flattened_data())
     width, height = rgb.size
     count = len(pixels)
     luminance = [_luminance(p) for p in pixels]

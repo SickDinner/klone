@@ -37,7 +37,14 @@ class SpatialInformationV93(unittest.TestCase):
 
     def test_vertical_stripes(self):
         row = self.rows["vertical_stripes"]
-        self.assertEqual(row["horizontal"]["joint_counts"], self.rows["checkerboard"]["horizontal"]["joint_counts"])
+        # Each stripe row has 16 transitions 0->1 and 15 transitions 1->0.
+        # There is no wraparound; checkerboard rows alternate their starting bit.
+        horizontal = row["horizontal"]
+        self.assertEqual(horizontal["joint_counts"], {"00": 0, "01": 512, "10": 480, "11": 0})
+        self.assertAlmostEqual(horizontal["conditional_second_given_first_bits"], 0)
+        expected_entropy = -sum(p * math.log2(p) for p in (16/31, 15/31))
+        self.assertAlmostEqual(horizontal["mutual_information_bits"], expected_entropy)
+        self.assertLess(horizontal["mutual_information_bits"], 1)
         self.assertEqual(row["vertical"]["joint_counts"], {"00": 496, "01": 0, "10": 0, "11": 496})
         self.assertEqual(row["vertical"]["mutual_information_bits"], 1)
 

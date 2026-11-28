@@ -18,6 +18,16 @@ def compare_artworks(kind, first, second):
     archive = creative_archive([(kind, first), (kind, second)])
     records = {r["record_id"]: r for r in archive["records"]}
     a, b = (records[s["record_id"]] for s in archive["selections"])
+    return _compare_records(a, b)
+
+
+def _compare_records(a, b):
+    """Compare internally generated artwork records without rereading media."""
+    kind = a["media_kind"]
+    if kind not in ("image", "audio", "lyrics") or b["media_kind"] != kind:
+        raise ValueError("comparison requires two records of the same artwork kind")
+    if a["report_schema"] != b["report_schema"]:
+        raise ValueError("comparison requires matching report schemas")
     x, y = a["report"], b["report"]
     metrics = []
 

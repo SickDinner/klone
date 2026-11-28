@@ -40,7 +40,7 @@ line; their corresponding PR comments record that limitation.
 | Mathematical art | Escape-time fractals, cellular patterns, Fourier and golden-angle examples | Finite demonstrations, not biological or physical models |
 | Musical mathematics | Bounded circular pulses, selected tuning ratios, original synthetic audio | Not universal tuning or perceptual preference |
 | Comparative experiments | Fixed abstract artworks, spatial pair statistics, translation and metric collisions | No representative art corpus |
-| Exhibition | Fixed offline museum, five sections, 28 media objects and three research panels | Browser and playback review still pending |
+| Exhibition | Fixed offline museum, five sections, 28 media objects and three research panels | Owner-reported mobile browser and playback checks passed; accessibility review pending |
 
 ## Museum baseline
 
@@ -70,13 +70,17 @@ calculations; it is not independent external research validation.
 | GitHub CI at v9.9 baseline | Observed pass |
 | v9.8 museum inventory and programmatic media checks | Observed pass |
 | v7.1 dashboard mobile screenshots | Previously observed |
-| v9.8 museum actual browser display and navigation | Pending |
-| Playback and listening review | Pending |
+| v9.8 museum actual browser display and navigation | Owner-reported pass |
+| Functional playback of three audio exhibits | Owner-reported pass |
 | Desktop and assistive technology review | Pending |
 | Standalone clean-environment creative-only verification | Pending |
 | External expert review and representative annotated data | Pending |
 | Licensing and redistribution review | Unconfirmed |
 | Release authorization | Deferred by owner |
+
+## Owner-reported manual creative exhibition review
+
+[Owner report, eight of eight checks passed](https://github.com/SickDinner/klone/pull/256#issuecomment-7236507928): all five navigation links, all 25 images, playback of all three audio exhibits, mobile text legibility, zoom, portrait and landscape orientation, research panels and offline operation. Browser/version and exact offline test procedure were not specified. Keyboard and assistive technology behavior were not reported. Functional playback does not establish listener preference or aesthetic merit.
 
 ## Manual creative exhibition review
 

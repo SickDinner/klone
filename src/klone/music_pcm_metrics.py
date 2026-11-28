@@ -11,7 +11,9 @@ import struct
 import wave
 from pathlib import Path
 
-MAX_FRAMES = 480_000
+MAX_DURATION_SECONDS = 600
+MAX_FRAMES = 96_000 * MAX_DURATION_SECONDS
+CHUNK_FRAMES = 16_384
 
 
 def analyze_music_wav(path: Path) -> dict:
@@ -21,25 +23,38 @@ def analyze_music_wav(path: Path) -> dict:
         frames = source.getnframes()
         if (source.getsampwidth() != 2 or channels not in (1, 2)
                 or not 8000 <= rate <= 96000 or not 0 < frames <= MAX_FRAMES
+                or frames > rate * MAX_DURATION_SECONDS
                 or source.getcomptype() != "NONE"):
             raise ValueError("Expected bounded mono/stereo 16-bit PCM WAV")
-        raw = source.readframes(frames)
-    if len(raw) != frames * channels * 2:
-        raise ValueError("Truncated PCM data")
-    samples = [item[0] for item in struct.iter_unpack("<h", raw)]
+        totals = [0] * channels
+        squares = [0] * channels
+        peaks = [0] * channels
+        zeros = [0] * channels
+        full = [0] * channels
+        remaining = frames
+        while remaining:
+            take = min(CHUNK_FRAMES, remaining)
+            raw = source.readframes(take)
+            if len(raw) != take * channels * 2:
+                raise ValueError("Truncated PCM data")
+            samples = struct.unpack("<" + "h" * (take * channels), raw)
+            for channel in range(channels):
+                values = samples[channel::channels]
+                totals[channel] += sum(values)
+                squares[channel] += sum(x * x for x in values)
+                peaks[channel] = max(peaks[channel], max(abs(x) for x in values))
+                zeros[channel] += values.count(0)
+                full[channel] += values.count(-32768) + values.count(32767)
+            remaining -= take
     results = []
     for channel in range(channels):
-        values = samples[channel::channels]
-        squares = sum(x * x for x in values)
-        peak = max(abs(x) for x in values) / 32768
-        rms = math.sqrt(squares / frames) / 32768
         results.append({
             "channel": channel,
-            "peak": round(peak, 8),
-            "rms": round(rms, 8),
-            "mean": round(sum(values) / frames / 32768, 8),
-            "zero_fraction": round(values.count(0) / frames, 8),
-            "full_scale_fraction": round(sum(x in (-32768, 32767) for x in values) / frames, 8),
+            "peak": round(peaks[channel] / 32768, 8),
+            "rms": round(math.sqrt(squares[channel] / frames) / 32768, 8),
+            "mean": round(totals[channel] / frames / 32768, 8),
+            "zero_fraction": round(zeros[channel] / frames, 8),
+            "full_scale_fraction": round(full[channel] / frames, 8),
         })
     return {
         "schema": "klone.music_pcm_metrics.v1",

@@ -10,6 +10,7 @@ from .artwork_color_metrics import artwork_color_metrics
 from .music_clip_spectrum import music_clip_spectrum
 from .written_verse_rhythm import written_verse_rhythm
 from .lyrics_metrics import MAX_BYTES
+from .creative_dashboard import render_creative_dashboard
 
 
 def compare_palettes(before: dict, after: dict) -> dict:
@@ -49,12 +50,16 @@ def main(argv=None):
     parser.add_argument("--artwork", type=Path, required=True)
     parser.add_argument("--music-clip", type=Path, required=True)
     parser.add_argument("--lyrics", type=Path, required=True)
+    parser.add_argument("--format", choices=("json", "html"), default="json")
     args = parser.parse_args(argv)
     try:
         report = creative_project_report(args.artwork, args.music_clip, args.lyrics)
     except (ValueError, OSError, EOFError, wave.Error) as exc:
         parser.error(str(exc))
-    print(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False))
+    if args.format == "html":
+        print(render_creative_dashboard(report))
+    else:
+        print(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False))
     return 0
 
 

@@ -114,18 +114,19 @@ def render_museum():
             if medium == "audio/wav":
                 content = f'<audio controls preload="none" aria-label="{name}" src="{uri}">Audio unavailable.</audio>'
             else:
-                content = f'<img loading="lazy" alt="{name}" src="{uri}">'
+                description = escape(item["description"], quote=True)
+                content = f'<img loading="lazy" alt="{name}. {description}" src="{uri}">'
             cards.append(f"<article><h3>{name}</h3>{content}<p>"
                          + escape(item["description"]) + "</p></article>")
         for panel in room["panels"]:
             content = "<p>" + escape(panel["description"]) + "</p>"
             if "text" in panel:
-                content += "<pre>" + escape(panel["text"]) + "</pre>"
+                content += '<pre lang="fi">' + escape(panel["text"]) + "</pre>"
             content += "<dl>" + "".join("<dt>" + escape(str(k)) + "</dt><dd>"
                                         + escape(str(v)) + "</dd>"
                                         for k, v in panel["facts"]) + "</dl>"
             cards.append("<article><h3>" + escape(panel["title"]) + "</h3>" + content + "</article>")
-        sections.append(f'<section id="{key}"><h2>{title}</h2><div class="gallery">'
+        sections.append(f'<section id="{key}" aria-labelledby="{key}-heading"><h2 id="{key}-heading">{title}</h2><div class="gallery">'
                         + "".join(cards) + "</div></section>")
     return (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
@@ -133,11 +134,15 @@ def render_museum():
         '<title>KLONE Creative Research Museum</title><style>'
         ':root{color-scheme:light dark}*{box-sizing:border-box}'
         'body{font:16px/1.5 system-ui;max-width:76rem;margin:1rem auto;padding:0 1rem}'
-        'nav{display:flex;flex-wrap:wrap;gap:1rem}section{margin:2rem 0}'
+        'nav{display:flex;flex-wrap:wrap;gap:.5rem}section{margin:2rem 0;scroll-margin-top:1rem}'
+        'nav a{display:inline-flex;align-items:center;min-height:44px;padding:.5rem .75rem;'
+        'text-decoration:underline;overflow-wrap:anywhere}'
+        'a:focus-visible,audio:focus-visible{outline:3px solid currentColor;outline-offset:3px}'
         '.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr));gap:1rem}'
         'article{border:1px solid #888;border-radius:.75rem;padding:1rem;min-width:0}'
         'img{display:block;width:100%;height:auto;max-height:20rem;object-fit:contain}'
-        'audio{width:100%}pre{white-space:pre-wrap;font:inherit}dd{margin:0 0 .5rem}'
+        'audio{width:100%;max-width:100%}pre{white-space:pre-wrap;font:inherit;overflow-wrap:anywhere}'
+        'dt,dd,h3,p{overflow-wrap:anywhere}dd{margin:0 0 .5rem}'
         '</style></head><body><main><h1>KLONE Creative Research Museum</h1>'
         '<p>Five curated rooms of mathematical art, original music and research.</p>'
         '<nav aria-label="Museum rooms">' + "".join(links) + "</nav>"

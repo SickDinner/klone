@@ -228,6 +228,44 @@ class ServiceIdentityReceiptV35Tests(unittest.TestCase):
                 expected_nonce=NONCE, now=NOW + 1,
             )
 
+    def test_audit_chain_rejects_duplicate_event_and_receipt_ids(self):
+        identity_receipt = signed("service_identity", identity_subject())
+        identity = verified_identity(identity_receipt)
+
+        first = signed(
+            "audit_event", audit_subject(identity, event_time=NOW),
+            receipt_id="00000000-0000-4000-8000-000000000001",
+        )
+        duplicate_event = signed(
+            "audit_event",
+            audit_subject(identity, previous=receipt_sha256(first), event_time=NOW + 1),
+            issued_at=NOW + 1,
+            receipt_id="00000000-0000-4000-8000-000000000002",
+        )
+        duplicate_event["body"]["subject"]["event_id"] = first["body"]["subject"]["event_id"]
+        duplicate_event["signature"] = base64.urlsafe_b64encode(
+            PRIVATE.sign(canonical_json(duplicate_event["body"]))
+        ).decode().rstrip("=")
+        with self.assertRaisesRegex(ReceiptError, "duplicate_audit_event_id"):
+            verify_audit_chain(
+                [first, duplicate_event], trusted_public_keys=KEYS,
+                identity_receipt=identity_receipt, expected_service_id="main-api",
+                expected_commit_sha=COMMIT, expected_nonce=NONCE, now=NOW + 1,
+            )
+
+        duplicate_receipt_id = signed(
+            "audit_event",
+            audit_subject(identity, previous=receipt_sha256(first), event_time=NOW + 1),
+            issued_at=NOW + 1,
+            receipt_id=first["body"]["receipt_id"],
+        )
+        with self.assertRaisesRegex(ReceiptError, "duplicate_audit_receipt_id"):
+            verify_audit_chain(
+                [first, duplicate_receipt_id], trusted_public_keys=KEYS,
+                identity_receipt=identity_receipt, expected_service_id="main-api",
+                expected_commit_sha=COMMIT, expected_nonce=NONCE, now=NOW + 1,
+            )
+
     def test_receipt_lifetime_is_bounded(self):
         receipt = signed("service_identity", identity_subject(), ttl=901)
         with self.assertRaisesRegex(ReceiptError, "invalid_receipt_lifetime"):

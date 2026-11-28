@@ -383,7 +383,7 @@ def verify_audit_chain(
     identity_receipt: Mapping, expected_service_id: str,
     expected_commit_sha: str, expected_nonce: str, now: int, max_age: int = 300,
 ) -> list[dict]:
-    """Verify a bounded ordered chain; every link is signed and identity-bound."""
+    """Verify a bounded ordered chain with unique IDs and signed links."""
     if type(receipts) not in (list, tuple) or not 1 <= len(receipts) <= 1000:
         raise ReceiptError("invalid_audit_chain_length")
     identity = verify_service_identity_receipt(
@@ -394,15 +394,24 @@ def verify_audit_chain(
     verified = []
     previous = "0" * 64
     last_event_time = -1
+    seen_event_ids = set()
+    seen_receipt_ids = set()
     for receipt in receipts:
         event = _verify_audit_event(
             receipt, trusted_public_keys=trusted_public_keys, identity=identity,
             expected_nonce=expected_nonce, now=now, max_age=max_age,
         )
+        receipt_id = receipt["body"]["receipt_id"]
+        if event["event_id"] in seen_event_ids:
+            raise ReceiptError("duplicate_audit_event_id")
+        if receipt_id in seen_receipt_ids:
+            raise ReceiptError("duplicate_audit_receipt_id")
         if event["previous_receipt_sha256"] != previous:
             raise ReceiptError("audit_chain_broken")
         if event["event_time"] < last_event_time:
             raise ReceiptError("audit_chain_time_order")
+        seen_event_ids.add(event["event_id"])
+        seen_receipt_ids.add(receipt_id)
         previous = event["receipt_sha256"]
         last_event_time = event["event_time"]
         verified.append(event)

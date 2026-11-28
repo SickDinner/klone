@@ -47,16 +47,21 @@ def render_song_html(report: dict) -> str:
     body = table("Lyrics", [(key, lyrics[key]) for key in (
         "line_count", "word_count", "unique_word_count",
         "type_token_ratio", "repeated_line_occurrences")])
+    unavailable = "Not recorded in this report version"
     body += table("Lexical diversity (MATTR)", [
-        (key + " tokens", value if value is not None else "Insufficient tokens")
-        for key, value in lyrics["mattr"].items()
+        (key + " tokens", ("Insufficient tokens" if lyrics["mattr"][key] is None
+                          else lyrics["mattr"][key])
+         if key in lyrics.get("mattr", {}) else unavailable)
+        for key in ("10", "25", "50")
     ])
     body += table("Orthographic patterns", [
-        ("Adjacent initial-letter matches", lyrics["adjacent_initial_matches"]),
-        ("Eligible adjacent word pairs", lyrics["adjacent_word_pairs"]),
+        ("Adjacent initial-letter matches", lyrics.get("adjacent_initial_matches", unavailable)),
+        ("Eligible adjacent word pairs", lyrics.get("adjacent_word_pairs", unavailable)),
     ])
     for distance, stats in lyrics.get("orthographic_end_patterns", {}).items():
         body += table("Written line endings (distance " + distance + ")", list(stats.items()))
+    if "orthographic_end_patterns" not in lyrics:
+        body += table("Written line endings", [("Availability", unavailable)])
     body += table("Sections", [(section["label"],
                                 f"{section['line_count']} lines, {section['word_count']} words")
                                for section in lyrics["sections"]])
@@ -71,6 +76,9 @@ def render_song_html(report: dict) -> str:
                 ("Crest factor (dB)", channel["crest_factor_db"]),
                 *channel["one_second_rms"].items(),
             ])
+        else:
+            body += table("Channel " + str(channel["channel"] + 1) + " dynamics",
+                          [("Availability", unavailable)])
     limitations = report["limitations"] + lyrics["limitations"] + audio["limitations"]
     body += "<h2>Limitations</h2><ul>" + "".join(
         "<li>" + escape(item) + "</li>" for item in limitations) + "</ul>"

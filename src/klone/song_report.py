@@ -55,6 +55,8 @@ def render_song_html(report: dict) -> str:
         ("Adjacent initial-letter matches", lyrics["adjacent_initial_matches"]),
         ("Eligible adjacent word pairs", lyrics["adjacent_word_pairs"]),
     ])
+    for distance, stats in lyrics.get("orthographic_end_patterns", {}).items():
+        body += table("Written line endings (distance " + distance + ")", list(stats.items()))
     body += table("Sections", [(section["label"],
                                 f"{section['line_count']} lines, {section['word_count']} words")
                                for section in lyrics["sections"]])
@@ -64,6 +66,11 @@ def render_song_html(report: dict) -> str:
         body += table("Channel " + str(channel["channel"] + 1),
                       [(key, channel[key]) for key in (
                           "peak", "rms", "mean", "zero_fraction", "full_scale_fraction")])
+        if "one_second_rms" in channel:
+            body += table("Channel " + str(channel["channel"] + 1) + " dynamics", [
+                ("Crest factor (dB)", channel["crest_factor_db"]),
+                *channel["one_second_rms"].items(),
+            ])
     limitations = report["limitations"] + lyrics["limitations"] + audio["limitations"]
     body += "<h2>Limitations</h2><ul>" + "".join(
         "<li>" + escape(item) + "</li>" for item in limitations) + "</ul>"

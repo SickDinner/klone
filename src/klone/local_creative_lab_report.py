@@ -12,7 +12,7 @@ import wave
 
 from PIL import Image
 from .local_creative_archive import creative_archive
-from .local_art_comparison import compare_artworks
+from .local_art_comparison import _compare_records
 from .art_metric_validation import validation_study
 
 MAX_COMPARISONS = 3
@@ -108,8 +108,8 @@ def render_lab(archive, comparisons, validation):
         '<!doctype html><html lang="en"><head><meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; base-uri \'none\'; form-action \'none\'">',
-        '<title>KLONE V11.8 | Creative laboratory</title><style>',CSS,
-        '</style></head><body><main><header><p class="muted">KLONE / CREATIVE LAB / V11.8</p>',
+        '<title>KLONE V12.1 | Creative laboratory</title><style>',CSS,
+        '</style></head><body><main><header><p class="muted">KLONE / CREATIVE LAB / V12.1</p>',
         '<h1>Local creative laboratory</h1><p>Descriptive artwork research, not a quality ranking.</p></header>',
         '<nav aria-label="Report sections"><a href="#inventory">Inventory</a><a href="#artworks">Artworks</a>',
         '<a href="#comparisons">Comparisons</a><a href="#validation">Validation</a>',
@@ -129,22 +129,23 @@ def render_lab(archive, comparisons, validation):
         out.extend(['<article><h3>Artwork ',_e(i),' / ',_e(record["media_kind"]),'</h3>',
                     '<p>Source SHA-256: <code>',_e(record["source_sha256"]),'</code></p>',
                     '<p>Report SHA-256: <code>',_e(record["report_sha256"]),'</code></p>',
-                    _record_summary(record), _details("Complete artwork record",record), '</article>'])
+                    _record_summary(record), '<h4>Method limitations</h4>', _limits(record["report"]["limitations"]), _details("Complete artwork record",record), '</article>'])
     out.extend(['</section><section id="comparisons"><h2>Explicit artwork comparisons</h2>',
-                '<p>Order is caller-selected. Differences are descriptive, not improvements or declines.</p>'])
+                '<p>Comparisons reuse selected artwork records from this collection. Order is caller-selected. Differences are descriptive, not improvements or declines.</p>'])
     if not comparisons:
         out.append("<p>No comparisons selected.</p>")
     for i,r in enumerate(comparisons,1):
         out.extend(['<article><h3>Comparison ',_e(i),' / ',_e(r["media_kind"]),'</h3>',
                     '<p>First: <code>',_e(r["first_record"]["record_id"]),'</code></p>',
                     '<p>Second: <code>',_e(r["second_record"]["record_id"]),'</code></p>',
-                    _table(("Metric","First","Second","Delta","Unit","Status"),
+                    _table(("Metric","First","Second","Delta","Unit","Status","Note"),
                            [(m["metric"],m["first"],m["second"],m["delta_second_minus_first"],
-                             m["unit"],m["status"]) for m in r["metrics"]],
+                             m["unit"],m["status"],m["note"]) for m in r["metrics"]],
                            "Signed differences; undefined or mismatched deltas are not zeros"),
                     _details("Complete comparison report",r),'</article>'])
     out.extend(['</section><section id="validation"><h2>Controlled synthetic validation</h2>',
                 '<p>These checks concern predefined synthetic fixtures, not the selected artworks or human observers.</p>',
+                _table(("Status","Count"),sorted(validation["status_counts"].items()),"Validation totals"),
                 _table(("Check","Domain","Status","Scope"),
                        [(c["id"],c["domain"],c["status"],c["scope"]) for c in validation["checks"]],
                        "Numerical validation outcomes"),
@@ -153,15 +154,31 @@ def render_lab(archive, comparisons, validation):
                 _limits(archive["limitations"]),_limits(validation["limitations"]),
                 '<p>Original media and file paths are not included. Fingerprints are not authenticated provenance.</p>',
                 _details("Complete collection report",archive),'</section>',
-                '<footer class="muted">KLONE V11.8 / Offline static report</footer></main></body></html>'])
+                '<footer class="muted">KLONE V12.1 / Offline static report</footer></main></body></html>'])
     return "".join(out)
 
 
 def build_lab(items, comparisons=()):
     if len(comparisons) > MAX_COMPARISONS:
         raise ValueError("at most three explicit comparisons")
+    # Path keys are local to this invocation and never enter the report.
+    # Require the same selected path (Path spelling), not filesystem aliases.
+    items = [(kind, Path(path)) for kind, path in items]
+    pairs = [(kind, Path(first), Path(second)) for kind, first, second in comparisons]
+    selected = set(items)
+    if any((kind, first) not in selected or (kind, second) not in selected
+           for kind, first, second in pairs):
+        raise ValueError("comparison endpoints must be selected with --item")
     archive = creative_archive(items)
-    reports = [compare_artworks(kind,first,second) for kind,first,second in comparisons]
+    records = {r["record_id"]: r for r in archive["records"]}
+    by_selection = {}
+    for key, selection in zip(items, archive["selections"], strict=True):
+        record = records[selection["record_id"]]
+        if key in by_selection and by_selection[key]["record_id"] != record["record_id"]:
+            raise ValueError("repeated artwork selection changed during analysis")
+        by_selection[key] = record
+    reports = [_compare_records(by_selection[(kind,first)], by_selection[(kind,second)])
+               for kind, first, second in pairs]
     validation = validation_study()
     return render_lab(archive,reports,validation), validation["status_counts"].get("failed",0)
 
@@ -169,7 +186,8 @@ def build_lab(items, comparisons=()):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--item",nargs=2,action="append",required=True,metavar=("KIND","PATH"))
-    parser.add_argument("--compare",nargs=3,action="append",default=[],metavar=("KIND","FIRST","SECOND"))
+    parser.add_argument("--compare",nargs=3,action="append",default=[],metavar=("KIND","FIRST","SECOND"),
+                        help="Both paths must be selected with --item for the same medium.")
     args = parser.parse_args(argv)
     try:
         document, failures = build_lab(args.item,args.compare)

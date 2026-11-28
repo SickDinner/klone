@@ -53,6 +53,12 @@ def analyze_lyrics(text: str) -> dict:
     line_word_counts = []
     adjacent_initial_matches = 0
     adjacent_word_pairs = 0
+    endings = []
+    suffix_patterns = {
+        str(distance): {"eligible_pairs": 0, "identical_end_words": 0,
+                        "suffix_2": 0, "suffix_3": 0, "suffix_4": 0}
+        for distance in (1, 2)
+    }
 
     def flush():
         if body or label != "unlabeled":
@@ -71,10 +77,29 @@ def analyze_lyrics(text: str) -> dict:
             flush()
             label = marker[1].strip()
             body = []
+            endings = []
             continue
         body.append(line)
         tokens = [word.casefold() for word in _WORD.findall(line)]
         words.extend(tokens)
+        ending = tokens[-1] if tokens and tokens[-1].isalpha() else None
+        for distance in (1, 2):
+            if ending is None or len(endings) < distance:
+                continue
+            previous = endings[-distance]
+            if previous is None:
+                continue
+            stats = suffix_patterns[str(distance)]
+            stats["eligible_pairs"] += 1
+            if previous == ending:
+                stats["identical_end_words"] += 1
+                continue
+            for size in (2, 3, 4):
+                if min(len(previous), len(ending)) >= size and previous[-size:] == ending[-size:]:
+                    stats[f"suffix_{size}"] += 1
+        endings.append(ending)
+        if len(endings) > 2:
+            endings.pop(0)
         line_word_counts.append(len(tokens))
         for first, second in zip(tokens, tokens[1:]):
             if first[0].isalpha() and second[0].isalpha():
@@ -93,6 +118,7 @@ def analyze_lyrics(text: str) -> dict:
         "type_token_ratio": round(len(set(words)) / len(words), 8) if words else None,
         "repeated_line_occurrences": sum(v - 1 for v in frequencies.values()),
         "sections": sections,
+        "orthographic_end_patterns": suffix_patterns,
         "mattr": {str(window): moving_average_ttr(words, window)
                   for window in (10, 25, 50)},
         "line_word_counts": line_word_counts,
@@ -104,6 +130,7 @@ def analyze_lyrics(text: str) -> dict:
             "Repeated lines use case and whitespace normalization, not semantic equivalence.",
             "MATTR compares fixed token windows; null means insufficient tokens.",
             "Initial-letter matches are orthographic, not validated phonetic alliteration.",
+            "End-pattern counts compare written suffixes within sections at distances 1 and 2; nested counts exclude identical end words and are not phonetic rhyme.",
         ],
     }
 

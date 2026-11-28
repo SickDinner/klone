@@ -10,7 +10,7 @@ from klone.nordic_poetry import DEMO, main, poetry_study
 
 class NordicPoetryV95(unittest.TestCase):
     def test_harmony_categories(self):
-        r = poetry_study("yö talo äiti tie kesätalo xyz")
+        r = poetry_study("yö talo äiti tie kesätalo xkz")
         self.assertEqual(r["vowel_harmony_word_counts"], {
             "front": 2, "back": 1, "mixed_front_back": 1,
             "neutral_only": 1, "no_recognized_vowel": 1,

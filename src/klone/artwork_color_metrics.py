@@ -9,7 +9,7 @@ MAX_PIXELS = 4_000_000
 SAMPLE_SIDE = 128
 
 
-def artwork_color_metrics(path: Path) -> dict:
+def artwork_color_metrics(path: Path, *, full_histogram: bool = False) -> dict:
     """Analyze a bounded PNG/JPEG; composite transparency on white."""
     with Image.open(path) as source:
         if source.format not in {"PNG", "JPEG"}:
@@ -29,7 +29,7 @@ def artwork_color_metrics(path: Path) -> dict:
         bins[(red // 32, green // 32, blue // 32)] += 1
         neutral += max(red, green, blue) - min(red, green, blue) <= 16
     dominant = sorted(bins.items(), key=lambda item: (-item[1], item[0]))[:8]
-    return {
+    report = {
         "schema": "klone.artwork_color_metrics.v1",
         "sample_dimensions": list(rgb.size),
         "sample_pixels": count,
@@ -46,3 +46,11 @@ def artwork_color_metrics(path: Path) -> dict:
             "No object recognition or aesthetic quality inference.",
         ],
     }
+    if full_histogram:
+        report["full_histogram"] = {
+            "schema": "klone.sampled_rgb_counts.v1",
+            "sample_pixels": count,
+            "bins": [{"rgb_bin": list(key), "count": value}
+                     for key, value in sorted(bins.items())],
+        }
+    return report
